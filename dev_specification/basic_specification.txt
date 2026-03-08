@@ -1,0 +1,490 @@
+Pharmacy POS System
+Complete Software Requirement Specification (SRS)
+1. System Overview
+
+The Pharmacy POS System is designed to manage medicine sales, inventory, purchases, financial records, expiration tracking, and multi-branch operations for pharmacy businesses.
+
+The system must support:
+
+Medicine sales using barcode scanning
+
+Inventory tracking with batch and expiry management
+
+Financial management and reporting
+
+Multi-unit medicine sales (box, pack, tablet)
+
+Multi-branch store management
+
+Role-based access control
+
+The system should integrate with hardware devices such as:
+
+Barcode scanners
+
+Barcode printers
+
+Receipt printers
+
+2. User Roles & Access Control
+
+The system must support Role-Based Access Control (RBAC).
+
+2.1 Owner / Admin
+
+Full access to the system.
+
+Permissions:
+
+Manage system settings
+
+Manage users
+
+Manage branches
+
+View all reports
+
+Access financial reports
+
+2.2 Manager
+
+Permissions:
+
+Manage inventory
+
+Manage purchases
+
+Manage suppliers
+
+View sales reports
+
+Monitor staff activity
+
+2.3 Sales Staff (Cashier)
+
+Permissions:
+
+Process sales transactions
+
+Scan products
+
+Print receipts
+
+Handle returns
+
+View limited sales information
+
+3. POS Sales Module
+Core Features
+
+Fast POS interface
+
+Barcode scanning
+
+Product search by name or code
+
+Add items to cart
+
+Apply discounts
+
+Accept multiple payment methods
+
+Print receipts
+
+Process refunds or cancellations
+
+Supported Payment Types
+
+Cash
+
+Credit / Debit card
+
+Mobile payment
+
+Digital wallet
+
+4. Medicine Unit Conversion System
+
+Pharmacies sell medicines in multiple unit levels.
+
+Example structure:
+
+1 Box = 10 Cards
+1 Card = 10 Tablets
+
+The POS must support selling by:
+
+Box
+
+Bottle
+
+Pack / Card
+
+Single tablet
+
+The system must automatically convert and update inventory.
+
+Example:
+
+Stock = 1 box (100 tablets)
+
+Selling 3 tablets → stock becomes 97 tablets.
+
+5. Inventory Management
+
+The system must maintain real-time inventory tracking.
+
+Features
+
+Stock In / Stock Out
+
+Stock adjustment
+
+Real-time inventory updates
+
+Category management
+
+Product search
+
+Medicine Information
+
+Each medicine record must include:
+
+Medicine name
+
+Generic name
+
+Brand name
+
+Category
+
+Manufacturer
+
+Strength (e.g., 500mg)
+
+Packaging type
+
+Barcode
+
+Purchase price
+
+Selling price
+
+Minimum stock level
+
+6. Batch & Expiry Management
+
+Each stock entry must include:
+
+Batch number
+
+Expiry date
+
+Purchase date
+
+Supplier information
+
+FEFO (First Expire First Out)
+
+The POS must automatically sell medicine with the earliest expiry date first.
+
+Expiry Alerts
+
+The system must generate alerts for:
+
+90 days before expiry
+
+60 days before expiry
+
+30 days before expiry
+
+Expiry Reports
+
+Near-expiry medicine report
+
+Expired medicine report
+
+7. Purchase Management
+
+The system must support supplier purchasing workflow.
+
+Process
+
+Create purchase order
+
+Receive medicine from supplier
+
+Enter batch number and expiry
+
+Inventory updated automatically
+
+Purchase Record Information
+
+Supplier
+
+Invoice number
+
+Purchase date
+
+Medicine items
+
+Quantity
+
+Cost
+
+Payment status
+
+8. Supplier Management
+
+The system must store supplier information.
+
+Supplier Data
+
+Supplier name
+
+Contact phone
+
+Address
+
+Payment terms
+
+Outstanding balance
+
+Reports
+
+Supplier purchase history
+
+Supplier payment reports
+
+9. Customer Management
+
+Optional but recommended.
+
+Features
+
+Customer profile
+
+Phone number
+
+Purchase history
+
+Loyalty programs
+
+Discount eligibility
+
+10. Prescription Management
+
+For controlled medicines.
+
+Features
+
+Upload prescription images
+
+Store doctor information
+
+Link prescription to sale transaction
+
+Track prescription medicines
+
+11. Medicine Alternative Suggestion
+
+If a medicine is out of stock, the system should suggest alternatives.
+
+Example:
+
+Customer requests:
+
+Panadol
+
+System suggests:
+
+Paracetamol (Generic)
+
+Calpol
+
+Tylenol
+
+This helps avoid lost sales.
+
+12. Financial Management
+
+Track all financial activities.
+
+Income
+
+Sales revenue
+
+Other income
+
+Expenses
+
+Purchases
+
+Operational expenses
+
+Staff salary
+
+Financial Reports
+
+Profit & Loss
+
+Monthly financial report
+
+Yearly financial report
+
+13. Reporting & Analytics
+
+The system must generate business reports.
+
+Sales Reports
+
+Daily sales report
+
+Monthly sales report
+
+Yearly sales report
+
+Inventory Reports
+
+Current stock report
+
+Low stock report
+
+Expired medicine report
+
+Near-expiry medicine report
+
+Product Reports
+
+Best-selling medicines
+
+Slow-moving medicines
+
+Profit by product
+
+Staff Reports
+
+Sales by employee
+
+Branch Reports
+
+Sales by branch
+
+14. Stock Alert System
+Low Stock Alert
+
+The system must notify when stock reaches minimum level.
+
+Expiry Alert
+
+Warn medicines that will expire soon.
+
+15. Return & Refund Management
+Customer Returns
+
+Return products
+
+Adjust inventory
+
+Issue refund
+
+Supplier Returns
+
+Return defective medicines
+
+Return expired products
+
+16. Multi-Branch Management
+
+The system must support multiple pharmacy branches.
+
+Features
+
+Centralized database
+
+Branch-wise inventory
+
+Branch-wise sales tracking
+
+Stock transfer between branches
+
+Branch performance reports
+
+17. Hardware Integration
+
+The system must support integration with:
+
+Barcode Scanner
+
+Scan product barcode
+
+Automatically add item to POS
+
+Barcode Printer
+
+Print product barcode labels
+
+Receipt Printer
+
+Print POS transaction receipts
+
+18. Audit Log & Activity Tracking
+
+The system must track user activities.
+
+Examples:
+
+Login history
+
+Product price changes
+
+Inventory edits
+
+Transaction cancellations
+
+19. Dashboard
+
+The system must include a business dashboard.
+
+Dashboard Information
+
+Today’s sales
+
+Monthly revenue
+
+Low stock alerts
+
+Expiring medicines
+
+Best selling products
+
+Branch performance
+
+20. Data Backup & Security
+Backup
+
+Automatic daily backup
+
+Cloud backup option
+
+Security
+
+Secure login authentication
+
+Password encryption
+
+Role-based permissions
+
+21. Offline Mode
+
+If internet connection fails:
+
+POS must continue operating offline
+
+Data sync when connection restores
+
+22. Performance Requirements
+
+POS transactions must complete within 2 seconds
+
+Support multiple concurrent users

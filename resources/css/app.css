@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    input:focus, 
+    textarea:focus, 
+    select:focus {
+        --tw-ring-color: transparent !important;
+        --tw-ring-offset-width: 0px !important;
+        --tw-ring-width: 0px !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+}
