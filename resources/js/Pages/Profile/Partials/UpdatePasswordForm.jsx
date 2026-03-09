@@ -1,12 +1,17 @@
 import { useRef } from 'react';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
 import { useForm } from '@inertiajs/react';
 import { Transition } from '@headlessui/react';
+import { 
+    TextField, 
+    Button, 
+    Typography, 
+    Box, 
+    Stack,
+    CircularProgress,
+    Divider
+} from '@mui/material';
 
-export default function UpdatePasswordForm({ className }) {
+export default function UpdatePasswordForm() {
     const passwordInput = useRef();
     const currentPasswordInput = useRef();
 
@@ -37,76 +42,80 @@ export default function UpdatePasswordForm({ className }) {
     };
 
     return (
-        <section className={className}>
+        <Box component="section">
             <header>
-                <h2 className="text-lg font-medium text-gray-900">Update Password</h2>
-
-                <p className="mt-1 text-sm text-gray-600">
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    UPDATE PASSWORD
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     Ensure your account is using a long, random password to stay secure.
-                </p>
+                </Typography>
             </header>
 
-            <form onSubmit={updatePassword} className="mt-6 space-y-6">
-                <div>
-                    <InputLabel htmlFor="current_password" value="Current Password" />
-
-                    <TextInput
-                        id="current_password"
-                        ref={currentPasswordInput}
+            <form onSubmit={updatePassword}>
+                <Stack spacing={3}>
+                    <TextField
+                        label="Current Password"
+                        type="password"
+                        fullWidth
+                        size="small"
+                        inputRef={currentPasswordInput}
                         value={data.current_password}
                         onChange={(e) => setData('current_password', e.target.value)}
-                        type="password"
-                        className="mt-1 block w-full"
+                        error={!!errors.current_password}
+                        helperText={errors.current_password}
                         autoComplete="current-password"
                     />
 
-                    <InputError message={errors.current_password} className="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel htmlFor="password" value="New Password" />
-
-                    <TextInput
-                        id="password"
-                        ref={passwordInput}
+                    <TextField
+                        label="New Password"
+                        type="password"
+                        fullWidth
+                        size="small"
+                        inputRef={passwordInput}
                         value={data.password}
                         onChange={(e) => setData('password', e.target.value)}
-                        type="password"
-                        className="mt-1 block w-full"
+                        error={!!errors.password}
+                        helperText={errors.password}
                         autoComplete="new-password"
                     />
 
-                    <InputError message={errors.password} className="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel htmlFor="password_confirmation" value="Confirm Password" />
-
-                    <TextInput
-                        id="password_confirmation"
+                    <TextField
+                        label="Confirm Password"
+                        type="password"
+                        fullWidth
+                        size="small"
                         value={data.password_confirmation}
                         onChange={(e) => setData('password_confirmation', e.target.value)}
-                        type="password"
-                        className="mt-1 block w-full"
+                        error={!!errors.password_confirmation}
+                        helperText={errors.password_confirmation}
                         autoComplete="new-password"
                     />
 
-                    <InputError message={errors.password_confirmation} className="mt-2" />
-                </div>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Button 
+                            variant="contained" 
+                            type="submit" 
+                            disabled={processing}
+                            size="small"
+                        >
+                            {processing ? <CircularProgress size={20} color="inherit" /> : 'Save Password'}
+                        </Button>
 
-                <div className="flex items-center gap-4">
-                    <PrimaryButton disabled={processing}>Save</PrimaryButton>
-
-                    <Transition
-                        show={recentlySuccessful}
-                        enterFrom="opacity-0"
-                        leaveTo="opacity-0"
-                        className="transition ease-in-out"
-                    >
-                        <p className="text-sm text-gray-600">Saved.</p>
-                    </Transition>
-                </div>
+                        <Transition
+                            show={recentlySuccessful}
+                            enterFrom="opacity-0"
+                            leaveTo="opacity-0"
+                            className="transition ease-in-out"
+                        >
+                            <Typography variant="body2" color="success.main">
+                                Password updated.
+                            </Typography>
+                        </Transition>
+                    </Box>
+                </Stack>
             </form>
-        </section>
+        </Box>
     );
 }

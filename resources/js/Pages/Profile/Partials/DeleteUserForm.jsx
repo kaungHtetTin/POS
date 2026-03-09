@@ -1,13 +1,20 @@
 import { useRef, useState } from 'react';
-import DangerButton from '@/Components/DangerButton';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import Modal from '@/Components/Modal';
-import SecondaryButton from '@/Components/SecondaryButton';
-import TextInput from '@/Components/TextInput';
 import { useForm } from '@inertiajs/react';
+import { 
+    Button, 
+    Typography, 
+    Box, 
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+    TextField,
+    CircularProgress,
+    Divider
+} from '@mui/material';
 
-export default function DeleteUserForm({ className }) {
+export default function DeleteUserForm() {
     const [confirmingUserDeletion, setConfirmingUserDeletion] = useState(false);
     const passwordInput = useRef();
 
@@ -39,61 +46,71 @@ export default function DeleteUserForm({ className }) {
 
     const closeModal = () => {
         setConfirmingUserDeletion(false);
-
         reset();
     };
 
     return (
-        <section className={`space-y-6 ${className}`}>
+        <Box component="section">
             <header>
-                <h2 className="text-lg font-medium text-gray-900">Delete Account</h2>
-
-                <p className="mt-1 text-sm text-gray-600">
-                    Once your account is deleted, all of its resources and data will be permanently deleted. Before
-                    deleting your account, please download any data or information that you wish to retain.
-                </p>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }} color="error">
+                    DELETE ACCOUNT
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Once your account is deleted, all of its resources and data will be permanently deleted.
+                </Typography>
             </header>
 
-            <DangerButton onClick={confirmUserDeletion}>Delete Account</DangerButton>
+            <Button 
+                variant="outlined" 
+                color="error" 
+                onClick={confirmUserDeletion}
+                sx={{ mt: 3 }}
+                size="small"
+            >
+                Delete Account
+            </Button>
 
-            <Modal show={confirmingUserDeletion} onClose={closeModal}>
-                <form onSubmit={deleteUser} className="p-6">
-                    <h2 className="text-lg font-medium text-gray-900">
+            <Dialog open={confirmingUserDeletion} onClose={closeModal}>
+                <form onSubmit={deleteUser}>
+                    <DialogTitle>
                         Are you sure you want to delete your account?
-                    </h2>
-
-                    <p className="mt-1 text-sm text-gray-600">
-                        Once your account is deleted, all of its resources and data will be permanently deleted. Please
-                        enter your password to confirm you would like to permanently delete your account.
-                    </p>
-
-                    <div className="mt-6">
-                        <InputLabel htmlFor="password" value="Password" className="sr-only" />
-
-                        <TextInput
-                            id="password"
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText sx={{ mb: 3 }}>
+                            Once your account is deleted, all of its resources and data will be permanently deleted. 
+                            Please enter your password to confirm you would like to permanently delete your account.
+                        </DialogContentText>
+                        
+                        <TextField
+                            label="Password"
                             type="password"
-                            name="password"
-                            ref={passwordInput}
+                            fullWidth
+                            size="small"
+                            inputRef={passwordInput}
                             value={data.password}
                             onChange={(e) => setData('password', e.target.value)}
-                            className="mt-1 block w-3/4"
-                            isFocused
-                            placeholder="Password"
+                            error={!!errors.password}
+                            helperText={errors.password}
+                            autoFocus
                         />
-
-                        <InputError message={errors.password} className="mt-2" />
-                    </div>
-
-                    <div className="mt-6 flex justify-end">
-                        <SecondaryButton onClick={closeModal}>Cancel</SecondaryButton>
-
-                        <DangerButton className="ml-3" disabled={processing}>
-                            Delete Account
-                        </DangerButton>
-                    </div>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                        <Button onClick={closeModal} variant="outlined" size="small">
+                            Cancel
+                        </Button>
+                        <Button 
+                            type="submit" 
+                            variant="contained" 
+                            color="error" 
+                            disabled={processing}
+                            size="small"
+                        >
+                            {processing ? <CircularProgress size={20} color="inherit" /> : 'Delete Account'}
+                        </Button>
+                    </DialogActions>
                 </form>
-            </Modal>
-        </section>
+            </Dialog>
+        </Box>
     );
 }

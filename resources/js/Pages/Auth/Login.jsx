@@ -1,13 +1,10 @@
 import { useEffect } from 'react';
-import Checkbox from '@/Components/Checkbox';
-import GuestLayout from '@/Layouts/GuestLayout';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
+import AuthSplitLayout from '@/Layouts/AuthSplitLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { Box, Typography, TextField, Button, Checkbox as MuiCheckbox, FormControlLabel, Alert, Stack, useTheme } from '@mui/material';
 
 export default function Login({ status, canResetPassword }) {
+    const theme = useTheme();
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -31,67 +28,106 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <GuestLayout>
+        <AuthSplitLayout
+            title="Log in to your account"
+            subtitle="Enter your email and password to continue"
+            topBarContent={
+                <Typography variant="body2" color="text.secondary">
+                    No account?{' '}
+                    <Link 
+                        href={route('register')} 
+                        style={{ 
+                            color: theme.palette.primary.main, 
+                            fontWeight: 600,
+                            textDecoration: 'none'
+                        }}
+                    >
+                        Sign up
+                    </Link>
+                </Typography>
+            }
+        >
             <Head title="Log in" />
 
-            {status && <div className="mb-4 font-medium text-sm text-green-600">{status}</div>}
+            {status && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                    {status}
+                </Alert>
+            )}
 
             <form onSubmit={submit}>
-                <div>
-                    <InputLabel htmlFor="email" value="Email" />
-
-                    <TextInput
+                <Stack spacing={2.5}>
+                    <TextField
                         id="email"
                         type="email"
                         name="email"
+                        label="Email"
+                        placeholder="Enter your email"
                         value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        isFocused={true}
                         onChange={handleOnChange}
+                        autoComplete="username"
+                        autoFocus
+                        error={Boolean(errors.email)}
+                        helperText={errors.email}
+                        fullWidth
+                        size="small"
                     />
 
-                    <InputError message={errors.email} className="mt-2" />
-                </div>
-
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
-
-                    <TextInput
+                    <TextField
                         id="password"
                         type="password"
                         name="password"
+                        label="Password"
+                        placeholder="Enter your password"
                         value={data.password}
-                        className="mt-1 block w-full"
-                        autoComplete="current-password"
                         onChange={handleOnChange}
+                        autoComplete="current-password"
+                        error={Boolean(errors.password)}
+                        helperText={errors.password}
+                        fullWidth
+                        size="small"
                     />
 
-                    <InputError message={errors.password} className="mt-2" />
-                </div>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <FormControlLabel
+                            control={
+                                <MuiCheckbox
+                                    name="remember"
+                                    checked={Boolean(data.remember)}
+                                    onChange={(e) => setData('remember', e.target.checked)}
+                                    size="small"
+                                />
+                            }
+                            label={<Typography variant="body2">Remember me</Typography>}
+                        />
+                    </Box>
 
-                <div className="block mt-4">
-                    <label className="flex items-center">
-                        <Checkbox name="remember" value={data.remember} onChange={handleOnChange} />
-                        <span className="ml-2 text-sm text-gray-600">Remember me</span>
-                    </label>
-                </div>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                        {canResetPassword && (
+                            <Link
+                                href={route('password.request')}
+                                style={{ 
+                                    fontSize: '0.875rem',
+                                    color: theme.palette.text.secondary,
+                                    textDecoration: 'none'
+                                }}
+                            >
+                                Forgot your password?
+                            </Link>
+                        )}
 
-                <div className="flex items-center justify-end mt-4">
-                    {canResetPassword && (
-                        <Link
-                            href={route('password.request')}
-                            className="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={processing}
+                            size="small"
+                            sx={{ px: 4 }}
                         >
-                            Forgot your password?
-                        </Link>
-                    )}
-
-                    <PrimaryButton className="ml-4" disabled={processing}>
-                        Log in
-                    </PrimaryButton>
-                </div>
+                            Log in
+                        </Button>
+                    </Stack>
+                </Stack>
             </form>
-        </GuestLayout>
+        </AuthSplitLayout>
     );
 }

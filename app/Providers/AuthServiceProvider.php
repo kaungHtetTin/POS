@@ -25,6 +25,17 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        // Dynamically define Gates based on Permissions
+        try {
+            if (app()->runningInConsole() === false || app()->runningUnitTests()) {
+                \App\Models\Permission::all()->each(function ($permission) {
+                    Gate::define($permission->slug, function ($user) use ($permission) {
+                        return $user->hasPermission($permission->slug);
+                    });
+                });
+            }
+        } catch (\Exception $e) {
+            // Silence errors during migration or if table doesn't exist yet
+        }
     }
 }

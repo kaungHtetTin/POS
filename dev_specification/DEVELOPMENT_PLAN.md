@@ -1,20 +1,25 @@
-# Pharmacy POS System: Development Roadmap & Timeline
+# Pharmacy POS System: Development Roadmap & Timeline (Refined)
 
 This document outlines the step-by-step development process for the Pharmacy POS project, including technical milestones and estimated timeframes.
 
 ---
 
-## Phase 1: Core Foundation & Security (Current Phase)
+## Phase 1: Core Foundation & UI Framework (Current Phase)
 
 **Estimated Duration: 1 Week**
 
 - [x] **Project Initialization**: Laravel 9 + React + Vite + MUI setup.
 - [x] **Database Architecture**: Comprehensive UUID-based schema design.
 - [x] **Migrations & Models**: Implementation of all 24+ core tables and Eloquent models.
+- [x] **UI Foundation**:
+    - [x] High-density, compact, and flat MUI theme implementation.
+    - [x] Night Mode (Dark Mode) support with theme switcher.
+    - [x] Responsive sidebar layout and dashboard structure.
+    - [x] UI Component Showcase (Modals, Forms, Tables, Alerts).
 - [ ] **Authentication & RBAC**:
-    - Implement multi-role login (Owner, Manager, Cashier).
-    - Setup Middleware to protect routes based on roles.
-- [ ] **Profile Management**: User profile updates including image upload.
+    - [ ] Implement multi-role login (Owner, Manager, Cashier).
+    - [ ] Setup Middleware to protect routes based on roles.
+- [ ] **Profile Management**: User profile updates including profile picture upload.
 
 ---
 
@@ -23,11 +28,14 @@ This document outlines the step-by-step development process for the Pharmacy POS
 **Estimated Duration: 2 Weeks**
 
 - [ ] **Branch Management**: CRUD operations for pharmacy locations.
-- [ ] **Category & Unit Setup**: Manage medicine categories and the multi-unit system (Box, Card, Tablet).
-- [ ] **Tax Configuration**: Manage different tax types and default settings.
+- [ ] **Category & Unit Setup**:
+    - [ ] Manage medicine categories.
+    - [ ] Multi-unit system (Box, Card, Tablet) with conversion factors.
+- [ ] **Tax Configuration**: Manage different tax types (VAT, Sales Tax) and defaults.
 - [ ] **Product Management**:
-    - Add/Edit medicines with image upload and barcode generation.
-    - Define conversion factors for units (e.g., 1 Box = 100 Tablets).
+    - [ ] Add/Edit medicines with image upload.
+    - [ ] Barcode generation and SKU tracking.
+    - [ ] Unit conversion logic (e.g., 1 Box = 10 Cards = 100 Tablets).
 
 ---
 
@@ -35,12 +43,13 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **Supplier Management**: Track supplier details and outstanding balances.
-- [ ] **Purchase Management**:
-    - Workflow for ordering and receiving stock.
-    - Automatic creation of **Inventory Batches** with expiry dates.
-- [ ] **Stock Adjustments**: Manual adjustment for damages, returns, or audit corrections.
-- [ ] **Low Stock & Expiry Tracking**: Real-time alerts and dashboard widgets.
+- [ ] **Supplier Management**: Track supplier details, credit limits, and balances.
+- [ ] **Purchase Workflow**:
+    - [ ] Create purchase orders and receive stock.
+    - [ ] Automatic batch creation with expiry dates and cost tracking.
+- [ ] **Inventory Control**:
+    - [ ] Stock adjustments for damage/returns.
+    - [ ] Real-time low stock and expiry alerts (Dashboard widgets).
 
 ---
 
@@ -48,26 +57,26 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 3 Weeks**
 
-- [ ] **POS Interface Development**:
-    - High-speed product lookup and barcode scanning.
-    - Multi-unit selection (Box/Card/Item) with instant price calculation.
-    - Cart management and tax/discount calculation.
-- [ ] **Checkout Workflow**:
-    - Handle multiple payment methods (Cash, Card, Wallet).
-    - Integrate thermal printer for receipt generation.
-- [ ] **Prescription Tracking**: Upload and link prescriptions to sales.
+- [ ] **POS Interface**:
+    - [ ] High-speed search and barcode scanner integration.
+    - [ ] Multi-unit selection at checkout with auto-price adjustment.
+    - [ ] Cart management, tax calculation, and discounts.
+- [ ] **Checkout & Payments**:
+    - [ ] Split payments (Cash, Card, Wallet).
+    - [ ] Thermal receipt printing (80mm/58mm).
+- [ ] **Prescription Handling**: Upload and link digital prescriptions to sales records.
 
 ---
 
-## Phase 5: Offline-First & Synchronization
+## Phase 5: Offline-First & Sync Engine
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **IndexedDB Integration**: Setup Dexie.js to store product and sale data locally in the browser.
-- [ ] **Service Worker Implementation**: Enable PWA features for app availability during downtime.
-- [ ] **Sync Engine**:
-    - Background worker to push offline sales to the server once online.
-    - Conflict resolution logic for inventory and price updates.
+- [ ] **Offline Storage**: IndexedDB (Dexie.js) for local data persistence.
+- [ ] **PWA Features**: Service workers for offline app availability.
+- [ ] **Synchronization**:
+    - [ ] Background sync for sales data.
+    - [ ] Inventory conflict resolution during sync.
 
 ---
 
@@ -75,22 +84,22 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **Expense Management**: Track operational costs (Rent, Salaries, Electricity).
-- [ ] **Returns & Refunds**: Handle customer returns and supplier defective item returns.
+- [ ] **Expense Tracking**: Manage operational costs (Rent, Salaries, Utilities).
+- [ ] **Returns & Refunds**: Customer sales returns and supplier purchase returns.
 - [ ] **Reporting Engine**:
-    - Daily/Monthly Sales & Profit reports.
-    - Inventory valuation and expiry reports.
-    - Branch-wise performance analytics.
+    - [ ] Daily/Monthly Sales, Profit, and Tax reports.
+    - [ ] Inventory valuation and expiry forecasting.
+    - [ ] Branch performance analytics.
 
 ---
 
-## Phase 7: Testing, Hardware & Deployment
+## Phase 7: Deployment & Final Optimization
 
 **Estimated Duration: 1 Week**
 
-- [ ] **Hardware UAT**: Testing with physical barcode scanners and thermal printers.
-- [ ] **Data Backup System**: Configure automatic daily database dumps and cloud storage.
-- [ ] **Production Deployment**: Setup server environment (XAMPP/VPS) and finalize optimization.
+- [ ] **Hardware UAT**: Testing with scanners and printers in a live environment.
+- [ ] **Backup & Security**: Automatic daily DB backups and SSL configuration.
+- [ ] **Production Launch**: Optimized VPS/Server setup with monitoring.
 
 ---
 
@@ -98,9 +107,9 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 | Phase     | Focus                    | Duration                         |
 | :-------- | :----------------------- | :------------------------------- |
-| **1**     | Core Foundation          | 1 Week                           |
+| **1**     | Core Foundation & UI     | 1 Week (Ongoing)                 |
 | **2**     | Master Data              | 2 Weeks                          |
-| **3**     | Inventory                | 2 Weeks                          |
+| **3**     | Inventory & Suppliers    | 2 Weeks                          |
 | **4**     | POS Module               | 3 Weeks                          |
 | **5**     | Offline Sync             | 2 Weeks                          |
 | **6**     | Financials & Reports     | 2 Weeks                          |

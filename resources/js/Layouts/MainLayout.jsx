@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import { ColorModeContext } from '../app';
 import {
     AppBar,
@@ -33,6 +33,12 @@ import {
     Person as PersonIcon,
     Brightness4 as DarkModeIcon,
     Brightness7 as LightModeIcon,
+    AssignmentInd as RolesIcon,
+    VerifiedUser as PermissionsIcon,
+    PeopleAlt as StaffIcon,
+    Store as StoreIcon,
+    Category as CategoryIcon,
+    Straighten as UnitIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -57,13 +63,23 @@ export default function MainLayout({ children, header }) {
     };
 
     const menuItems = [
-        { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard') },
-        { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#' },
-        { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: '#' },
-        { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#' },
-        { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#' },
-        { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: '#' },
+        { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), permission: null },
+        { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', permission: 'process_sale' },
+        { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: '#', permission: 'manage_inventory' },
+        { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), permission: 'manage_inventory' },
+        { text: 'Units', icon: <UnitIcon fontSize="small" />, href: route('units.index'), permission: 'manage_inventory' },
+        { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', permission: 'process_sale' },
+        { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', permission: 'view_financial_reports' },
+        { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), permission: 'manage_users' },
+        { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), permission: 'manage_users' },
+        { text: 'Branch Management', icon: <StoreIcon fontSize="small" />, href: route('branches.index'), permission: 'manage_branches' },
+        { text: 'Permission', icon: <PermissionsIcon fontSize="small" />, href: route('permissions.index'), permission: 'manage_users' },
+        { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: route('settings.index'), permission: 'manage_branches' },
     ];
+
+    const filteredMenuItems = menuItems.filter(item => 
+        !item.permission || auth.user?.permissions?.includes(item.permission)
+    );
 
     const drawer = (
         <div>
@@ -74,7 +90,7 @@ export default function MainLayout({ children, header }) {
             </Toolbar>
             <Divider />
             <List dense>
-                {menuItems.map((item) => (
+                {filteredMenuItems.map((item) => (
                     <ListItem key={item.text} disablePadding>
                         <ListItemButton
                             component={Link}
@@ -95,6 +111,23 @@ export default function MainLayout({ children, header }) {
                         </ListItemButton>
                     </ListItem>
                 ))}
+            </List>
+            <Divider sx={{ my: 1 }} />
+            <List dense>
+                <ListItem disablePadding>
+                    <ListItemButton
+                        onClick={() => router.post(route('logout'))}
+                        sx={{ py: 0.5, color: 'error.main' }}
+                    >
+                        <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+                            <LogoutIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText 
+                            primary="Logout" 
+                            primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} 
+                        />
+                    </ListItemButton>
+                </ListItem>
             </List>
         </div>
     );
@@ -136,8 +169,8 @@ export default function MainLayout({ children, header }) {
                         <Tooltip title="Open settings">
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar 
-                                    alt={auth.user.name} 
-                                    src={auth.user.image_path} 
+                                    alt={auth.user?.name || 'User'} 
+                                    src={auth.user?.image_path ? `/storage/${auth.user.image_path}` : null} 
                                     sx={{ width: 32, height: 32 }}
                                 />
                             </IconButton>
@@ -160,11 +193,11 @@ export default function MainLayout({ children, header }) {
                         >
                             <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-                                <Typography textAlign="center">Profile</Typography>
+                                <Typography variant="body2">Profile</Typography>
                             </MenuItem>
-                            <MenuItem component={Link} href={route('logout')} method="post" as="button" onClick={handleCloseUserMenu} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }}>
                                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                                <Typography textAlign="center">Logout</Typography>
+                                <Typography variant="body2">Logout</Typography>
                             </MenuItem>
                         </Menu>
                     </Box>

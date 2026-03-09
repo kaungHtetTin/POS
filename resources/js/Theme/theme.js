@@ -57,6 +57,30 @@ export const getTheme = (mode) => createTheme({
         borderRadius: 4,
     },
     components: {
+        MuiCssBaseline: {
+            styleOverrides: {
+                body: {
+                    scrollbarColor: mode === 'light' ? '#bdbdbd #f5f5f5' : '#455a64 #101f33',
+                    '&::-webkit-scrollbar, & *::-webkit-scrollbar': {
+                        width: '8px',
+                        height: '8px',
+                    },
+                    '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': {
+                        background: mode === 'light' ? '#f5f5f5' : '#101f33',
+                        borderRadius: '10px',
+                    },
+                    '&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb': {
+                        background: mode === 'light' ? '#bdbdbd' : '#455a64',
+                        borderRadius: '10px',
+                        border: '2px solid',
+                        borderColor: mode === 'light' ? '#f5f5f5' : '#101f33',
+                    },
+                    '&::-webkit-scrollbar-thumb:hover, & *::-webkit-scrollbar-thumb:hover': {
+                        background: mode === 'light' ? '#9e9e9e' : '#607d8b',
+                    },
+                },
+            },
+        },
         MuiButton: {
             defaultProps: {
                 size: 'small',
