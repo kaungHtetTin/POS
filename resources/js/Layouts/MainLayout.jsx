@@ -20,11 +20,14 @@ import {
     MenuItem,
     Tooltip,
     useTheme,
+    Snackbar,
+    Alert,
 } from '@mui/material';
 import {
     Menu as MenuIcon,
     Dashboard as DashboardIcon,
     Inventory as InventoryIcon,
+    Medication as ProductIcon,
     ShoppingCart as POSIcon,
     People as CustomersIcon,
     Assessment as ReportsIcon,
@@ -39,6 +42,7 @@ import {
     Store as StoreIcon,
     Category as CategoryIcon,
     Straighten as UnitIcon,
+    Percent as TaxIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -46,9 +50,23 @@ const drawerWidth = 200; // More compact sidebar
 export default function MainLayout({ children, header }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth } = usePage().props;
+    const { auth, flash } = usePage().props;
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorElUser, setAnchorElUser] = useState(null);
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+    React.useEffect(() => {
+        if (flash.success || flash.error) {
+            setSnackbarOpen(true);
+        }
+    }, [flash]);
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbarOpen(false);
+    };
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -65,9 +83,10 @@ export default function MainLayout({ children, header }) {
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), permission: null },
         { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', permission: 'process_sale' },
-        { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: '#', permission: 'manage_inventory' },
+        { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), permission: 'manage_inventory' },
         { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), permission: 'manage_inventory' },
         { text: 'Units', icon: <UnitIcon fontSize="small" />, href: route('units.index'), permission: 'manage_inventory' },
+        { text: 'Tax Configuration', icon: <TaxIcon fontSize="small" />, href: route('taxes.index'), permission: 'manage_inventory' },
         { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', permission: 'process_sale' },
         { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', permission: 'view_financial_reports' },
         { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), permission: 'manage_users' },
@@ -240,6 +259,22 @@ export default function MainLayout({ children, header }) {
                 <Toolbar />
                 {children}
             </Box>
+
+            <Snackbar 
+                open={snackbarOpen} 
+                autoHideDuration={4000} 
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert 
+                    onClose={handleSnackbarClose} 
+                    severity={flash.error ? "error" : "success"} 
+                    variant="filled" 
+                    sx={{ width: '100%' }}
+                >
+                    {flash.success || flash.error}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

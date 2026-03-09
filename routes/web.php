@@ -8,6 +8,8 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\UnitController;
+use App\Http\Controllers\TaxController;
+use App\Http\Controllers\ProductController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -66,6 +68,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/units', [UnitController::class, 'store'])->name('units.store')->middleware('permission:manage_inventory');
     Route::patch('/units/{unit}', [UnitController::class, 'update'])->name('units.update')->middleware('permission:manage_inventory');
     Route::delete('/units/{unit}', [UnitController::class, 'destroy'])->name('units.destroy')->middleware('permission:manage_inventory');
+
+    Route::get('/taxes', [TaxController::class, 'index'])->name('taxes.index')->middleware('permission:manage_inventory');
+    Route::post('/taxes', [TaxController::class, 'store'])->name('taxes.store')->middleware('permission:manage_inventory');
+    Route::patch('/taxes/{tax}', [TaxController::class, 'update'])->name('taxes.update')->middleware('permission:manage_inventory');
+    Route::delete('/taxes/{tax}', [TaxController::class, 'destroy'])->name('taxes.destroy')->middleware('permission:manage_inventory');
+
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:manage_inventory');
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:manage_inventory');
+    Route::post('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:manage_inventory');
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:manage_inventory');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
 });
