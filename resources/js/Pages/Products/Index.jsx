@@ -40,9 +40,10 @@ import {
     Search as SearchIcon,
     FilterAlt as FilterIcon,
     Clear as ClearIcon,
+    AddCircleOutline as AddUnitIcon,
 } from '@mui/icons-material';
 
-export default function ProductIndex({ auth, products, categories, taxes, filters }) {
+export default function ProductIndex({ auth, products, categories, taxes, units, filters }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -128,6 +129,9 @@ export default function ProductIndex({ auth, products, categories, taxes, filter
         tax_method: 'Exclusive',
         status: 'Active',
         image: null,
+        product_units: [
+            { unit_id: '', conversion_factor: 1, selling_price: 0, is_base_unit: true }
+        ],
     });
 
     const handleOpen = (product = null) => {
@@ -148,6 +152,12 @@ export default function ProductIndex({ auth, products, categories, taxes, filter
                 tax_method: product.tax_method,
                 status: product.status,
                 image: null,
+                product_units: product.product_units.map(pu => ({
+                    unit_id: pu.unit_id,
+                    conversion_factor: pu.conversion_factor,
+                    selling_price: pu.selling_price,
+                    is_base_unit: Boolean(pu.is_base_unit)
+                }))
             });
         } else {
             setEditMode(false);
@@ -155,6 +165,31 @@ export default function ProductIndex({ auth, products, categories, taxes, filter
             reset();
         }
         setOpen(true);
+    };
+
+    const handleAddUnit = () => {
+        const newUnits = [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, is_base_unit: false }];
+        setData('product_units', newUnits);
+    };
+
+    const handleRemoveUnit = (index) => {
+        if (data.product_units[index].is_base_unit) return;
+        const newUnits = data.product_units.filter((_, i) => i !== index);
+        setData('product_units', newUnits);
+    };
+
+    const handleUnitChange = (index, field, value) => {
+        const newUnits = [...data.product_units];
+        newUnits[index][field] = value;
+        setData('product_units', newUnits);
+    };
+
+    const handleSetBaseUnit = (index) => {
+        const newUnits = data.product_units.map((unit, i) => ({
+            ...unit,
+            is_base_unit: i === index
+        }));
+        setData('product_units', newUnits);
     };
 
     const handleClose = () => {
@@ -571,7 +606,7 @@ export default function ProductIndex({ auth, products, categories, taxes, filter
                                 </FormControl>
                             </Grid>
 
-                            <Grid item xs={12} sm={8}>
+                            <Grid item xs={12}>
                                 <TextField
                                     label="Description"
                                     fullWidth
@@ -586,6 +621,134 @@ export default function ProductIndex({ auth, products, categories, taxes, filter
                             </Grid>
                         </Grid>
                     </DialogContent>
+                    
+                    {/* Unit Conversion Section (Systematic Grid) */}
+                    <Box sx={{ px: 3, pb: 3 }}>
+                        <Divider sx={{ mb: 2 }} />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', letterSpacing: 0.5 }}>
+                                UNIT CONVERSION & PRICING
+                            </Typography>
+                            <Button 
+                                size="small" 
+                                startIcon={<AddUnitIcon />} 
+                                onClick={handleAddUnit}
+                                variant="contained"
+                                color="primary"
+                            >
+                                Add Unit
+                            </Button>
+                        </Box>
+
+                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
+                            <Table size="small" sx={{ minWidth: 650 }}>
+                                <TableHead sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Unit Type</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Conversion Factor</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Selling Price</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }} align="right">Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {data.product_units.map((unit, index) => (
+                                        <TableRow 
+                                            key={index} 
+                                            sx={{ 
+                                                bgcolor: unit.is_base_unit ? 'rgba(0, 150, 136, 0.04)' : 'inherit',
+                                                '&:hover': { bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.02)' }
+                                            }}
+                                        >
+                                            <TableCell sx={{ py: 1.5 }}>
+                                                <FormControl fullWidth size="small" required>
+                                                    <Select
+                                                        value={unit.unit_id}
+                                                        onChange={(e) => handleUnitChange(index, 'unit_id', e.target.value)}
+                                                        displayEmpty
+                                                    >
+                                                        <MenuItem value="" disabled>Select Unit</MenuItem>
+                                                        {units.map(u => (
+                                                            <MenuItem key={u.id} value={u.id}>{u.name} ({u.short_name})</MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.5 }}>
+                                                <Stack direction="row" alignItems="center" spacing={1}>
+                                                    {!unit.is_base_unit && (
+                                                        <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                            1 Unit =
+                                                        </Typography>
+                                                    )}
+                                                    <TextField
+                                                        fullWidth
+                                                        size="small"
+                                                        type="number"
+                                                        value={unit.conversion_factor}
+                                                        onChange={(e) => handleUnitChange(index, 'conversion_factor', e.target.value)}
+                                                        disabled={unit.is_base_unit}
+                                                        placeholder={unit.is_base_unit ? "1 (Base Unit)" : "Factor"}
+                                                    />
+                                                    {!unit.is_base_unit && (
+                                                        <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                            Base
+                                                        </Typography>
+                                                    )}
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.5 }}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    type="number"
+                                                    value={unit.selling_price}
+                                                    onChange={(e) => handleUnitChange(index, 'selling_price', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.5 }} align="right">
+                                                <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                                                    <Tooltip title={unit.is_base_unit ? "Current Base Unit" : "Set as Base Unit"}>
+                                                        <Button 
+                                                            size="small" 
+                                                            variant={unit.is_base_unit ? "contained" : "outlined"}
+                                                            color={unit.is_base_unit ? "success" : "primary"}
+                                                            onClick={() => handleSetBaseUnit(index)}
+                                                            sx={{ 
+                                                                fontSize: '10px', 
+                                                                minWidth: '85px',
+                                                                height: '30px'
+                                                            }}
+                                                        >
+                                                            {unit.is_base_unit ? "Base Unit" : "Set Base"}
+                                                        </Button>
+                                                    </Tooltip>
+                                                    {!unit.is_base_unit && (
+                                                        <IconButton 
+                                                            size="small" 
+                                                            color="error" 
+                                                            onClick={() => handleRemoveUnit(index)}
+                                                            sx={{ border: '1px solid', borderColor: 'error.light' }}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                        {errors.product_units && (
+                            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                                {errors.product_units}
+                            </Typography>
+                        )}
+                    </Box>
+                    
                     <DialogActions sx={{ p: 2 }}>
                         <Button onClick={handleClose} size="small">Cancel</Button>
                         <Button 

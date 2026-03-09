@@ -15,7 +15,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with(['category', 'tax']);
+        $query = Product::with(['category', 'tax', 'product_units.unit']);
 
         // Search by name, generic name, brand name, or barcode
         if ($request->search) {
@@ -41,6 +41,7 @@ class ProductController extends Controller
             'products' => $query->latest()->get(),
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
+            'units' => Unit::all(),
             'filters' => $request->only(['search', 'category', 'status']),
         ]);
     }
@@ -61,6 +62,11 @@ class ProductController extends Controller
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:2048',
+            'product_units' => 'required|array|min:1',
+            'product_units.*.unit_id' => 'required|exists:units,id',
+            'product_units.*.conversion_factor' => 'required|numeric|min:1',
+            'product_units.*.selling_price' => 'required|numeric|min:0',
+            'product_units.*.is_base_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated) {
@@ -68,10 +74,14 @@ class ProductController extends Controller
                 $validated['image_path'] = $request->file('image')->store('product-images', 'public');
             }
 
-            Product::create($validated);
+            $product = Product::create($validated);
+
+            foreach ($validated['product_units'] as $unitData) {
+                $product->product_units()->create($unitData);
+            }
         });
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Medicine created successfully.');
     }
 
     public function update(Request $request, Product $product)
@@ -90,6 +100,11 @@ class ProductController extends Controller
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:2048',
+            'product_units' => 'required|array|min:1',
+            'product_units.*.unit_id' => 'required|exists:units,id',
+            'product_units.*.conversion_factor' => 'required|numeric|min:1',
+            'product_units.*.selling_price' => 'required|numeric|min:0',
+            'product_units.*.is_base_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated, $product) {
@@ -101,9 +116,15 @@ class ProductController extends Controller
             }
 
             $product->update($validated);
+
+            // Update product units
+            $product->product_units()->delete();
+            foreach ($validated['product_units'] as $unitData) {
+                $product->product_units()->create($unitData);
+            }
         });
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Medicine updated successfully.');
     }
 
     public function destroy(Product $product)

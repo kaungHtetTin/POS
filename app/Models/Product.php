@@ -44,6 +44,13 @@ class Product extends Model
 
     public function units()
     {
+        return $this->belongsToMany(Unit::class, 'product_units')
+                    ->withPivot(['id', 'conversion_factor', 'selling_price', 'is_base_unit'])
+                    ->withTimestamps();
+    }
+
+    public function product_units()
+    {
         return $this->hasMany(ProductUnit::class);
     }
 
