@@ -1,0 +1,1 @@
+import{a as c}from"./app-55a4e1f3.js";import{c as o}from"./Box-1a2bd992.js";const a=o(c("path",{d:"M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2m-5 12H9v-2h6zm5-7H4V4l16-.02z"}));export{a as I};

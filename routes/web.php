@@ -10,6 +10,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\PurchaseController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -78,6 +80,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:manage_inventory');
     Route::post('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:manage_inventory');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:manage_inventory');
+
+    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index')->middleware('permission:manage_inventory');
+    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store')->middleware('permission:manage_inventory');
+    Route::patch('/suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update')->middleware('permission:manage_inventory');
+    Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy')->middleware('permission:manage_inventory');
+
+    Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index')->middleware('permission:manage_inventory');
+    Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store')->middleware('permission:manage_inventory');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
 });

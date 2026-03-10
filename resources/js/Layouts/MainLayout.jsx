@@ -43,6 +43,8 @@ import {
     Category as CategoryIcon,
     Straighten as UnitIcon,
     Percent as TaxIcon,
+    LocalShipping as SupplierIcon,
+    ReceiptLong as PurchaseIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -81,19 +83,21 @@ export default function MainLayout({ children, header }) {
     };
 
     const menuItems = [
-        { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), permission: null },
-        { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', permission: 'process_sale' },
-        { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), permission: 'manage_inventory' },
-        { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), permission: 'manage_inventory' },
-        { text: 'Units', icon: <UnitIcon fontSize="small" />, href: route('units.index'), permission: 'manage_inventory' },
-        { text: 'Tax Configuration', icon: <TaxIcon fontSize="small" />, href: route('taxes.index'), permission: 'manage_inventory' },
-        { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', permission: 'process_sale' },
-        { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', permission: 'view_financial_reports' },
-        { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), permission: 'manage_users' },
-        { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), permission: 'manage_users' },
-        { text: 'Branch Management', icon: <StoreIcon fontSize="small" />, href: route('branches.index'), permission: 'manage_branches' },
-        { text: 'Permission', icon: <PermissionsIcon fontSize="small" />, href: route('permissions.index'), permission: 'manage_users' },
-        { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: route('settings.index'), permission: 'manage_branches' },
+        { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
+        { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },
+        { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_inventory' },
+        { text: 'Units', icon: <UnitIcon fontSize="small" />, href: route('units.index'), routePattern: 'units.*', permission: 'manage_inventory' },
+        { text: 'Tax Configuration', icon: <TaxIcon fontSize="small" />, href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_inventory' },
+        { text: 'Suppliers', icon: <SupplierIcon fontSize="small" />, href: route('suppliers.index'), routePattern: 'suppliers.*', permission: 'manage_inventory' },
+        { text: 'Purchases', icon: <PurchaseIcon fontSize="small" />, href: route('purchases.index'), routePattern: 'purchases.*', permission: 'manage_inventory' },
+        { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', routePattern: null, permission: 'view_financial_reports' },
+        { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
+        { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
+        { text: 'Branch Management', icon: <StoreIcon fontSize="small" />, href: route('branches.index'), routePattern: 'branches.*', permission: 'manage_branches' },
+        { text: 'Permission', icon: <PermissionsIcon fontSize="small" />, href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_users' },
+        { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_branches' },
     ];
 
     const filteredMenuItems = menuItems.filter(item => 
@@ -109,27 +113,43 @@ export default function MainLayout({ children, header }) {
             </Toolbar>
             <Divider />
             <List dense>
-                {filteredMenuItems.map((item) => (
+                {filteredMenuItems.map((item) => {
+                    const isActive = item.routePattern ? route().current(item.routePattern) : false;
+
+                    return (
                     <ListItem key={item.text} disablePadding>
                         <ListItemButton
                             component={Link}
                             href={item.href}
-                            selected={route().current(item.href.split('/').pop())}
-                            sx={{ py: 0.5 }}
+                            selected={isActive}
+                            sx={{
+                                py: 0.5,
+                                borderRadius: 1,
+                                mx: 0.5,
+                                '&.Mui-selected': {
+                                    bgcolor: 'action.selected',
+                                    borderLeft: '3px solid',
+                                    borderColor: 'primary.main',
+                                },
+                                '&.Mui-selected:hover': {
+                                    bgcolor: 'action.selected',
+                                },
+                            }}
                         >
                             <ListItemIcon sx={{ 
                                 minWidth: 40,
-                                color: route().current(item.href.split('/').pop()) ? 'primary.main' : 'inherit' 
+                                color: isActive ? 'primary.main' : 'inherit' 
                             }}>
                                 {item.icon}
                             </ListItemIcon>
                             <ListItemText 
                                 primary={item.text} 
-                                primaryTypographyProps={{ variant: 'body2' }} 
+                                primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} 
                             />
                         </ListItemButton>
                     </ListItem>
-                ))}
+                    );
+                })}
             </List>
             <Divider sx={{ my: 1 }} />
             <List dense>

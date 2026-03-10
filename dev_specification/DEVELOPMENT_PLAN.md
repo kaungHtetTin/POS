@@ -16,10 +16,10 @@ This document outlines the step-by-step development process for the Pharmacy POS
     - [x] Night Mode (Dark Mode) support with theme switcher.
     - [x] Responsive sidebar layout and dashboard structure.
     - [x] UI Component Showcase (Modals, Forms, Tables, Alerts).
-- [ ] **Authentication & RBAC**:
-    - [ ] Implement multi-role login (Owner, Manager, Cashier).
-    - [ ] Setup Middleware to protect routes based on roles.
-- [ ] **Profile Management**: User profile updates including profile picture upload.
+- [x] **Authentication & RBAC**:
+    - [x] Implement multi-role login (Owner, Manager, Cashier).
+    - [x] Setup Middleware to protect routes based on roles.
+- [x] **Profile Management**: User profile updates including profile picture upload.
 
 ---
 
@@ -27,15 +27,15 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **Branch Management**: CRUD operations for pharmacy locations.
-- [ ] **Category & Unit Setup**:
-    - [ ] Manage medicine categories.
-    - [ ] Multi-unit system (Box, Card, Tablet) with conversion factors.
-- [ ] **Tax Configuration**: Manage different tax types (VAT, Sales Tax) and defaults.
-- [ ] **Product Management**:
-    - [ ] Add/Edit medicines with image upload.
-    - [ ] Barcode generation and SKU tracking.
-    - [ ] Unit conversion logic (e.g., 1 Box = 10 Cards = 100 Tablets).
+- [x] **Branch Management**: CRUD operations for pharmacy locations.
+- [x] **Category & Unit Setup**:
+    - [x] Manage medicine categories.
+    - [x] Multi-unit system (Box, Card, Tablet) with conversion factors.
+- [x] **Tax Configuration**: Manage different tax types (VAT, Sales Tax) and defaults.
+- [x] **Product Management**:
+    - [x] Add/Edit medicines with image upload.
+    - [x] Barcode generation and SKU tracking.
+    - [x] Unit conversion logic (e.g., 1 Box = 10 Cards = 100 Tablets).
 
 ---
 
@@ -45,6 +45,7 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 - [ ] **Supplier Management**: Track supplier details, credit limits, and balances.
 - [ ] **Purchase Workflow**:
+    - [ ] Add automatic warning in purchase flow when a new purchase exceeds supplier credit limit.
     - [ ] Create purchase orders and receive stock.
     - [ ] Automatic batch creation with expiry dates and cost tracking.
 - [ ] **Inventory Control**:
