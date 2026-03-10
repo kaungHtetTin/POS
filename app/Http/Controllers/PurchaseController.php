@@ -16,7 +16,13 @@ class PurchaseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Purchase::with(['supplier:id,name', 'branch:id,name'])
+        $query = Purchase::with([
+            'supplier:id,name,credit_limit,balance', 
+            'branch:id,name',
+            'items' => function($q) {
+                $q->with(['product:id,name', 'unit:id,name,short_name']);
+            }
+        ])
             ->withCount('items');
 
         if ($request->search) {
@@ -224,6 +230,217 @@ class PurchaseController extends Controller
         });
 
         return redirect()->back()->with('success', 'Purchase order created and stock received successfully.');
+    }
+
+    public function update(Request $request, Purchase $purchase)
+    {
+        $validated = $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'branch_id' => 'required|exists:branches,id',
+            'invoice_number' => 'required|string|max:255|unique:purchases,invoice_number,' . $purchase->id,
+            'purchase_date' => 'required|date',
+            'payment_status' => 'required|in:Paid,Partial,Due',
+            'paid_amount' => 'nullable|numeric|min:0|max:999999999999.99',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.unit_id' => 'required|exists:units,id',
+            'items.*.batch_number' => 'nullable|string|max:255',
+            'items.*.expiry_date' => 'required|date|after:today',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
+            'items.*.selling_price' => 'required|numeric|min:0.01|max:999999999999.99',
+        ]);
+
+        $items = collect($validated['items']);
+        $productIds = $items->pluck('product_id')->unique()->values();
+
+        $productUnitRows = DB::table('product_units')
+            ->select('product_id', 'unit_id', 'conversion_factor')
+            ->whereIn('product_id', $productIds)
+            ->get();
+
+        $preparedItems = [];
+
+        foreach ($items as $index => $item) {
+            $productUnit = $productUnitRows->first(function ($row) use ($item) {
+                return $row->product_id === $item['product_id'] && $row->unit_id === $item['unit_id'];
+            });
+
+            if (!$productUnit) {
+                return redirect()->back()->withErrors([
+                    "items.$index.unit_id" => 'Selected unit does not belong to the selected product.',
+                ])->withInput();
+            }
+
+            $conversionFactor = (int) $productUnit->conversion_factor;
+            $baseQuantity = (int) $item['quantity'] * $conversionFactor;
+            $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
+            $batchNumber = $this->resolveBatchNumber(
+                $item['batch_number'] ?? null,
+                $validated['branch_id'],
+                $item['product_id'],
+                $validated['purchase_date']
+            );
+
+            $preparedItems[] = array_merge($item, [
+                'batch_number' => $batchNumber,
+                'conversion_factor' => $conversionFactor,
+                'base_quantity' => $baseQuantity,
+                'base_unit_price' => (float) $item['unit_price'] / $conversionFactor,
+                'base_selling_price' => (float) $item['selling_price'] / $conversionFactor,
+                'line_total' => $lineTotal,
+            ]);
+        }
+
+        $totalAmount = (float) collect($preparedItems)->sum('line_total');
+        $paidAmount = (float) ($validated['paid_amount'] ?? 0);
+
+        if ($validated['payment_status'] === 'Paid') $paidAmount = $totalAmount;
+        if ($validated['payment_status'] === 'Due') $paidAmount = 0;
+
+        if ($paidAmount > $totalAmount) {
+            return redirect()->back()->withErrors(['paid_amount' => 'Paid amount cannot exceed total purchase amount.'])->withInput();
+        }
+
+        $dueAmount = $totalAmount - $paidAmount;
+        $supplier = Supplier::findOrFail($validated['supplier_id']);
+
+        // Check credit limit (ignoring the current purchase's existing due amount)
+        $projectedBalance = (float) $supplier->balance - (float) $purchase->due_amount + $dueAmount;
+        if ($projectedBalance > (float) $supplier->credit_limit) {
+            return redirect()->back()->withErrors(['supplier_id' => 'Credit limit exceeded for selected supplier.'])->withInput();
+        }
+
+        DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $supplier) {
+            // 1. Reverse old inventory and supplier balance
+            $oldSupplier = $purchase->supplier;
+            $oldSupplier->update(['balance' => (float) $oldSupplier->balance - (float) $purchase->due_amount]);
+
+            foreach ($purchase->items as $oldItem) {
+                Inventory::where('branch_id', $purchase->branch_id)
+                    ->where('product_id', $oldItem->product_id)
+                    ->decrement('quantity', $oldItem->base_quantity);
+
+                InventoryBatch::where('branch_id', $purchase->branch_id)
+                    ->where('product_id', $oldItem->product_id)
+                    ->where('batch_number', $oldItem->batch_number)
+                    ->whereDate('expiry_date', $oldItem->expiry_date)
+                    ->decrement('quantity', $oldItem->base_quantity);
+            }
+
+            // 2. Update Purchase record
+            $purchase->update([
+                'supplier_id' => $validated['supplier_id'],
+                'branch_id' => $validated['branch_id'],
+                'invoice_number' => $validated['invoice_number'],
+                'purchase_date' => $validated['purchase_date'],
+                'total_amount' => $totalAmount,
+                'paid_amount' => $paidAmount,
+                'due_amount' => $dueAmount,
+                'payment_status' => $validated['payment_status'],
+            ]);
+
+            // 3. Replace Items and apply new inventory
+            $purchase->items()->delete();
+
+            foreach ($preparedItems as $item) {
+                $purchase->items()->create([
+                    'product_id' => $item['product_id'],
+                    'unit_id' => $item['unit_id'],
+                    'batch_number' => $item['batch_number'],
+                    'expiry_date' => $item['expiry_date'],
+                    'quantity' => $item['quantity'],
+                    'base_quantity' => $item['base_quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'total_price' => $item['line_total'],
+                    'created_at' => now(),
+                ]);
+
+                $inventory = Inventory::firstOrCreate(
+                    ['branch_id' => $validated['branch_id'], 'product_id' => $item['product_id']],
+                    ['quantity' => 0]
+                );
+                $inventory->increment('quantity', $item['base_quantity']);
+
+                $batch = InventoryBatch::where('branch_id', $validated['branch_id'])
+                    ->where('product_id', $item['product_id'])
+                    ->where('batch_number', $item['batch_number'])
+                    ->whereDate('expiry_date', $item['expiry_date'])
+                    ->first();
+
+                if ($batch) {
+                    $existingQty = (int) $batch->quantity;
+                    $incomingQty = (int) $item['base_quantity'];
+                    $newQty = $existingQty + $incomingQty;
+
+                    // Simple update for simplicity in update logic (weighted average might be complex during update)
+                    $batch->update([
+                        'quantity' => $newQty,
+                        'purchase_price' => $item['base_unit_price'],
+                        'selling_price' => $item['base_selling_price'],
+                    ]);
+                } else {
+                    InventoryBatch::create([
+                        'branch_id' => $validated['branch_id'],
+                        'product_id' => $item['product_id'],
+                        'batch_number' => $item['batch_number'],
+                        'expiry_date' => $item['expiry_date'],
+                        'quantity' => $item['base_quantity'],
+                        'purchase_price' => $item['base_unit_price'],
+                        'selling_price' => $item['base_selling_price'],
+                    ]);
+                }
+            }
+
+            // 4. Update new supplier balance
+            $supplier->refresh();
+            $supplier->update(['balance' => (float) $supplier->balance + $dueAmount]);
+        });
+
+        return redirect()->back()->with('success', 'Purchase record updated and inventory synchronized successfully.');
+    }
+
+    public function destroy(Purchase $purchase)
+    {
+        DB::transaction(function () use ($purchase) {
+            $supplier = $purchase->supplier;
+            $dueAmount = (float) $purchase->due_amount;
+
+            if ($dueAmount > 0) {
+                $supplier->update([
+                    'balance' => (float) $supplier->balance - $dueAmount,
+                ]);
+            }
+
+            foreach ($purchase->items as $item) {
+                $inventory = Inventory::where('branch_id', $purchase->branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
+                if ($inventory) {
+                    $inventory->update([
+                        'quantity' => max(0, $inventory->quantity - $item->base_quantity),
+                    ]);
+                }
+
+                $batch = InventoryBatch::where('branch_id', $purchase->branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->where('batch_number', $item->batch_number)
+                    ->whereDate('expiry_date', $item->expiry_date)
+                    ->first();
+
+                if ($batch) {
+                    $batch->update([
+                        'quantity' => max(0, $batch->quantity - $item->base_quantity),
+                    ]);
+                }
+            }
+
+            $purchase->items()->delete();
+            $purchase->delete();
+        });
+
+        return redirect()->back()->with('success', 'Purchase record deleted and inventory reversed successfully.');
     }
 
     protected function resolveBatchNumber(?string $batchNumber, string $branchId, string $productId, string $purchaseDate): string

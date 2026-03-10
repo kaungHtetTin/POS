@@ -88,6 +88,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index')->middleware('permission:manage_inventory');
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store')->middleware('permission:manage_inventory');
+    Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update')->middleware('permission:manage_inventory');
+    Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy')->middleware('permission:manage_inventory');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
 });

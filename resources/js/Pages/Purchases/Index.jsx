@@ -29,6 +29,7 @@ import {
     Add as AddIcon,
     Close as CloseIcon,
     Delete as DeleteIcon,
+    Edit as EditIcon,
     Inventory as InventoryIcon,
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
@@ -47,9 +48,10 @@ const emptyItem = {
 
 export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters }) {
     const [open, setOpen] = useState(false);
+    const [editingPurchase, setEditingPurchase] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, patch, delete: destroy, processing, errors, reset } = useForm({
         supplier_id: '',
         branch_id: auth.user?.branch_id || branches[0]?.id || '',
         invoice_number: '',
@@ -90,6 +92,24 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
     const exceedsCredit = selectedSupplier && projectedBalance > Number(selectedSupplier.credit_limit || 0);
 
+    const formatPurchaseDate = (value) => {
+        if (!value) {
+            return '-';
+        }
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return new Intl.DateTimeFormat(undefined, {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        }).format(date);
+    };
+
     const getProductById = (productId) => products.find((product) => product.id === productId);
 
     const getUnitsForProduct = (productId) => {
@@ -97,20 +117,55 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         return product?.product_units || [];
     };
 
-    const handleOpen = () => setOpen(true);
+    const handleOpen = (purchase = null) => {
+        if (purchase) {
+            setEditingPurchase(purchase);
+            setData({
+                supplier_id: purchase.supplier_id,
+                branch_id: purchase.branch_id,
+                invoice_number: purchase.invoice_number,
+                purchase_date: purchase.purchase_date.split('T')[0],
+                payment_status: purchase.payment_status,
+                paid_amount: purchase.paid_amount,
+                items: purchase.items.map(item => ({
+                    product_id: item.product_id,
+                    unit_id: item.unit_id,
+                    batch_number: item.batch_number,
+                    expiry_date: item.expiry_date.split('T')[0],
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    // Try to find the matching selling_price from product units
+                    selling_price: products.find(p => p.id === item.product_id)?.product_units.find(u => u.unit_id === item.unit_id)?.selling_price || item.unit_price
+                }))
+            });
+        } else {
+            setEditingPurchase(null);
+            reset();
+            setData({
+                supplier_id: '',
+                branch_id: auth.user?.branch_id || branches[0]?.id || '',
+                invoice_number: '',
+                purchase_date: new Date().toISOString().split('T')[0],
+                payment_status: 'Due',
+                paid_amount: 0,
+                items: [{ ...emptyItem }],
+            });
+        }
+        setOpen(true);
+    };
 
     const handleClose = () => {
         setOpen(false);
+        setEditingPurchase(null);
         reset();
-        setData({
-            supplier_id: '',
-            branch_id: auth.user?.branch_id || branches[0]?.id || '',
-            invoice_number: '',
-            purchase_date: new Date().toISOString().split('T')[0],
-            payment_status: 'Due',
-            paid_amount: 0,
-            items: [{ ...emptyItem }],
-        });
+    };
+
+    const handleDelete = (purchase) => {
+        if (confirm('Are you sure you want to delete this purchase? This will reverse the stock increase.')) {
+            destroy(route('purchases.destroy', purchase.id), {
+                preserveScroll: true,
+            });
+        }
     };
 
     const handleSearch = () => {
@@ -170,10 +225,17 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
     const submit = (event) => {
         event.preventDefault();
-        post(route('purchases.store'), {
-            preserveScroll: true,
-            onSuccess: () => handleClose(),
-        });
+        if (editingPurchase) {
+            patch(route('purchases.update', editingPurchase.id), {
+                preserveScroll: true,
+                onSuccess: () => handleClose(),
+            });
+        } else {
+            post(route('purchases.store'), {
+                preserveScroll: true,
+                onSuccess: () => handleClose(),
+            });
+        }
     };
 
     return (
@@ -223,6 +285,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Paid</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Due</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -240,7 +303,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                             <Typography variant="body2">{purchase.supplier?.name}</Typography>
                                             <Typography variant="caption" color="text.secondary">{purchase.branch?.name}</Typography>
                                         </TableCell>
-                                        <TableCell align="center">{purchase.purchase_date}</TableCell>
+                                        <TableCell align="center">{formatPurchaseDate(purchase.purchase_date)}</TableCell>
                                         <TableCell align="center">{purchase.items_count}</TableCell>
                                         <TableCell align="right">${Number(purchase.total_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell align="right">${Number(purchase.paid_amount || 0).toFixed(2)}</TableCell>
@@ -253,11 +316,31 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 variant="outlined"
                                             />
                                         </TableCell>
+                                        <TableCell align="center">
+                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleOpen(purchase)}
+                                                    title="Edit Purchase"
+                                                >
+                                                    <EditIcon fontSize="inherit" />
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleDelete(purchase)}
+                                                    title="Delete Purchase"
+                                                >
+                                                    <DeleteIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Stack>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                                 {purchases.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No purchases found. Create a purchase order to receive stock.
                                             </Typography>
@@ -273,7 +356,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
             <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        Create Purchase Order & Receive Stock
+                        {editingPurchase ? 'Edit Purchase Order' : 'Create Purchase Order & Receive Stock'}
                         <IconButton size="small" onClick={handleClose}>
                             <CloseIcon />
                         </IconButton>
@@ -283,6 +366,12 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             {exceedsCredit && (
                                 <Alert severity="error" icon={<WarningIcon fontSize="inherit" />}>
                                     Credit limit warning: projected balance (${Number(projectedBalance || 0).toFixed(2)}) exceeds supplier credit limit (${Number(selectedSupplier?.credit_limit || 0).toFixed(2)}).
+                                </Alert>
+                            )}
+
+                            {editingPurchase && (
+                                <Alert severity="warning" sx={{ mb: 1 }}>
+                                    Warning: Editing this purchase will temporarily reverse previous stock increases and supplier balance changes before applying new values.
                                 </Alert>
                             )}
 
@@ -553,7 +642,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                     <DialogActions sx={{ p: 2 }}>
                         <Button onClick={handleClose} size="small">Cancel</Button>
                         <Button type="submit" variant="contained" size="small" disabled={processing}>
-                            Save Purchase & Receive Stock
+                            {editingPurchase ? 'Update Purchase' : 'Save Purchase & Receive Stock'}
                         </Button>
                     </DialogActions>
                 </form>
