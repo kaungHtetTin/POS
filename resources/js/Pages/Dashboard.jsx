@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import { Head } from '@inertiajs/react';
 import { 
@@ -8,12 +8,7 @@ import {
     Box, 
     Card, 
     CardContent, 
-    Button, 
-    TextField, 
-    Select, 
-    MenuItem, 
-    FormControl, 
-    InputLabel,
+    Button,
     Table,
     TableBody,
     TableCell,
@@ -22,89 +17,90 @@ import {
     TableRow,
     Chip,
     Stack,
-    IconButton,
     Divider,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    DialogContentText,
-    Snackbar,
-    Alert
+    Alert,
+    IconButton,
+    Tooltip
 } from '@mui/material';
 import { 
-    TrendingUp as SalesIcon, 
     Inventory as StockIcon, 
     Warning as ExpiryIcon, 
     ShoppingCart as POSIcon,
-    Edit as EditIcon,
-    Delete as DeleteIcon,
-    Add as AddIcon,
-    Visibility as ViewIcon,
-    CheckCircle as SuccessIcon
+    Medication as ProductIcon,
+    People as SupplierIcon,
+    AttachMoney as MoneyIcon,
+    ErrorOutline as LowStockIcon,
+    NotificationImportant as ExpiryAlertIcon,
+    ArrowForward as ViewIcon
 } from '@mui/icons-material';
+import { Link } from '@inertiajs/react';
 
-export default function Dashboard(props) {
-    const [open, setOpen] = useState(false);
-    const [snackbarOpen, setSnackbarOpen] = useState(false);
-
-    const handleClickOpen = () => setOpen(true);
-    const handleClose = () => setOpen(false);
-
-    const handleSnackbarOpen = () => setSnackbarOpen(true);
-    const handleSnackbarClose = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setSnackbarOpen(false);
-    };
-
-    const stats = [
-        { title: "Today's Sales", value: "$1,250", icon: <SalesIcon color="primary" fontSize="small" />, color: '#e3f2fd' },
-        { title: "Low Stock Items", value: "12", icon: <StockIcon color="warning" fontSize="small" />, color: '#fff3e0' },
-        { title: "Near Expiry", value: "5", icon: <ExpiryIcon color="error" fontSize="small" />, color: '#ffebee' },
-        { title: "Total Transactions", value: "48", icon: <POSIcon color="info" fontSize="small" />, color: '#e0f2f1' },
-    ];
-
-    const sampleData = [
-        { id: 1, name: 'Paracetamol 500mg', category: 'Analgesics', stock: 150, price: '$5.00', status: 'Active' },
-        { id: 2, name: 'Amoxicillin 250mg', category: 'Antibiotics', stock: 45, price: '$12.50', status: 'Low Stock' },
-        { id: 3, name: 'Cough Syrup 100ml', category: 'Syrup', stock: 0, price: '$8.00', status: 'Out of Stock' },
+export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts }) {
+    
+    const statCards = [
+        { 
+            title: "Total Products", 
+            value: stats.total_products, 
+            icon: <ProductIcon color="primary" fontSize="small" />, 
+            color: '#e3f2fd',
+            link: route('products.index')
+        },
+        { 
+            title: "Total Suppliers", 
+            value: stats.total_suppliers, 
+            icon: <SupplierIcon color="info" fontSize="small" />, 
+            color: '#e0f2f1',
+            link: route('suppliers.index')
+        },
+        { 
+            title: "Stock Value", 
+            value: `$${Number(stats.total_stock_value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 
+            icon: <MoneyIcon color="success" fontSize="small" />, 
+            color: '#e8f5e9',
+            link: '#'
+        },
+        { 
+            title: "Pending Payments", 
+            value: stats.pending_purchases, 
+            icon: <POSIcon color="warning" fontSize="small" />, 
+            color: '#fff3e0',
+            link: route('purchases.index')
+        },
     ];
 
     return (
-        <MainLayout
-            auth={props.auth}
-            errors={props.errors}
-            header="UI Components Showcase"
-        >
+        <MainLayout auth={auth} header="Pharmacy Dashboard">
             <Head title="Dashboard" />
 
             <Box sx={{ flexGrow: 1 }}>
-                {/* 1. Statistics Cards Section */}
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-                    STATISTICS CARDS (FLAT DESIGN)
-                </Typography>
-                <Grid container spacing={2} sx={{ mb: 4 }}>
-                    {stats.map((stat, index) => (
+                {/* Statistics Cards */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {statCards.map((stat, index) => (
                         <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card>
-                                <CardContent sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}>
+                            <Card sx={{ height: '100%' }}>
+                                <CardContent sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
                                     <Box sx={{ 
-                                        p: 1, 
-                                        borderRadius: 1, 
+                                        p: 1.5, 
+                                        borderRadius: 2, 
                                         bgcolor: stat.color, 
-                                        mr: 1.5,
+                                        mr: 2,
                                         display: 'flex'
                                     }}>
                                         {stat.icon}
                                     </Box>
-                                    <Box>
-                                        <Typography color="text.secondary" variant="caption">
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <Typography color="text.secondary" variant="caption" sx={{ fontWeight: 500 }}>
                                             {stat.title}
                                         </Typography>
                                         <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
                                             {stat.value}
                                         </Typography>
                                     </Box>
+                                    {stat.link !== '#' && (
+                                        <IconButton component={Link} href={stat.link} size="small">
+                                            <ViewIcon fontSize="inherit" />
+                                        </IconButton>
+                                    )}
                                 </CardContent>
                             </Card>
                         </Grid>
@@ -112,179 +108,150 @@ export default function Dashboard(props) {
                 </Grid>
 
                 <Grid container spacing={2}>
-                    {/* 2. Form Components Section */}
-                    <Grid item xs={12} md={5}>
-                        <Paper sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                FORM COMPONENTS (DENSE)
-                            </Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            <Stack spacing={2.5} sx={{ mt: 1 }}>
-                                <TextField label="Product Name" placeholder="e.g. Paracetamol" />
-                                <Grid container spacing={2}>
-                                    <Grid item xs={6}>
-                                        <FormControl fullWidth size="small">
-                                            <InputLabel id="category-label">Category</InputLabel>
-                                            <Select 
-                                                labelId="category-label"
-                                                id="category-select"
-                                                label="Category" 
-                                                defaultValue=""
-                                            >
-                                                <MenuItem value={10}>Analgesics</MenuItem>
-                                                <MenuItem value={20}>Antibiotics</MenuItem>
-                                                <MenuItem value={30}>Vitamins</MenuItem>
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <TextField label="Price" type="number" />
-                                    </Grid>
-                                </Grid>
-                                <TextField multiline rows={2} label="Description" />
-                                
-                                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleSnackbarOpen}>Save Product</Button>
-                                    <Button variant="outlined" color="secondary">Cancel</Button>
-                                    <Button variant="text" color="error">Reset</Button>
-                                </Box>
+                    {/* Low Stock Alerts */}
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 2, height: '100%', borderTop: '3px solid', borderColor: 'warning.main' }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <LowStockIcon color="warning" fontSize="small" />
+                                    LOW STOCK ALERTS
+                                </Typography>
+                                <Chip label={`${lowStockAlerts.length} Items`} size="small" color="warning" variant="outlined" />
                             </Stack>
+                            <Divider sx={{ mb: 2 }} />
+                            
+                            {lowStockAlerts.length > 0 ? (
+                                <TableContainer sx={{ maxHeight: 350 }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Medicine</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }} align="right">Current</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }} align="right">Min Level</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }} align="center">Status</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {lowStockAlerts.map((item) => (
+                                                <TableRow key={item.id} hover>
+                                                    <TableCell variant="body2">{item.name}</TableCell>
+                                                    <TableCell align="right" sx={{ color: item.current_quantity === 0 ? 'error.main' : 'warning.main', fontWeight: 'bold' }}>
+                                                        {item.current_quantity}
+                                                    </TableCell>
+                                                    <TableCell align="right">{item.min_level}</TableCell>
+                                                    <TableCell align="center">
+                                                        <Chip 
+                                                            label={item.current_quantity === 0 ? 'Out of Stock' : 'Low Stock'} 
+                                                            size="small" 
+                                                            color={item.current_quantity === 0 ? 'error' : 'warning'}
+                                                            sx={{ fontSize: '10px', height: '20px' }}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            ) : (
+                                <Box sx={{ py: 4, textAlign: 'center' }}>
+                                    <Typography variant="body2" color="text.secondary">All products are within healthy stock levels.</Typography>
+                                </Box>
+                            )}
                         </Paper>
                     </Grid>
 
-                    {/* 3. Table Components Section */}
-                    <Grid item xs={12} md={7}>
-                        <Paper sx={{ p: 2, height: '100%' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                    DATA TABLE (COMPACT)
+                    {/* Expiry Alerts */}
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 2, height: '100%', borderTop: '3px solid', borderColor: 'error.main' }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <ExpiryAlertIcon color="error" fontSize="small" />
+                                    NEAR EXPIRY ALERTS
                                 </Typography>
-                                <Chip label="3 Items Found" size="small" variant="outlined" color="primary" />
-                            </Box>
-                            <Divider sx={{ mb: 1 }} />
-                            <TableContainer>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Stock</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {sampleData.map((row) => (
-                                            <TableRow key={row.id} hover>
-                                                <TableCell>{row.name}</TableCell>
-                                                <TableCell>{row.stock}</TableCell>
-                                                <TableCell>
-                                                    <Chip 
-                                                        label={row.status} 
-                                                        size="small" 
-                                                        color={row.status === 'Active' ? 'success' : (row.status === 'Low Stock' ? 'warning' : 'error')}
-                                                        sx={{ fontSize: '10px', height: '20px' }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell align="right">
-                                                    <IconButton size="small" color="info" onClick={handleClickOpen}><ViewIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton size="small" color="primary"><EditIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton size="small" color="error"><DeleteIcon fontSize="inherit" /></IconButton>
-                                                </TableCell>
+                                <Chip label={`${expiryAlerts.length} Batches`} size="small" color="error" variant="outlined" />
+                            </Stack>
+                            <Divider sx={{ mb: 2 }} />
+
+                            {expiryAlerts.length > 0 ? (
+                                <TableContainer sx={{ maxHeight: 350 }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Batch #</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Medicine</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }} align="right">Expiry</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }} align="center">Status</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
+                                        </TableHead>
+                                        <TableBody>
+                                            {expiryAlerts.map((batch) => (
+                                                <TableRow key={batch.id} hover>
+                                                    <TableCell variant="body2" sx={{ fontWeight: 500 }}>{batch.batch_number}</TableCell>
+                                                    <TableCell variant="body2">{batch.product_name}</TableCell>
+                                                    <TableCell align="right" sx={{ color: batch.days_left <= 0 ? 'error.main' : 'warning.main', fontWeight: 'bold' }}>
+                                                        {batch.expiry_date}
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Tooltip title={`${batch.days_left} days remaining`}>
+                                                            <Chip 
+                                                                label={batch.days_left <= 0 ? 'Expired' : `${batch.days_left}d left`} 
+                                                                size="small" 
+                                                                color={batch.days_left <= 0 ? 'error' : (batch.days_left <= 30 ? 'error' : 'warning')}
+                                                                sx={{ fontSize: '10px', height: '20px' }}
+                                                            />
+                                                        </Tooltip>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            ) : (
+                                <Box sx={{ py: 4, textAlign: 'center' }}>
+                                    <Typography variant="body2" color="text.secondary">No batches are near expiry.</Typography>
+                                </Box>
+                            )}
                         </Paper>
                     </Grid>
                 </Grid>
 
-                {/* 4. Typography Showcase */}
-                <Paper sx={{ mt: 2, p: 2 }}>
+                {/* Quick Actions */}
+                <Paper sx={{ mt: 3, p: 2 }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        TYPOGRAPHY & BRANDING
+                        QUICK ACTIONS
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                            <Typography variant="h6" color="primary" gutterBottom>Primary Theme Color (Medical Teal)</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                This dashboard showcases the dense UI design. Notice the 4px border radius, 
-                                the 13px base font size, and the compact padding across all components.
-                            </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                <Chip label="Compact Chip" size="small" />
-                                <Chip label="Success" size="small" color="success" />
-                                <Chip label="Warning" size="small" color="warning" />
-                                <Chip label="Error" size="small" color="error" />
-                                <Chip label="Info" size="small" color="info" />
-                            </Box>
-                        </Grid>
-                    </Grid>
+                    <Stack direction="row" spacing={2}>
+                        <Button 
+                            variant="outlined" 
+                            startIcon={<POSIcon />} 
+                            component={Link} 
+                            href="#"
+                            size="small"
+                        >
+                            New Sale
+                        </Button>
+                        <Button 
+                            variant="outlined" 
+                            startIcon={<StockIcon />} 
+                            component={Link} 
+                            href={route('purchases.index')}
+                            size="small"
+                        >
+                            Purchase Stock
+                        </Button>
+                        <Button 
+                            variant="outlined" 
+                            startIcon={<ExpiryIcon />} 
+                            component={Link} 
+                            href={route('inventory.adjustments.index')}
+                            size="small"
+                        >
+                            Adjust Inventory
+                        </Button>
+                    </Stack>
                 </Paper>
             </Box>
-
-            {/* Showcase Dialog */}
-            <Dialog 
-                open={open} 
-                onClose={handleClose}
-                maxWidth="xs"
-                fullWidth
-            >
-                <DialogTitle>
-                    Product Details
-                </DialogTitle>
-                <DialogContent>
-                    <DialogContentText variant="body2" sx={{ mb: 2 }}>
-                        View detailed information for the selected medicine.
-                    </DialogContentText>
-                    <Stack spacing={1.5}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="caption" color="text.secondary">Name:</Typography>
-                            <Typography variant="body2" fontWeight="medium">Paracetamol 500mg</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="caption" color="text.secondary">Category:</Typography>
-                            <Typography variant="body2" fontWeight="medium">Analgesics</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="caption" color="text.secondary">Stock Level:</Typography>
-                            <Typography variant="body2" fontWeight="medium">150 Units</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="caption" color="text.secondary">Price:</Typography>
-                            <Typography variant="body2" fontWeight="medium">$5.00</Typography>
-                        </Box>
-                    </Stack>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose} variant="outlined" color="secondary">
-                        Close
-                    </Button>
-                    <Button onClick={handleClose} variant="contained" color="primary">
-                        Edit Item
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Success Snackbar */}
-            <Snackbar 
-                open={snackbarOpen} 
-                onClose={handleSnackbarClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-                <Alert 
-                    onClose={handleSnackbarClose} 
-                    severity="success" 
-                    variant="filled"
-                    icon={<SuccessIcon fontSize="inherit" />}
-                    sx={{ width: '100%' }}
-                >
-                    Product saved successfully!
-                </Alert>
-            </Snackbar>
         </MainLayout>
     );
 }

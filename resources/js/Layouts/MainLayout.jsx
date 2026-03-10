@@ -45,6 +45,7 @@ import {
     Percent as TaxIcon,
     LocalShipping as SupplierIcon,
     ReceiptLong as PurchaseIcon,
+    SwapHoriz as AdjustmentIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -85,12 +86,14 @@ export default function MainLayout({ children, header }) {
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
         { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
         { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },
         { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_inventory' },
         { text: 'Units', icon: <UnitIcon fontSize="small" />, href: route('units.index'), routePattern: 'units.*', permission: 'manage_inventory' },
         { text: 'Tax Configuration', icon: <TaxIcon fontSize="small" />, href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_inventory' },
         { text: 'Suppliers', icon: <SupplierIcon fontSize="small" />, href: route('suppliers.index'), routePattern: 'suppliers.*', permission: 'manage_inventory' },
         { text: 'Purchases', icon: <PurchaseIcon fontSize="small" />, href: route('purchases.index'), routePattern: 'purchases.*', permission: 'manage_inventory' },
+        { text: 'Adjustments', icon: <AdjustmentIcon fontSize="small" />, href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'manage_inventory' },
         { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
         { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', routePattern: null, permission: 'view_financial_reports' },
         { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },

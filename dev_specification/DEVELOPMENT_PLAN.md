@@ -43,14 +43,14 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **Supplier Management**: Track supplier details, credit limits, and balances.
-- [ ] **Purchase Workflow**:
-    - [ ] Add automatic warning in purchase flow when a new purchase exceeds supplier credit limit.
-    - [ ] Create purchase orders and receive stock.
-    - [ ] Automatic batch creation with expiry dates and cost tracking.
-- [ ] **Inventory Control**:
-    - [ ] Stock adjustments for damage/returns.
-    - [ ] Real-time low stock and expiry alerts (Dashboard widgets).
+- [x] **Supplier Management**: Track supplier details, credit limits, and balances.
+- [x] **Purchase Workflow**:
+    - [x] Add automatic warning in purchase flow when a new purchase exceeds supplier credit limit.
+    - [x] Create purchase orders and receive stock.
+    - [x] Automatic batch creation with expiry dates and cost tracking.
+- [x] **Inventory Control**:
+    - [x] Stock adjustments for damage/returns.
+    - [x] Real-time low stock and expiry alerts (Dashboard widgets).
 
 ---
 

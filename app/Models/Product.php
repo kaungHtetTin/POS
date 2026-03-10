@@ -24,12 +24,14 @@ class Product extends Model
         'image_path',
         'description',
         'min_stock_level',
+        'expiry_alert_days',
         'tax_method',
         'status',
     ];
 
     protected $casts = [
         'min_stock_level' => 'integer',
+        'expiry_alert_days' => 'integer',
     ];
 
     public function category()
@@ -57,5 +59,10 @@ class Product extends Model
     public function batches()
     {
         return $this->hasMany(InventoryBatch::class);
+    }
+
+    public function inventories()
+    {
+        return $this->hasMany(Inventory::class);
     }
 }
