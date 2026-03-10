@@ -404,115 +404,137 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             </Stack>
 
                             <Stack spacing={1.5}>
-                                {data.items.map((item, index) => (
-                                    <Paper key={index} variant="outlined" sx={{ p: 1.5 }}>
-                                        {(() => {
-                                            const unitsForProduct = getUnitsForProduct(item.product_id);
-                                            const selectedUnit = unitsForProduct.find((unit) => unit.unit_id === item.unit_id);
-                                            const conversionFactor = Number(selectedUnit?.conversion_factor || 1);
-                                            const baseQuantity = Number(item.quantity || 0) * conversionFactor;
+                                {data.items.map((item, index) => {
+                                    const unitsForProduct = getUnitsForProduct(item.product_id);
+                                    const selectedUnit = unitsForProduct.find((unit) => unit.unit_id === item.unit_id);
+                                    const conversionFactor = Number(selectedUnit?.conversion_factor || 1);
+                                    const baseQuantity = Number(item.quantity || 0) * conversionFactor;
+                                    const lineTotal = (Number(item.quantity || 0) * Number(item.unit_price || 0)).toFixed(2);
 
-                                            return (
-                                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                                            <TextField
-                                                select
-                                                size="small"
-                                                label="Product"
-                                                value={item.product_id}
-                                                onChange={(event) => updateItem(index, 'product_id', event.target.value)}
-                                                required
-                                                sx={{ minWidth: { md: 200 } }}
-                                            >
-                                                {products.map((product) => (
-                                                    <MenuItem key={product.id} value={product.id}>
-                                                        {product.name}
-                                                    </MenuItem>
-                                                ))}
-                                            </TextField>
-                                            <TextField
-                                                select
-                                                size="small"
-                                                label="Unit"
-                                                value={item.unit_id}
-                                                onChange={(event) => updateItem(index, 'unit_id', event.target.value)}
-                                                required
-                                                sx={{ minWidth: { md: 150 } }}
-                                                disabled={!item.product_id}
-                                            >
-                                                {unitsForProduct.map((productUnit) => (
-                                                    <MenuItem key={productUnit.id} value={productUnit.unit_id}>
-                                                        {productUnit.unit?.short_name || productUnit.unit?.name}
-                                                    </MenuItem>
-                                                ))}
-                                            </TextField>
-                                            <TextField
-                                                size="small"
-                                                label="Batch Number"
-                                                value={item.batch_number}
-                                                onChange={(event) => updateItem(index, 'batch_number', event.target.value)}
-                                                required
-                                            />
-                                            <TextField
-                                                size="small"
-                                                label="Expiry Date"
-                                                type="date"
-                                                value={item.expiry_date}
-                                                onChange={(event) => updateItem(index, 'expiry_date', event.target.value)}
-                                                InputLabelProps={{ shrink: true }}
-                                                required
-                                            />
-                                            <TextField
-                                                size="small"
-                                                label="Qty"
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(event) => updateItem(index, 'quantity', event.target.value)}
-                                                inputProps={{ min: 1 }}
-                                                required
-                                            />
-                                            <TextField
-                                                size="small"
-                                                label="Unit Cost"
-                                                type="number"
-                                                value={item.unit_price}
-                                                onChange={(event) => updateItem(index, 'unit_price', event.target.value)}
-                                                inputProps={{ min: 0.01, step: '0.01' }}
-                                                required
-                                            />
-                                            <TextField
-                                                size="small"
-                                                label="Selling Price"
-                                                type="number"
-                                                value={item.selling_price}
-                                                onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
-                                                inputProps={{ min: 0.01, step: '0.01' }}
-                                                required
-                                            />
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 150 }}>
-                                                <Stack spacing={0}>
-                                                    <Typography variant="caption" color="text.secondary">Line Total</Typography>
-                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                        ${((Number(item.quantity || 0) * Number(item.unit_price || 0))).toFixed(2)}
-                                                    </Typography>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        Base Qty: {baseQuantity}
-                                                    </Typography>
-                                                </Stack>
+                                    return (
+                                        <Paper key={index} variant="outlined" sx={{ p: 1.5 }}>
+                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                                                    Item #{index + 1}
+                                                </Typography>
                                                 <IconButton color="error" size="small" onClick={() => removeItem(index)}>
                                                     <DeleteIcon fontSize="small" />
                                                 </IconButton>
+                                            </Stack>
+
+                                            <Box
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: { xs: '1fr', md: '2fr 1.2fr 0.8fr 1fr 1fr' },
+                                                    gap: 1.2,
+                                                    mb: 1.2,
+                                                }}
+                                            >
+                                                <TextField
+                                                    select
+                                                    size="small"
+                                                    label="Product"
+                                                    value={item.product_id}
+                                                    onChange={(event) => updateItem(index, 'product_id', event.target.value)}
+                                                    required
+                                                >
+                                                    {products.map((product) => (
+                                                        <MenuItem key={product.id} value={product.id}>
+                                                            {product.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+                                                <TextField
+                                                    select
+                                                    size="small"
+                                                    label="Unit"
+                                                    value={item.unit_id}
+                                                    onChange={(event) => updateItem(index, 'unit_id', event.target.value)}
+                                                    required
+                                                    disabled={!item.product_id}
+                                                >
+                                                    {unitsForProduct.map((productUnit) => (
+                                                        <MenuItem key={productUnit.id} value={productUnit.unit_id}>
+                                                            {productUnit.unit?.short_name || productUnit.unit?.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+                                                <TextField
+                                                    size="small"
+                                                    label="Qty"
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(event) => updateItem(index, 'quantity', event.target.value)}
+                                                    inputProps={{ min: 1 }}
+                                                    required
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    label="Unit Cost"
+                                                    type="number"
+                                                    value={item.unit_price}
+                                                    onChange={(event) => updateItem(index, 'unit_price', event.target.value)}
+                                                    inputProps={{ min: 0.01, step: '0.01' }}
+                                                    required
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    label="Selling Price"
+                                                    type="number"
+                                                    value={item.selling_price}
+                                                    onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
+                                                    inputProps={{ min: 0.01, step: '0.01' }}
+                                                    required
+                                                />
                                             </Box>
-                                        </Stack>
-                                            );
-                                        })()}
-                                        {errors[`items.${index}.product_id`] && (
-                                            <Typography variant="caption" color="error">{errors[`items.${index}.product_id`]}</Typography>
-                                        )}
-                                        {errors[`items.${index}.unit_id`] && (
-                                            <Typography variant="caption" color="error">{errors[`items.${index}.unit_id`]}</Typography>
-                                        )}
-                                    </Paper>
-                                ))}
+
+                                            <Box
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: { xs: '1fr', md: '1.5fr 1fr auto' },
+                                                    gap: 1.2,
+                                                    alignItems: 'start',
+                                                }}
+                                            >
+                                                <TextField
+                                                    size="small"
+                                                    label="Batch Number"
+                                                    value={item.batch_number}
+                                                    onChange={(event) => updateItem(index, 'batch_number', event.target.value)}
+                                                    placeholder="Optional (auto-generate if empty)"
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    label="Expiry Date"
+                                                    type="date"
+                                                    value={item.expiry_date}
+                                                    onChange={(event) => updateItem(index, 'expiry_date', event.target.value)}
+                                                    InputLabelProps={{ shrink: true }}
+                                                    required
+                                                />
+                                                <Paper
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 1,
+                                                        minWidth: { md: 170 },
+                                                        bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255,255,255,0.03)',
+                                                    }}
+                                                >
+                                                    <Typography variant="caption" color="text.secondary">Line Total</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>${lineTotal}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">Base Qty: {baseQuantity}</Typography>
+                                                </Paper>
+                                            </Box>
+
+                                            {errors[`items.${index}.product_id`] && (
+                                                <Typography variant="caption" color="error">{errors[`items.${index}.product_id`]}</Typography>
+                                            )}
+                                            {errors[`items.${index}.unit_id`] && (
+                                                <Typography variant="caption" color="error">{errors[`items.${index}.unit_id`]}</Typography>
+                                            )}
+                                        </Paper>
+                                    );
+                                })}
                             </Stack>
 
                             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>

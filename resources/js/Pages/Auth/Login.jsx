@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import AuthSplitLayout from '@/Layouts/AuthSplitLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Box, Typography, TextField, Button, Checkbox as MuiCheckbox, FormControlLabel, Alert, Stack, useTheme } from '@mui/material';
 
 export default function Login({ status, canResetPassword }) {
@@ -8,7 +8,7 @@ export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
-        remember: '',
+        remember: false,
     });
 
     useEffect(() => {
@@ -24,7 +24,11 @@ export default function Login({ status, canResetPassword }) {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('login'));
+        post(route('login'), {
+            onSuccess: () => {
+                router.visit(route('dashboard'), { replace: true });
+            },
+        });
     };
 
     return (

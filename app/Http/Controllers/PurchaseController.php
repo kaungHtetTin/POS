@@ -58,7 +58,7 @@ class PurchaseController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.unit_id' => 'required|exists:units,id',
-            'items.*.batch_number' => 'required|string|max:255',
+            'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'required|date|after:today',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
@@ -96,8 +96,15 @@ class PurchaseController extends Controller
 
             $baseQuantity = (int) $item['quantity'] * $conversionFactor;
             $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
+            $batchNumber = $this->resolveBatchNumber(
+                $item['batch_number'] ?? null,
+                $validated['branch_id'],
+                $item['product_id'],
+                $validated['purchase_date']
+            );
 
             $preparedItems[] = array_merge($item, [
+                'batch_number' => $batchNumber,
                 'conversion_factor' => $conversionFactor,
                 'base_quantity' => $baseQuantity,
                 'base_unit_price' => (float) $item['unit_price'] / $conversionFactor,
@@ -166,10 +173,24 @@ class PurchaseController extends Controller
                     ->first();
 
                 if ($batch) {
+                    $existingQuantity = (int) $batch->quantity;
+                    $incomingQuantity = (int) $item['base_quantity'];
+                    $newQuantity = $existingQuantity + $incomingQuantity;
+
+                    $weightedPurchasePrice = (
+                        ($existingQuantity * (float) $batch->purchase_price)
+                        + ($incomingQuantity * (float) $item['base_unit_price'])
+                    ) / $newQuantity;
+
+                    $weightedSellingPrice = (
+                        ($existingQuantity * (float) $batch->selling_price)
+                        + ($incomingQuantity * (float) $item['base_selling_price'])
+                    ) / $newQuantity;
+
                     $batch->update([
-                        'quantity' => $batch->quantity + $item['base_quantity'],
-                        'purchase_price' => $item['base_unit_price'],
-                        'selling_price' => $item['base_selling_price'],
+                        'quantity' => $newQuantity,
+                        'purchase_price' => $weightedPurchasePrice,
+                        'selling_price' => $weightedSellingPrice,
                     ]);
                 } else {
                     InventoryBatch::create([
@@ -203,5 +224,33 @@ class PurchaseController extends Controller
         });
 
         return redirect()->back()->with('success', 'Purchase order created and stock received successfully.');
+    }
+
+    protected function resolveBatchNumber(?string $batchNumber, string $branchId, string $productId, string $purchaseDate): string
+    {
+        $trimmedBatchNumber = trim((string) $batchNumber);
+
+        if ($trimmedBatchNumber !== '') {
+            return $trimmedBatchNumber;
+        }
+
+        $datePart = str_replace('-', '', $purchaseDate);
+        $productPart = strtoupper(substr(str_replace('-', '', $productId), 0, 6));
+
+        do {
+            $candidate = sprintf(
+                'B%s-%s-%03d',
+                $datePart,
+                $productPart,
+                random_int(100, 999)
+            );
+
+            $exists = InventoryBatch::where('branch_id', $branchId)
+                ->where('product_id', $productId)
+                ->where('batch_number', $candidate)
+                ->exists();
+        } while ($exists);
+
+        return $candidate;
     }
 }
