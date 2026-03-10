@@ -46,6 +46,7 @@ import {
     LocalShipping as SupplierIcon,
     ReceiptLong as PurchaseIcon,
     SwapHoriz as AdjustmentIcon,
+    CompareArrows as TransferIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -94,6 +95,7 @@ export default function MainLayout({ children, header }) {
         { text: 'Suppliers', icon: <SupplierIcon fontSize="small" />, href: route('suppliers.index'), routePattern: 'suppliers.*', permission: 'manage_inventory' },
         { text: 'Purchases', icon: <PurchaseIcon fontSize="small" />, href: route('purchases.index'), routePattern: 'purchases.*', permission: 'manage_inventory' },
         { text: 'Adjustments', icon: <AdjustmentIcon fontSize="small" />, href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'manage_inventory' },
+        { text: 'Transfers', icon: <TransferIcon fontSize="small" />, href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'manage_inventory' },
         { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
         { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', routePattern: null, permission: 'view_financial_reports' },
         { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },

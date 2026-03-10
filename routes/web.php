@@ -15,6 +15,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\StockTransferController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -96,6 +97,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/inventory/adjustments', [InventoryAdjustmentController::class, 'store'])->name('inventory.adjustments.store')->middleware('permission:manage_inventory');
     Route::get('/inventory/batches/{product}/{branch}', [InventoryAdjustmentController::class, 'getBatches'])->name('inventory.batches.get')->middleware('permission:manage_inventory');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index')->middleware('permission:manage_inventory');
+    
+    Route::get('/inventory/transfers', [StockTransferController::class, 'index'])->name('inventory.transfers.index')->middleware('permission:manage_inventory');
+    Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store')->middleware('permission:manage_inventory');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
 });

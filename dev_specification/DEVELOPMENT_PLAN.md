@@ -51,6 +51,7 @@ This document outlines the step-by-step development process for the Pharmacy POS
 - [x] **Inventory Control**:
     - [x] Stock adjustments for damage/returns.
     - [x] Real-time low stock and expiry alerts (Dashboard widgets).
+    - [x] Branch-to-branch stock transfers.
 
 ---
 

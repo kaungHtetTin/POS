@@ -124,18 +124,18 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 supplier_id: purchase.supplier_id,
                 branch_id: purchase.branch_id,
                 invoice_number: purchase.invoice_number,
-                purchase_date: purchase.purchase_date.split('T')[0],
+                purchase_date: purchase.purchase_date?.split('T')[0] || '',
                 payment_status: purchase.payment_status,
                 paid_amount: purchase.paid_amount,
-                items: purchase.items.map(item => ({
+                items: (purchase.items || []).map(item => ({
                     product_id: item.product_id,
                     unit_id: item.unit_id,
                     batch_number: item.batch_number,
-                    expiry_date: item.expiry_date.split('T')[0],
+                    expiry_date: item.expiry_date?.split('T')[0] || '',
                     quantity: item.quantity,
                     unit_price: item.unit_price,
                     // Try to find the matching selling_price from product units
-                    selling_price: products.find(p => p.id === item.product_id)?.product_units.find(u => u.unit_id === item.unit_id)?.selling_price || item.unit_price
+                    selling_price: products.find(p => p.id === item.product_id)?.product_units?.find(u => u.unit_id === item.unit_id)?.selling_price || item.unit_price
                 }))
             });
         } else {
@@ -526,6 +526,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     value={item.product_id}
                                                     onChange={(event) => updateItem(index, 'product_id', event.target.value)}
                                                     required
+                                                    sx={{ minWidth: 220 }}
                                                 >
                                                     {products.map((product) => (
                                                         <MenuItem key={product.id} value={product.id}>
@@ -541,6 +542,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     onChange={(event) => updateItem(index, 'unit_id', event.target.value)}
                                                     required
                                                     disabled={!item.product_id}
+                                                    sx={{ minWidth: 120 }}
                                                 >
                                                     {unitsForProduct.map((productUnit) => (
                                                         <MenuItem key={productUnit.id} value={productUnit.unit_id}>
@@ -591,6 +593,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     value={item.batch_number}
                                                     onChange={(event) => updateItem(index, 'batch_number', event.target.value)}
                                                     placeholder="Optional (auto-generate if empty)"
+                                                    sx={{ minWidth: 180 }}
                                                 />
                                                 <TextField
                                                     size="small"
@@ -600,6 +603,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     onChange={(event) => updateItem(index, 'expiry_date', event.target.value)}
                                                     InputLabelProps={{ shrink: true }}
                                                     required
+                                                    sx={{ minWidth: 150 }}
                                                 />
                                                 <Paper
                                                     variant="outlined"
