@@ -22,9 +22,8 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ReturnsController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ReportsController;
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\SalesController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,12 +37,11 @@ use Inertia\Inertia;
 */
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
@@ -117,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy')->middleware('permission:view_financial_reports');
 
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index')->middleware('permission:view_financial_reports');
+    Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
 
     Route::get('/returns', [ReturnsController::class, 'index'])->name('returns.index')->middleware('permission:process_sale');
     Route::post('/returns', [ReturnsController::class, 'store'])->name('returns.store')->middleware('permission:process_sale');

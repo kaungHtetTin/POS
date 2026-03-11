@@ -123,6 +123,21 @@ export default function ReportsIndex({
         }));
     }, [branch_performance]);
 
+    const branchNameTick = useMemo(() => {
+        return (value) => {
+            const text = String(value ?? '');
+            if (text.length <= 14) return text;
+            return `${text.slice(0, 13)}…`;
+        };
+    }, []);
+
+    const branchYAxisWidth = useMemo(() => {
+        const maxLen = (branchPerformanceChartData || []).reduce((m, r) => Math.max(m, String(r.name ?? '').length), 0);
+        if (maxLen <= 10) return 64;
+        if (maxLen <= 14) return 76;
+        return 88;
+    }, [branchPerformanceChartData]);
+
     const profitTrendData = useMemo(() => {
         return (profit_trend || []).map((row) => ({
             period: row.period,
@@ -137,6 +152,11 @@ export default function ReportsIndex({
 
     const formatMoney = (value) => money(value);
     const pieColors = ['#1976d2', '#6a1b9a', '#2e7d32', '#f57c00', '#0288d1', '#7b1fa2', '#388e3c', '#ef6c00', '#455a64', '#c2185b', '#5d4037', '#00796b'];
+    const chartHeight = 220;
+    const chartMargin = { top: 6, right: 12, bottom: 6, left: 0 };
+    const axisTick = { fontSize: 11 };
+    const tooltipStyles = { fontSize: 12, padding: 8 };
+    const legendStyles = { fontSize: 11, lineHeight: '12px' };
 
     return (
         <MainLayout auth={auth} header="Reports">
@@ -221,9 +241,9 @@ export default function ReportsIndex({
                         </Button>
                     </Box>
 
-                    <Divider sx={{ mb: 2 }} />
+                    <Divider sx={{ mb: 1.5 }} />
 
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
                         <Chip size="small" variant="outlined" label={`Sales: ${summary?.sales_count || 0}`} />
                         <Chip size="small" variant="outlined" label={`Gross Total: ${money(summary?.grand_total)}`} color="primary" />
                         <Chip size="small" variant="outlined" label={`Tax: ${money(summary?.tax)}`} />
@@ -236,95 +256,45 @@ export default function ReportsIndex({
                         <Chip size="small" variant="outlined" label={`Net Profit: ${money(summary?.net_profit)}`} color="success" />
                     </Stack>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2 }}>
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Sales Trend ({groupBy})
                             </Typography>
-                            <Box sx={{ height: 280, mb: 1.5 }}>
+                            <Box sx={{ height: chartHeight }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={salesTrendData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="period" />
-                                        <YAxis tickFormatter={formatMoney} />
-                                        <Tooltip formatter={(v) => formatMoney(v)} />
-                                        <Legend />
-                                        <Line type="monotone" dataKey="grand_total" name="Gross Total" stroke="#1976d2" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="tax" name="Tax" stroke="#f57c00" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="net_sales" name="Net Sales" stroke="#2e7d32" strokeWidth={2} dot={false} />
+                                    <LineChart data={salesTrendData} margin={chartMargin}>
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis dataKey="period" tick={axisTick} />
+                                        <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
+                                        <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
+                                        <Line type="monotone" dataKey="grand_total" name="Gross Total" stroke="#1976d2" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="tax" name="Tax" stroke="#f57c00" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="net_sales" name="Net Sales" stroke="#2e7d32" strokeWidth={1.75} dot={false} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </Box>
-                            <TableContainer sx={{ maxHeight: 260 }}>
-                                <Table size="small" stickyHeader>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>
-                                                <Stack direction="row" spacing={1} alignItems="center">
-                                                    <CalendarIcon fontSize="small" />
-                                                    <span>Period</span>
-                                                </Stack>
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Total
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Tax
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Discount
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Grand
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {(sales_trend || []).map((row) => (
-                                            <TableRow key={row.period} hover>
-                                                <TableCell>
-                                                    <Typography variant="caption">{row.period}</Typography>
-                                                </TableCell>
-                                                <TableCell align="right">{money(row.total_amount)}</TableCell>
-                                                <TableCell align="right">{money(row.tax)}</TableCell>
-                                                <TableCell align="right">{money(row.discount)}</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 800 }}>
-                                                    {money(row.grand_total)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {(sales_trend || []).length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                                                    <Typography variant="body2" color="text.secondary italic">
-                                                        No sales data for selected range.
-                                                    </Typography>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
                         </Paper>
 
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Profit Trend ({groupBy})
                             </Typography>
-                            <Box sx={{ height: 280, mb: 1.5 }}>
+                            <Box sx={{ height: chartHeight, mb: 1 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={profitTrendData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="period" />
-                                        <YAxis tickFormatter={formatMoney} />
-                                        <Tooltip formatter={(v) => formatMoney(v)} />
-                                        <Legend />
-                                        <Line type="monotone" dataKey="gross_profit" name="Gross Profit" stroke="#2e7d32" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="net_profit" name="Net Profit" stroke="#6a1b9a" strokeWidth={2} dot={false} />
+                                    <LineChart data={profitTrendData} margin={chartMargin}>
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis dataKey="period" tick={axisTick} />
+                                        <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
+                                        <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
+                                        <Line type="monotone" dataKey="gross_profit" name="Gross Profit" stroke="#2e7d32" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="net_profit" name="Net Profit" stroke="#6a1b9a" strokeWidth={1.75} dot={false} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </Box>
-                            <TableContainer sx={{ maxHeight: 260 }}>
+                            <TableContainer sx={{ maxHeight: 210 }}>
                                 <Table size="small" stickyHeader>
                                     <TableHead>
                                         <TableRow>
@@ -368,30 +338,31 @@ export default function ReportsIndex({
                                 </Table>
                             </TableContainer>
                         </Paper>
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Expenses By Category
                             </Typography>
-                            <Box sx={{ height: 280, mb: 1.5 }}>
+                            <Box sx={{ height: chartHeight, mb: 1 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                                    <PieChart margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
                                         <Tooltip
                                             formatter={(v, _name, props) => {
                                                 const value = Number(v || 0);
                                                 const pct = expensesCategoryTotal > 0 ? (value / expensesCategoryTotal) * 100 : 0;
                                                 return [`${money(value)} (${pct.toFixed(1)}%)`, props?.payload?.name || 'Total'];
                                             }}
+                                            contentStyle={tooltipStyles}
                                         />
-                                        <Legend />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
                                         <Pie
                                             data={expensesCategoryChartData}
                                             dataKey="total"
                                             nameKey="name"
                                             cx="50%"
                                             cy="50%"
-                                            innerRadius={55}
-                                            outerRadius={100}
-                                            paddingAngle={2}
+                                            innerRadius={44}
+                                            outerRadius={84}
+                                            paddingAngle={1}
                                         >
                                             {expensesCategoryChartData.map((entry, index) => (
                                                 <Cell key={`${entry.name}-${index}`} fill={pieColors[index % pieColors.length]} />
@@ -400,7 +371,7 @@ export default function ReportsIndex({
                                     </PieChart>
                                 </ResponsiveContainer>
                             </Box>
-                            <TableContainer sx={{ maxHeight: 260 }}>
+                            <TableContainer sx={{ maxHeight: 210 }}>
                                 <Table size="small" stickyHeader>
                                     <TableHead>
                                         <TableRow>
@@ -437,28 +408,37 @@ export default function ReportsIndex({
                             </TableContainer>
                         </Paper>
 
-                        <Paper variant="outlined" sx={{ p: 2, flex: 1 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Branch Performance
                             </Typography>
-                            <Box sx={{ height: 280, mb: 1.5 }}>
+                            <Box sx={{ height: chartHeight, mb: 1 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         data={branchPerformanceChartData}
                                         layout="vertical"
-                                        margin={{ top: 10, right: 20, bottom: 10, left: 10 }}
+                                        margin={{ top: 6, right: 12, bottom: 6, left: 0 }}
+                                        barSize={10}
                                     >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={formatMoney} />
-                                        <YAxis type="category" dataKey="name" width={140} />
-                                        <Tooltip formatter={(v) => formatMoney(v)} />
-                                        <Legend />
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis type="number" tickFormatter={formatMoney} tick={axisTick} />
+                                        <YAxis
+                                            type="category"
+                                            dataKey="name"
+                                            width={branchYAxisWidth}
+                                            tick={axisTick}
+                                            tickFormatter={branchNameTick}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
                                         <Bar dataKey="grand_total" name="Gross Total" fill="#1976d2" />
                                         <Bar dataKey="tax" name="Tax" fill="#f57c00" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </Box>
-                            <TableContainer sx={{ maxHeight: 260 }}>
+                            <TableContainer sx={{ maxHeight: 210 }}>
                                 <Table size="small" stickyHeader>
                                     <TableHead>
                                         <TableRow>
@@ -510,7 +490,7 @@ export default function ReportsIndex({
                             </TableContainer>
                         </Paper>
 
-                        <Paper variant="outlined" sx={{ p: 2, gridColumn: { xs: 'auto', lg: '1 / -1' } }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 100%' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Inventory Valuation & Expiry Forecast
                             </Typography>
