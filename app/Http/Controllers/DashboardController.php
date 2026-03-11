@@ -15,7 +15,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $branchId = auth()->user()->branch_id;
+        $branchId = auth()->user()->currentBranchId();
 
         // Statistics for widgets
         $totalProducts = Product::count();

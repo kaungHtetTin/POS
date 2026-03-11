@@ -17,11 +17,15 @@ class StaffController extends Controller
     public function index()
     {
         return Inertia::render('Staff/Index', [
-            'staff' => User::with(['roles', 'branch'])->whereHas('roles', function($q) {
+            'staff' => User::with([
+                'roles',
+                'branch:id,name',
+                'branches:id,name',
+            ])->whereHas('roles', function($q) {
                 $q->where('name', '!=', 'Root');
             })->get(),
             'roles' => Role::where('name', '!=', 'Root')->get(),
-            'branches' => Branch::all(),
+            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -33,6 +37,8 @@ class StaffController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'phone' => 'nullable|string|max:20',
             'branch_id' => 'required|exists:branches,id',
+            'branch_ids' => 'nullable|array',
+            'branch_ids.*' => 'exists:branches,id',
             'role_id' => 'required|exists:roles,id',
             'image' => 'nullable|image|max:2048',
         ]);
@@ -49,9 +55,18 @@ class StaffController extends Controller
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
                 'branch_id' => $request->branch_id,
+                'active_branch_id' => $request->branch_id,
                 'image_path' => $imagePath,
             ]);
 
+            $branchIds = collect($request->branch_ids ?? [])
+                ->filter()
+                ->push($request->branch_id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $user->branches()->sync($branchIds);
             $user->roles()->attach($request->role_id);
         });
 
@@ -70,6 +85,8 @@ class StaffController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,'.$staff->id,
             'phone' => 'nullable|string|max:20',
             'branch_id' => 'required|exists:branches,id',
+            'branch_ids' => 'nullable|array',
+            'branch_ids.*' => 'exists:branches,id',
             'role_id' => 'required|exists:roles,id',
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'image' => 'nullable|image|max:2048',
@@ -81,6 +98,7 @@ class StaffController extends Controller
                 'email' => $request->email,
                 'phone' => $request->phone,
                 'branch_id' => $request->branch_id,
+                'active_branch_id' => $request->branch_id,
             ];
 
             if ($request->hasFile('image')) {
@@ -97,6 +115,14 @@ class StaffController extends Controller
 
             $staff->update($data);
 
+            $branchIds = collect($request->branch_ids ?? [])
+                ->filter()
+                ->push($request->branch_id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $staff->branches()->sync($branchIds);
             $staff->roles()->sync([$request->role_id]);
         });
 

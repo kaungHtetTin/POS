@@ -28,6 +28,8 @@ import {
     Avatar,
     Grid,
     Tooltip,
+    Checkbox,
+    ListItemText,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -118,6 +120,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     const { data, setData, post, reset, errors, processing } = useForm({
         category_id: '',
         tax_id: '',
+        tax_ids: [],
         name: '',
         generic_name: '',
         brand_name: '',
@@ -138,9 +141,14 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         if (product) {
             setEditMode(true);
             setEditingProduct(product);
+            const taxIds = (product.taxes || []).map((t) => t.id);
+            const mergedTaxIds = taxIds.length > 0
+                ? taxIds
+                : (product.tax_id ? [product.tax_id] : []);
             setData({
                 category_id: product.category_id,
-                tax_id: product.tax_id || '',
+                tax_id: mergedTaxIds[0] || '',
+                tax_ids: mergedTaxIds,
                 name: product.name,
                 generic_name: product.generic_name || '',
                 brand_name: product.brand_name || '',
@@ -370,7 +378,21 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             <Typography variant="caption">{product.manufacturer || 'N/A'}</Typography>
                                         </TableCell>
                                         <TableCell>
-                                            {product.tax ? (
+                                            {(product.taxes || []).length > 0 ? (
+                                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                                    <Typography variant="caption">
+                                                        {product.taxes[0].name} ({product.taxes[0].rate}%)
+                                                    </Typography>
+                                                    {(product.taxes || []).length > 1 && (
+                                                        <Chip
+                                                            size="small"
+                                                            label={`+${product.taxes.length - 1}`}
+                                                            variant="outlined"
+                                                            sx={{ height: 18, fontSize: 10 }}
+                                                        />
+                                                    )}
+                                                </Stack>
+                                            ) : product.tax ? (
                                                 <Typography variant="caption">{product.tax.name} ({product.tax.rate}%)</Typography>
                                             ) : (
                                                 <Typography variant="caption" color="text.secondary">No Tax</Typography>
@@ -552,16 +574,35 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
 
                             {/* Additional Details Row 2 */}
                             <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small" error={!!errors.tax_id} sx={{ minWidth: 150 }}>
-                                    <InputLabel>Applied Tax</InputLabel>
+                                <FormControl fullWidth size="small" error={!!errors.tax_id || !!errors.tax_ids} sx={{ minWidth: 150 }}>
+                                    <InputLabel>Applied Taxes</InputLabel>
                                     <Select
-                                        value={data.tax_id}
-                                        label="Applied Tax"
-                                        onChange={e => setData('tax_id', e.target.value)}
+                                        multiple
+                                        value={data.tax_ids}
+                                        label="Applied Taxes"
+                                        onChange={(e) => {
+                                            const selected = e.target.value;
+                                            const selectedIds = Array.isArray(selected) ? selected : [];
+                                            setData((prev) => ({
+                                                ...prev,
+                                                tax_ids: selectedIds,
+                                                tax_id: selectedIds[0] || '',
+                                            }));
+                                        }}
+                                        renderValue={(selected) => {
+                                            const selectedIds = Array.isArray(selected) ? selected : [];
+                                            if (selectedIds.length === 0) return 'None';
+                                            const names = taxes
+                                                .filter((t) => selectedIds.includes(t.id))
+                                                .map((t) => t.name);
+                                            return names.join(', ');
+                                        }}
                                     >
-                                        <MenuItem value="">None</MenuItem>
-                                        {taxes.map(tax => (
-                                            <MenuItem key={tax.id} value={tax.id}>{tax.name} ({tax.rate}%)</MenuItem>
+                                        {taxes.map((tax) => (
+                                            <MenuItem key={tax.id} value={tax.id}>
+                                                <Checkbox size="small" checked={(data.tax_ids || []).includes(tax.id)} />
+                                                <ListItemText primary={`${tax.name} (${tax.rate}%)`} />
+                                            </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>

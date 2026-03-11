@@ -15,7 +15,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with(['category', 'tax', 'product_units.unit']);
+        $query = Product::with(['category', 'tax', 'taxes', 'product_units.unit']);
 
         // Search by name, generic name, brand name, or barcode
         if ($request->search) {
@@ -51,6 +51,8 @@ class ProductController extends Controller
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'tax_id' => 'nullable|exists:taxes,id',
+            'tax_ids' => 'nullable|array',
+            'tax_ids.*' => 'exists:taxes,id',
             'name' => 'required|string|max:255',
             'generic_name' => 'nullable|string|max:255',
             'brand_name' => 'nullable|string|max:255',
@@ -70,11 +72,23 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated) {
+            $taxIds = collect($validated['tax_ids'] ?? [])
+                ->filter()
+                ->values();
+
+            if ($taxIds->isEmpty() && !empty($validated['tax_id'])) {
+                $taxIds = collect([$validated['tax_id']]);
+            }
+
+            $validated['tax_id'] = $taxIds->first();
+
             if ($request->hasFile('image')) {
                 $validated['image_path'] = $request->file('image')->store('product-images', 'public');
             }
 
             $product = Product::create($validated);
+
+            $product->taxes()->sync($taxIds->all());
 
             foreach ($validated['product_units'] as $unitData) {
                 $product->product_units()->create($unitData);
@@ -89,6 +103,8 @@ class ProductController extends Controller
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'tax_id' => 'nullable|exists:taxes,id',
+            'tax_ids' => 'nullable|array',
+            'tax_ids.*' => 'exists:taxes,id',
             'name' => 'required|string|max:255',
             'generic_name' => 'nullable|string|max:255',
             'brand_name' => 'nullable|string|max:255',
@@ -108,6 +124,16 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated, $product) {
+            $taxIds = collect($validated['tax_ids'] ?? [])
+                ->filter()
+                ->values();
+
+            if ($taxIds->isEmpty() && !empty($validated['tax_id'])) {
+                $taxIds = collect([$validated['tax_id']]);
+            }
+
+            $validated['tax_id'] = $taxIds->first();
+
             if ($request->hasFile('image')) {
                 if ($product->image_path) {
                     Storage::disk('public')->delete($product->image_path);
@@ -116,6 +142,8 @@ class ProductController extends Controller
             }
 
             $product->update($validated);
+
+            $product->taxes()->sync($taxIds->all());
 
             // Update product units
             $product->product_units()->delete();

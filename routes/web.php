@@ -16,6 +16,11 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\StockTransferController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\ActiveBranchController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ReturnsController;
+use App\Http\Controllers\ExpenseCategoryController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -100,6 +105,30 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/inventory/transfers', [StockTransferController::class, 'index'])->name('inventory.transfers.index')->middleware('permission:manage_inventory');
     Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store')->middleware('permission:manage_inventory');
+
+    Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware('permission:view_financial_reports');
+    Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store')->middleware('permission:view_financial_reports');
+    Route::patch('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update')->middleware('permission:view_financial_reports');
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy')->middleware('permission:view_financial_reports');
+    Route::get('/expense-categories', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index')->middleware('permission:view_financial_reports');
+    Route::post('/expense-categories', [ExpenseCategoryController::class, 'store'])->name('expense-categories.store')->middleware('permission:view_financial_reports');
+    Route::patch('/expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update'])->name('expense-categories.update')->middleware('permission:view_financial_reports');
+    Route::delete('/expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy')->middleware('permission:view_financial_reports');
+
+    Route::get('/returns', [ReturnsController::class, 'index'])->name('returns.index')->middleware('permission:process_sale');
+    Route::post('/returns', [ReturnsController::class, 'store'])->name('returns.store')->middleware('permission:process_sale');
+    Route::post('/returns/status/{return}', [ReturnsController::class, 'updateStatus'])->name('returns.status')->middleware('permission:approve_returns');
+    Route::get('/returns/lookup/sale', [ReturnsController::class, 'lookupSale'])->name('returns.lookup.sale')->middleware('permission:process_sale');
+    Route::get('/returns/lookup/purchase', [ReturnsController::class, 'lookupPurchase'])->name('returns.lookup.purchase')->middleware('permission:process_sale');
+
+    Route::get('/pos', [PosController::class, 'index'])->name('pos.index')->middleware('permission:process_sale');
+    Route::get('/pos/products', [PosController::class, 'products'])->name('pos.products')->middleware('permission:process_sale');
+    Route::get('/pos/categories', [PosController::class, 'categories'])->name('pos.categories')->middleware('permission:process_sale');
+    Route::get('/pos/catalog', [PosController::class, 'catalog'])->name('pos.catalog')->middleware('permission:process_sale');
+    Route::get('/pos/scan', [PosController::class, 'scan'])->name('pos.scan')->middleware('permission:process_sale');
+    Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout')->middleware('permission:process_sale');
+
+    Route::post('/active-branch', [ActiveBranchController::class, 'update'])->name('active-branch.update');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
 });

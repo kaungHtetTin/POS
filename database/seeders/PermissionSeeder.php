@@ -14,6 +14,7 @@ class PermissionSeeder extends Seeder
             // Sales
             ['name' => 'Process Sale', 'slug' => 'process_sale'],
             ['name' => 'Cancel Transaction', 'slug' => 'cancel_transaction'],
+            ['name' => 'Approve Returns', 'slug' => 'approve_returns'],
             
             // Products
             ['name' => 'Add Products', 'slug' => 'add_products'],
@@ -53,6 +54,7 @@ class PermissionSeeder extends Seeder
             $manager->permissions()->sync([
                 $createdPermissions['process_sale']->id,
                 $createdPermissions['cancel_transaction']->id,
+                $createdPermissions['approve_returns']->id,
                 $createdPermissions['add_products']->id,
                 $createdPermissions['edit_products']->id,
                 $createdPermissions['manage_inventory']->id,

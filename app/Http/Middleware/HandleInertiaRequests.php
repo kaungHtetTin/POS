@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Branch;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tightenco\Ziggy\Ziggy;
@@ -35,6 +36,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user() ? array_merge($request->user()->toArray(), [
                     'roles' => $request->user()->roles->pluck('name'),
                     'permissions' => $request->user()->roles->flatMap->permissions->pluck('slug')->unique()->values(),
+                    'current_branch_id' => $request->user()->currentBranchId(),
+                    'accessible_branches' => $this->getAccessibleBranches($request),
                 ]) : null,
             ],
             'ziggy' => function () use ($request) {
@@ -47,5 +50,40 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
             ],
         ]);
+    }
+
+    protected function getAccessibleBranches(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return [];
+            }
+
+            if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+                return Branch::select('id', 'name')->orderBy('name')->get();
+            }
+
+            $branchIds = collect([$user->branch_id, $user->active_branch_id])
+                ->filter()
+                ->values();
+
+            try {
+                $extraIds = $user->branches()->pluck('branches.id');
+                $branchIds = $branchIds->merge($extraIds)->unique()->values();
+            } catch (\Throwable $e) {
+            }
+
+            if ($branchIds->isEmpty()) {
+                return [];
+            }
+
+            return Branch::select('id', 'name')
+                ->whereIn('id', $branchIds)
+                ->orderBy('name')
+                ->get();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 }

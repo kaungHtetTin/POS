@@ -26,6 +26,8 @@ import {
     Select,
     MenuItem,
     Avatar,
+    Checkbox,
+    ListItemText,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -48,21 +50,31 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
         email: '',
         phone: '',
         branch_id: '',
+        branch_ids: [],
         role_id: '',
         password: '',
         password_confirmation: '',
         image: null,
     });
 
+    const ensurePrimaryBranchIncluded = (primaryBranchId, selectedBranchIds) => {
+        const ids = Array.isArray(selectedBranchIds) ? selectedBranchIds : [];
+        if (!primaryBranchId) return ids;
+        if (ids.includes(primaryBranchId)) return ids;
+        return [...ids, primaryBranchId];
+    };
+
     const handleOpen = (member = null) => {
         if (member) {
             setEditMode(true);
             setEditingStaff(member);
+            const selectedBranchIds = (member.branches || []).map((b) => b.id);
             setData({
                 name: member.name,
                 email: member.email,
                 phone: member.phone || '',
                 branch_id: member.branch_id,
+                branch_ids: ensurePrimaryBranchIncluded(member.branch_id, selectedBranchIds),
                 role_id: member.roles[0]?.id || '',
                 password: '',
                 password_confirmation: '',
@@ -72,6 +84,17 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
             setEditMode(false);
             setEditingStaff(null);
             reset();
+            setData({
+                name: '',
+                email: '',
+                phone: '',
+                branch_id: '',
+                branch_ids: [],
+                role_id: '',
+                password: '',
+                password_confirmation: '',
+                image: null,
+            });
         }
         setOpen(true);
     };
@@ -177,6 +200,14 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                             <Stack direction="row" spacing={0.5} alignItems="center">
                                                 <StoreIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                                                 <Typography variant="body2">{member.branch?.name}</Typography>
+                                                {(member.branches || []).length > 1 && (
+                                                    <Chip
+                                                        size="small"
+                                                        label={`+${(member.branches || []).length - 1}`}
+                                                        variant="outlined"
+                                                        sx={{ height: 18, fontSize: 10 }}
+                                                    />
+                                                )}
                                             </Stack>
                                         </TableCell>
                                         <TableCell>
@@ -283,7 +314,14 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     <Select
                                         value={data.branch_id}
                                         label="Branch"
-                                        onChange={e => setData('branch_id', e.target.value)}
+                                        onChange={(e) => {
+                                            const primaryBranchId = e.target.value;
+                                            setData((prev) => ({
+                                                ...prev,
+                                                branch_id: primaryBranchId,
+                                                branch_ids: ensurePrimaryBranchIncluded(primaryBranchId, prev.branch_ids),
+                                            }));
+                                        }}
                                     >
                                         {branches.map(branch => (
                                             <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>
@@ -304,6 +342,48 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     </Select>
                                 </FormControl>
                             </Stack>
+
+                            <FormControl fullWidth size="small" error={!!errors.branch_ids}>
+                                <InputLabel>Branch Access</InputLabel>
+                                <Select
+                                    multiple
+                                    value={data.branch_ids}
+                                    label="Branch Access"
+                                    onChange={(e) => {
+                                        const selected = e.target.value;
+                                        setData((prev) => ({
+                                            ...prev,
+                                            branch_ids: ensurePrimaryBranchIncluded(prev.branch_id, selected),
+                                        }));
+                                    }}
+                                    renderValue={(selected) => {
+                                        const selectedIds = Array.isArray(selected) ? selected : [];
+                                        const names = branches
+                                            .filter((b) => selectedIds.includes(b.id))
+                                            .map((b) => b.name);
+                                        return names.join(', ');
+                                    }}
+                                >
+                                    {branches.map((branch) => {
+                                        const isPrimary = branch.id === data.branch_id;
+                                        const checked = (data.branch_ids || []).includes(branch.id);
+                                        return (
+                                            <MenuItem key={branch.id} value={branch.id} disabled={isPrimary}>
+                                                <Checkbox size="small" checked={checked} />
+                                                <ListItemText primary={branch.name} />
+                                                {isPrimary && (
+                                                    <Chip size="small" label="Primary" sx={{ ml: 1, height: 18, fontSize: 10 }} />
+                                                )}
+                                            </MenuItem>
+                                        );
+                                    })}
+                                </Select>
+                                {errors.branch_ids && (
+                                    <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                                        {errors.branch_ids}
+                                    </Typography>
+                                )}
+                            </FormControl>
 
                             <Divider sx={{ my: 1 }}>
                                 <Chip label="Security" size="small" />

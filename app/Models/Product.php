@@ -44,6 +44,11 @@ class Product extends Model
         return $this->belongsTo(Tax::class);
     }
 
+    public function taxes()
+    {
+        return $this->belongsToMany(Tax::class)->withTimestamps();
+    }
+
     public function units()
     {
         return $this->belongsToMany(Unit::class, 'product_units')

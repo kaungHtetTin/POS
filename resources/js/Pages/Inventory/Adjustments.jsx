@@ -41,7 +41,7 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
     const [loadingBatches, setLoadingBatches] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        branch_id: auth.user?.branch_id || branches[0]?.id || '',
+        branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
         product_id: '',
         inventory_batch_id: '',
         adjustment_type: 'Damage',

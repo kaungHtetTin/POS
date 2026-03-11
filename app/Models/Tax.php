@@ -20,4 +20,9 @@ class Tax extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    public function productsWithTax()
+    {
+        return $this->belongsToMany(Product::class)->withTimestamps();
+    }
 }

@@ -31,6 +31,7 @@ import {
     ShoppingCart as POSIcon,
     People as CustomersIcon,
     Assessment as ReportsIcon,
+    Payments as ExpensesIcon,
     Settings as SettingsIcon,
     Logout as LogoutIcon,
     Person as PersonIcon,
@@ -47,6 +48,8 @@ import {
     ReceiptLong as PurchaseIcon,
     SwapHoriz as AdjustmentIcon,
     CompareArrows as TransferIcon,
+    AssignmentReturn as ReturnIcon,
+    Label as ExpenseCategoryIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -86,7 +89,7 @@ export default function MainLayout({ children, header }) {
 
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
-        { text: 'POS', icon: <POSIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        { text: 'POS', icon: <POSIcon fontSize="small" />, href: route('pos.index'), routePattern: 'pos.*', permission: 'process_sale' },
         { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
         { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },
         { text: 'Categories', icon: <CategoryIcon fontSize="small" />, href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_inventory' },
@@ -97,6 +100,9 @@ export default function MainLayout({ children, header }) {
         { text: 'Adjustments', icon: <AdjustmentIcon fontSize="small" />, href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'manage_inventory' },
         { text: 'Transfers', icon: <TransferIcon fontSize="small" />, href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'manage_inventory' },
         { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        { text: 'Returns', icon: <ReturnIcon fontSize="small" />, href: route('returns.index'), routePattern: 'returns.*', permission: 'process_sale' },
+        { text: 'Expenses', icon: <ExpensesIcon fontSize="small" />, href: route('expenses.index'), routePattern: 'expenses.*', permission: 'view_financial_reports' },
+        { text: 'Expense Categories', icon: <ExpenseCategoryIcon fontSize="small" />, href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'view_financial_reports' },
         { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: '#', routePattern: null, permission: 'view_financial_reports' },
         { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
         { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },

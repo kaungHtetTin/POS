@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'image_path',
         'branch_id',
+        'active_branch_id',
         'phone',
         'status',
     ];
@@ -62,6 +63,30 @@ class User extends Authenticatable
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function branches()
+    {
+        return $this->belongsToMany(Branch::class)->withTimestamps();
+    }
+
+    public function activeBranch()
+    {
+        return $this->belongsTo(Branch::class, 'active_branch_id');
+    }
+
+    public function currentBranchId()
+    {
+        return $this->active_branch_id ?: $this->branch_id;
+    }
+
+    public function canAccessBranch(string $branchId): bool
+    {
+        if ($this->branch_id && $this->branch_id === $branchId) {
+            return true;
+        }
+
+        return $this->branches()->where('branches.id', $branchId)->exists();
     }
 
     /**

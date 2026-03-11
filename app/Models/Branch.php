@@ -23,4 +23,9 @@ class Branch extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function usersWithAccess()
+    {
+        return $this->belongsToMany(User::class)->withTimestamps();
+    }
 }

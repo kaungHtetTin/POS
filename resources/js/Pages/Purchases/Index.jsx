@@ -53,7 +53,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
     const { data, setData, post, patch, delete: destroy, processing, errors, reset } = useForm({
         supplier_id: '',
-        branch_id: auth.user?.branch_id || branches[0]?.id || '',
+        branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
         invoice_number: '',
         purchase_date: new Date().toISOString().split('T')[0],
         payment_status: 'Due',
