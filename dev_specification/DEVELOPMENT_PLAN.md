@@ -1,10 +1,10 @@
 # Pharmacy POS System: Development Roadmap & Timeline (Refined)
 
-This document outlines the step-by-step development process for the Pharmacy POS project, including technical milestones and estimated timeframes.
+This document outlines the step-by-step development process for the Pharmacy POS project, including technical milestones and estimated timeframes. **Checkbox status is aligned with actual codebase state** — see [CURRENT_PROJECT_STATE.md](CURRENT_PROJECT_STATE.md) for a detailed implementation summary and gaps.
 
 ---
 
-## Phase 1: Core Foundation & UI Framework (Current Phase)
+## Phase 1: Core Foundation & UI Framework
 
 **Estimated Duration: 1 Week**
 
@@ -59,12 +59,12 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 3 Weeks**
 
-- [ ] **POS Interface**:
-    - [ ] High-speed search and barcode scanner integration.
-    - [ ] Multi-unit selection at checkout with auto-price adjustment.
-    - [ ] Cart management, tax calculation, and discounts.
-- [ ] **Checkout & Payments**:
-    - [ ] Split payments (Cash, Card, Wallet).
+- [x] **POS Interface**:
+    - [x] High-speed search and barcode scanner integration.
+    - [x] Multi-unit selection at checkout with auto-price adjustment.
+    - [x] Cart management, tax calculation, and discounts.
+- [x] **Checkout & Payments**:
+    - [x] Split payments (Cash, Card, Wallet).
     - [ ] Thermal receipt printing (80mm/58mm).
 - [ ] **Prescription Handling**: Upload and link digital prescriptions to sales records.
 
@@ -86,12 +86,12 @@ This document outlines the step-by-step development process for the Pharmacy POS
 
 **Estimated Duration: 2 Weeks**
 
-- [ ] **Expense Tracking**: Manage operational costs (Rent, Salaries, Utilities).
-- [ ] **Returns & Refunds**: Customer sales returns and supplier purchase returns.
-- [ ] **Reporting Engine**:
-    - [ ] Daily/Monthly Sales, Profit, and Tax reports.
-    - [ ] Inventory valuation and expiry forecasting.
-    - [ ] Branch performance analytics.
+- [x] **Expense Tracking**: Manage operational costs (Rent, Salaries, Utilities).
+- [x] **Returns & Refunds**: Customer sales returns and supplier purchase returns.
+- [x] **Reporting Engine**:
+    - [x] Daily/Monthly Sales, Profit, and Tax reports.
+    - [x] Inventory valuation and expiry forecasting.
+    - [x] Branch performance analytics.
 
 ---
 

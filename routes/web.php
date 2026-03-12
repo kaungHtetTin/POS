@@ -19,6 +19,7 @@ use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ActiveBranchController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ReturnsController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ReportsController;
@@ -117,6 +118,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index')->middleware('permission:view_financial_reports');
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
 
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('permission:process_sale');
+    Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store')->middleware('permission:process_sale');
+    Route::patch('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update')->middleware('permission:process_sale');
+    Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('permission:process_sale');
+
     Route::get('/returns', [ReturnsController::class, 'index'])->name('returns.index')->middleware('permission:process_sale');
     Route::post('/returns', [ReturnsController::class, 'store'])->name('returns.store')->middleware('permission:process_sale');
     Route::post('/returns/status/{return}', [ReturnsController::class, 'updateStatus'])->name('returns.status')->middleware('permission:approve_returns');
@@ -128,6 +134,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/pos/categories', [PosController::class, 'categories'])->name('pos.categories')->middleware('permission:process_sale');
     Route::get('/pos/catalog', [PosController::class, 'catalog'])->name('pos.catalog')->middleware('permission:process_sale');
     Route::get('/pos/scan', [PosController::class, 'scan'])->name('pos.scan')->middleware('permission:process_sale');
+    Route::get('/pos/customers', [PosController::class, 'customers'])->name('pos.customers')->middleware('permission:process_sale');
+    Route::post('/pos/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store')->middleware('permission:process_sale');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout')->middleware('permission:process_sale');
 
     Route::post('/active-branch', [ActiveBranchController::class, 'update'])->name('active-branch.update');

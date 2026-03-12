@@ -1,14 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PosLayout from '@/Layouts/PosLayout';
 import { Head, useForm } from '@inertiajs/react';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Card,
     CardActionArea,
     CardContent,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Divider,
     IconButton,
     InputAdornment,
@@ -28,7 +33,9 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
+    PersonAdd as PersonAddIcon,
     Delete as DeleteIcon,
+    Close as CloseIcon,
     QrCodeScanner as ScanIcon,
     Search as SearchIcon,
     ShoppingCartCheckout as CheckoutIcon,
@@ -50,6 +57,14 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
     const [catalogPage, setCatalogPage] = useState(1);
     const [catalogHasMore, setCatalogHasMore] = useState(false);
     const [catalogLoading, setCatalogLoading] = useState(false);
+    const [customerOptions, setCustomerOptions] = useState([]);
+    const [customerSearchInput, setCustomerSearchInput] = useState('');
+    const [customerLoading, setCustomerLoading] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+    const [newCustomerForm, setNewCustomerForm] = useState({ name: '', phone: '', email: '', address: '' });
+    const [newCustomerSubmitting, setNewCustomerSubmitting] = useState(false);
+    const [newCustomerError, setNewCustomerError] = useState('');
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
@@ -72,6 +87,77 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
             quantity: line.quantity,
         })));
     }, [cart, setData]);
+
+    useEffect(() => {
+        setData('customer_id', selectedCustomer?.id ?? null);
+    }, [selectedCustomer, setData]);
+
+    const fetchCustomers = useCallback(async (query) => {
+        setCustomerLoading(true);
+        try {
+            const response = await fetch(route('pos.customers', { query: query.trim() || undefined }));
+            const list = await response.json();
+            setCustomerOptions(Array.isArray(list) ? list : []);
+        } catch {
+            setCustomerOptions([]);
+        } finally {
+            setCustomerLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        const t = setTimeout(() => {
+            fetchCustomers(customerSearchInput);
+        }, 300);
+        return () => clearTimeout(t);
+    }, [customerSearchInput, fetchCustomers]);
+
+    const openNewCustomer = () => {
+        setNewCustomerForm({ name: '', phone: '', email: '', address: '' });
+        setNewCustomerError('');
+        setNewCustomerOpen(true);
+    };
+
+    const closeNewCustomer = () => {
+        setNewCustomerOpen(false);
+        setNewCustomerError('');
+    };
+
+    const submitNewCustomer = async (e) => {
+        e.preventDefault();
+        setNewCustomerError('');
+        if (!newCustomerForm.name?.trim()) {
+            setNewCustomerError('Name is required.');
+            return;
+        }
+        setNewCustomerSubmitting(true);
+        try {
+            const response = await fetch(route('pos.customers.store'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(newCustomerForm),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const errors = data?.errors ? Object.values(data.errors).flat() : [];
+                const msg = errors.length ? errors.join(' ') : (data?.message || 'Failed to create customer.');
+                setNewCustomerError(msg);
+                return;
+            }
+            setSelectedCustomer(data);
+            setCustomerOptions((prev) => (prev.some((c) => c.id === data.id) ? prev : [data, ...prev]));
+            closeNewCustomer();
+        } catch {
+            setNewCustomerError('Network error. Please try again.');
+        } finally {
+            setNewCustomerSubmitting(false);
+        }
+    };
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
@@ -284,6 +370,9 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                 setSearchResults([]);
                 setSearchQuery('');
                 setScanError('');
+                setSelectedCustomer(null);
+                setCustomerSearchInput('');
+                setData('customer_id', null);
                 setData('discount', 0);
                 setData('payment_method', paymentMethods?.[0] || 'Cash');
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
@@ -453,7 +542,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                 sx={{
                                     mt: 1,
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                    gridTemplateColumns: 'repeat(3, 1fr)',
                                     gap: 1.5,
                                 }}
                             >
@@ -672,6 +761,53 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
 
                         <Box component="form" onSubmit={submit}>
                             <Stack spacing={1.5}>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                        Customer (optional)
+                                    </Typography>
+                                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                                        <Autocomplete
+                                            size="small"
+                                            fullWidth
+                                            options={customerOptions}
+                                            value={selectedCustomer}
+                                            onChange={(e, value) => setSelectedCustomer(value)}
+                                            inputValue={customerSearchInput}
+                                            onInputChange={(e, value) => setCustomerSearchInput(value || '')}
+                                            getOptionLabel={(option) => (option?.name ?? '') || ''}
+                                            renderOption={(props, option) => (
+                                                <li {...props} key={option.id}>
+                                                    <Stack>
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {[option.phone, option.email].filter(Boolean).join(' · ') || 'No contact'}
+                                                        </Typography>
+                                                    </Stack>
+                                                </li>
+                                            )}
+                                            loading={customerLoading}
+                                            isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    placeholder="Search by name, phone, or email..."
+                                                    size="small"
+                                                />
+                                            )}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<PersonAddIcon />}
+                                            onClick={openNewCustomer}
+                                            sx={{ minWidth: 140 }}
+                                        >
+                                            New customer
+                                        </Button>
+                                    </Stack>
+                                </Box>
+
                                 <Stack direction="row" spacing={1}>
                                     <TextField
                                         select
@@ -725,6 +861,68 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                     </Paper>
                 </Box>
             </Box>
+
+            <Dialog open={newCustomerOpen} onClose={closeNewCustomer} maxWidth="sm" fullWidth>
+                <form onSubmit={submitNewCustomer}>
+                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        New customer
+                        <IconButton size="small" onClick={closeNewCustomer}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2} sx={{ mt: 0.5 }}>
+                            {newCustomerError && (
+                                <Alert severity="error" onClose={() => setNewCustomerError('')}>
+                                    {newCustomerError}
+                                </Alert>
+                            )}
+                            <TextField
+                                size="small"
+                                label="Name"
+                                fullWidth
+                                value={newCustomerForm.name}
+                                onChange={(e) => setNewCustomerForm((p) => ({ ...p, name: e.target.value }))}
+                                required
+                            />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField
+                                    size="small"
+                                    label="Phone"
+                                    fullWidth
+                                    value={newCustomerForm.phone}
+                                    onChange={(e) => setNewCustomerForm((p) => ({ ...p, phone: e.target.value }))}
+                                />
+                                <TextField
+                                    size="small"
+                                    label="Email"
+                                    fullWidth
+                                    type="email"
+                                    value={newCustomerForm.email}
+                                    onChange={(e) => setNewCustomerForm((p) => ({ ...p, email: e.target.value }))}
+                                />
+                            </Stack>
+                            <TextField
+                                size="small"
+                                label="Address"
+                                fullWidth
+                                multiline
+                                rows={2}
+                                value={newCustomerForm.address}
+                                onChange={(e) => setNewCustomerForm((p) => ({ ...p, address: e.target.value }))}
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button type="button" size="small" onClick={closeNewCustomer}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" variant="contained" size="small" disabled={newCustomerSubmitting}>
+                            {newCustomerSubmitting ? 'Creating…' : 'Create & use'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
         </PosLayout>
     );
 }

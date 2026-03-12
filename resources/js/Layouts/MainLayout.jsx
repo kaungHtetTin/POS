@@ -105,7 +105,7 @@ export default function MainLayout({ children, header }) {
         adjustments: { text: 'Adjustments', icon: <AdjustmentIcon fontSize="small" />, href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'manage_inventory' },
         transfers: { text: 'Transfers', icon: <TransferIcon fontSize="small" />, href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'manage_inventory' },
 
-        customers: { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: '#', routePattern: null, permission: 'process_sale' },
+        customers: { text: 'Customers', icon: <CustomersIcon fontSize="small" />, href: route('customers.index'), routePattern: 'customers.*', permission: 'process_sale' },
         returns: { text: 'Returns', icon: <ReturnIcon fontSize="small" />, href: route('returns.index'), routePattern: 'returns.*', permission: 'process_sale' },
 
         sales: { text: 'Sales', icon: <SalesIcon fontSize="small" />, href: route('sales.index'), routePattern: 'sales.*', permission: 'view_financial_reports' },

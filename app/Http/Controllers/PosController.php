@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use Illuminate\Http\Request;
@@ -465,5 +466,51 @@ class PosController extends Controller
         } while (Sale::where('invoice_number', $candidate)->exists());
 
         return $candidate;
+    }
+
+    /**
+     * Search customers for POS autocomplete (JSON).
+     */
+    public function customers(Request $request)
+    {
+        $query = trim((string) $request->query('query', ''));
+        $limit = min(25, max(5, (int) $request->query('limit', 15)));
+
+        $customers = Customer::query()
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where(function ($q) use ($query) {
+                    $q->where('name', 'like', "%{$query}%")
+                        ->orWhere('phone', 'like', "%{$query}%")
+                        ->orWhere('email', 'like', "%{$query}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit($limit)
+            ->get(['id', 'name', 'phone', 'email', 'address']);
+
+        return response()->json($customers);
+    }
+
+    /**
+     * Quick-create a customer from POS (JSON).
+     */
+    public function storeCustomer(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:500',
+        ]);
+
+        $customer = Customer::create($validated);
+
+        return response()->json([
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'phone' => $customer->phone,
+            'email' => $customer->email,
+            'address' => $customer->address,
+        ]);
     }
 }
