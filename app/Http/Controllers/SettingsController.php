@@ -44,13 +44,62 @@ class SettingsController extends Controller
             'invoice_prefix' => Setting::get('invoice.prefix', 'S'),
         ];
 
+        $labels = [
+            'width' => (int) Setting::get('label.width', '50'),
+            'height' => (int) Setting::get('label.height', '30'),
+            'labels_per_row' => (int) Setting::get('label.per_row', '1'),
+            'show_pharmacy_name' => Setting::get('label.show_pharmacy', '1') === '1',
+            'show_product_name' => Setting::get('label.show_product', '1') === '1',
+            'show_generic_name' => Setting::get('label.show_generic', '0') === '1',
+            'show_price' => Setting::get('label.show_price', '1') === '1',
+            'show_expiry' => Setting::get('label.show_expiry', '1') === '1',
+            'show_batch' => Setting::get('label.show_batch', '0') === '1',
+            'font_size' => (int) Setting::get('label.font_size', '8'),
+            'barcode_height' => (int) Setting::get('label.barcode_height', '10'),
+            'symbology' => Setting::get('label.symbology', 'CODE_128'),
+        ];
+
         return Inertia::render('Settings/Index', [
             'pos_behavior' => $posBehavior,
             'notifications' => $notifications,
             'localization' => $localization,
             'invoice' => $invoice,
+            'labels' => $labels,
             'taxes' => \App\Models\Tax::where('status', 'Active')->get(['id', 'name', 'rate']),
         ]);
+    }
+
+    public function updateLabels(Request $request)
+    {
+        $validated = $request->validate([
+            'width' => 'required|integer|min:10|max:210',
+            'height' => 'required|integer|min:10|max:297',
+            'labels_per_row' => 'required|integer|min:1|max:10',
+            'show_pharmacy_name' => 'required|boolean',
+            'show_product_name' => 'required|boolean',
+            'show_generic_name' => 'required|boolean',
+            'show_price' => 'required|boolean',
+            'show_expiry' => 'required|boolean',
+            'show_batch' => 'required|boolean',
+            'font_size' => 'required|integer|min:4|max:24',
+            'barcode_height' => 'required|integer|min:5|max:50',
+            'symbology' => 'required|in:CODE_128,EAN_13,QR_CODE',
+        ]);
+
+        Setting::set('label.width', (string) $validated['width']);
+        Setting::set('label.height', (string) $validated['height']);
+        Setting::set('label.per_row', (string) $validated['labels_per_row']);
+        Setting::set('label.show_pharmacy', $validated['show_pharmacy_name'] ? '1' : '0');
+        Setting::set('label.show_product', $validated['show_product_name'] ? '1' : '0');
+        Setting::set('label.show_generic', $validated['show_generic_name'] ? '1' : '0');
+        Setting::set('label.show_price', $validated['show_price_name'] ?? $validated['show_price'] ? '1' : '0');
+        Setting::set('label.show_expiry', $validated['show_expiry'] ? '1' : '0');
+        Setting::set('label.show_batch', $validated['show_batch'] ? '1' : '0');
+        Setting::set('label.font_size', (string) $validated['font_size']);
+        Setting::set('label.barcode_height', (string) $validated['barcode_height']);
+        Setting::set('label.symbology', $validated['symbology']);
+
+        return redirect()->back()->with('success', 'Label settings updated successfully.');
     }
 
     public function updateInvoice(Request $request)

@@ -22,10 +22,11 @@ import {
     SettingsApplications as PosIcon,
     Notifications as NotificationsIcon,
     Language as LanguageIcon,
-    Receipt as InvoiceIcon
+    Receipt as InvoiceIcon,
+    QrCode as LabelIcon
 } from '@mui/icons-material';
 
-export default function Settings({ auth, pos_behavior: posBehavior = {}, notifications: notificationSettings = {}, localization: localizationSettings = {}, invoice: invoiceSettings = {}, taxes = [] }) {
+export default function Settings({ auth, pos_behavior: posBehavior = {}, notifications: notificationSettings = {}, localization: localizationSettings = {}, invoice: invoiceSettings = {}, labels: labelSettings = {}, taxes = [] }) {
     const [tabValue, setTabValue] = React.useState(0);
 
     const posForm = useForm({
@@ -61,6 +62,117 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         receipt_footer: invoiceSettings.receipt_footer ?? '',
         invoice_prefix: invoiceSettings.invoice_prefix ?? 'S',
     });
+
+    const labelForm = useForm({
+        width: labelSettings.width ?? 50,
+        height: labelSettings.height ?? 30,
+        labels_per_row: labelSettings.labels_per_row ?? 1,
+        show_pharmacy_name: !!labelSettings.show_pharmacy_name,
+        show_product_name: !!labelSettings.show_product_name,
+        show_generic_name: !!labelSettings.show_generic_name,
+        show_price: !!labelSettings.show_price,
+        show_expiry: !!labelSettings.show_expiry,
+        show_batch: !!labelSettings.show_batch,
+        font_size: labelSettings.font_size ?? 8,
+        barcode_height: labelSettings.barcode_height ?? 10,
+        symbology: labelSettings.symbology ?? 'CODE_128',
+    });
+
+    const LabelPreview = () => {
+        const { data } = labelForm;
+        const pharmacyName = invoiceSettings.pharmacy_name || 'Your Pharmacy';
+        const currencySymbol = localizationSettings.currency_symbol || '$';
+
+        return (
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                mt: 2, 
+                p: 2, 
+                bgcolor: 'grey.100', 
+                borderRadius: 1,
+                border: '1px dashed',
+                borderColor: 'divider'
+            }}>
+                <Typography variant="caption" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>LIVE PREVIEW</Typography>
+                <Box sx={{ 
+                    width: `${data.width * 3.78}px`, // mm to px conversion (approx)
+                    height: `${data.height * 3.78}px`,
+                    bgcolor: 'white',
+                    boxShadow: 3,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    p: '2mm',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                    textAlign: 'center',
+                    border: '1px solid #ccc'
+                }}>
+                    {data.show_pharmacy_name && (
+                        <Typography sx={{ fontSize: `${data.font_size - 2}pt`, fontWeight: 'bold', whiteSpace: 'nowrap', lineHeight: 1 }}>
+                            {pharmacyName}
+                        </Typography>
+                    )}
+                    {data.show_product_name && (
+                        <Typography sx={{ fontSize: `${data.font_size}pt`, fontWeight: 'bold', lineHeight: 1.1, mt: 0.5 }}>
+                            Sample Medicine Name
+                        </Typography>
+                    )}
+                    {data.show_generic_name && (
+                        <Typography sx={{ fontSize: `${data.font_size - 1}pt`, fontStyle: 'italic', color: 'text.secondary', lineHeight: 1 }}>
+                            Generic Name
+                        </Typography>
+                    )}
+                    
+                    {/* Mock Barcode */}
+                    <Box sx={{ 
+                        width: '80%', 
+                        height: `${data.barcode_height * 3.78}px`, 
+                        mt: 0.5, 
+                        mb: 0.2,
+                        display: 'flex',
+                        gap: '1px',
+                        alignItems: 'flex-end'
+                    }}>
+                        {[...Array(20)].map((_, i) => (
+                            <Box key={i} sx={{ 
+                                flex: 1, 
+                                height: `${Math.random() * 20 + 80}%`, 
+                                bgcolor: 'black',
+                                width: i % 3 === 0 ? '2px' : '1px'
+                            }} />
+                        ))}
+                    </Box>
+                    <Typography sx={{ fontSize: '6pt', lineHeight: 1 }}>123456789012</Typography>
+
+                    <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        width: '100%', 
+                        mt: 0.5,
+                        px: 0.5
+                    }}>
+                        {data.show_price && (
+                            <Typography sx={{ fontSize: `${data.font_size - 1}pt`, fontWeight: 'bold' }}>
+                                {currencySymbol}10.00
+                            </Typography>
+                        )}
+                        {data.show_expiry && (
+                            <Typography sx={{ fontSize: `${data.font_size - 2}pt` }}>
+                                Exp: 31/12/26
+                            </Typography>
+                        )}
+                    </Box>
+                </Box>
+                <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary' }}>
+                    Approximate size: {data.width}mm x {data.height}mm
+                </Typography>
+            </Box>
+        );
+    };
 
     useEffect(() => {
         posForm.setData({
@@ -104,6 +216,23 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         });
     }, [invoiceSettings]);
 
+    useEffect(() => {
+        labelForm.setData({
+            width: labelSettings.width ?? 50,
+            height: labelSettings.height ?? 30,
+            labels_per_row: labelSettings.labels_per_row ?? 1,
+            show_pharmacy_name: !!labelSettings.show_pharmacy_name,
+            show_product_name: !!labelSettings.show_product_name,
+            show_generic_name: !!labelSettings.show_generic_name,
+            show_price: !!labelSettings.show_price,
+            show_expiry: !!labelSettings.show_expiry,
+            show_batch: !!labelSettings.show_batch,
+            font_size: labelSettings.font_size ?? 8,
+            barcode_height: labelSettings.barcode_height ?? 10,
+            symbology: labelSettings.symbology ?? 'CODE_128',
+        });
+    }, [labelSettings]);
+
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
     };
@@ -119,6 +248,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                         <Tab icon={<NotificationsIcon fontSize="small" />} iconPosition="start" label="Notifications" />
                         <Tab icon={<LanguageIcon fontSize="small" />} iconPosition="start" label="Localization" />
                         <Tab icon={<InvoiceIcon fontSize="small" />} iconPosition="start" label="Invoice & Receipt" />
+                        <Tab icon={<LabelIcon fontSize="small" />} iconPosition="start" label="Labels & Barcodes" />
                     </Tabs>
                 </Paper>
 
@@ -591,6 +721,165 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                     disabled={invoiceForm.processing}
                                 >
                                     {invoiceForm.processing ? 'Saving…' : 'Save Invoice Settings'}
+                                </Button>
+                            </Box>
+                        </Box>
+                    </Paper>
+                )}
+
+                {tabValue === 4 && (
+                    <Paper sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                            LABELS & BARCODES
+                        </Typography>
+                        <Divider sx={{ my: 1.5 }} />
+
+                        <Box
+                            component="form"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                labelForm.patch(route('settings.labels.update'));
+                            }}
+                        >
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={8}>
+                                    <Grid container spacing={3}>
+                                        <Grid item xs={12}>
+                                            <Typography variant="caption" color="primary" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+                                                Paper Dimensions (mm)
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                label="Label Width (mm)"
+                                                value={labelForm.data.width}
+                                                onChange={(e) => labelForm.setData('width', e.target.value)}
+                                                error={!!labelForm.errors.width}
+                                                helperText={labelForm.errors.width || "e.g. 50"}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                label="Label Height (mm)"
+                                                value={labelForm.data.height}
+                                                onChange={(e) => labelForm.setData('height', e.target.value)}
+                                                error={!!labelForm.errors.height}
+                                                helperText={labelForm.errors.height || "e.g. 30"}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                label="Labels Per Row"
+                                                value={labelForm.data.labels_per_row}
+                                                onChange={(e) => labelForm.setData('labels_per_row', e.target.value)}
+                                                error={!!labelForm.errors.labels_per_row}
+                                                helperText={labelForm.errors.labels_per_row || "1 for roll, >1 for A4 sheets"}
+                                            />
+                                        </Grid>
+
+                                        <Grid item xs={12}>
+                                            <Divider />
+                                            <Typography variant="caption" color="primary" sx={{ fontWeight: 700, textTransform: 'uppercase', mt: 2, display: 'block' }}>
+                                                Content & Style
+                                            </Typography>
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={6}>
+                                            <Stack spacing={1}>
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_pharmacy_name} onChange={e => labelForm.setData('show_pharmacy_name', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Pharmacy Name</Typography>}
+                                                />
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_product_name} onChange={e => labelForm.setData('show_product_name', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Product Name</Typography>}
+                                                />
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_generic_name} onChange={e => labelForm.setData('show_generic_name', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Generic Name</Typography>}
+                                                />
+                                            </Stack>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <Stack spacing={1}>
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_price} onChange={e => labelForm.setData('show_price', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Selling Price</Typography>}
+                                                />
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_expiry} onChange={e => labelForm.setData('show_expiry', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Expiry Date</Typography>}
+                                                />
+                                                <FormControlLabel
+                                                    control={<Switch size="small" checked={labelForm.data.show_batch} onChange={e => labelForm.setData('show_batch', e.target.checked)} />}
+                                                    label={<Typography variant="body2">Show Batch Number</Typography>}
+                                                />
+                                            </Stack>
+                                        </Grid>
+
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                label="Font Size (pt)"
+                                                value={labelForm.data.font_size}
+                                                onChange={(e) => labelForm.setData('font_size', e.target.value)}
+                                                error={!!labelForm.errors.font_size}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                label="Barcode Height (mm)"
+                                                value={labelForm.data.barcode_height}
+                                                onChange={(e) => labelForm.setData('barcode_height', e.target.value)}
+                                                error={!!labelForm.errors.barcode_height}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                select
+                                                fullWidth
+                                                size="small"
+                                                label="Barcode Type"
+                                                value={labelForm.data.symbology}
+                                                onChange={(e) => labelForm.setData('symbology', e.target.value)}
+                                                error={!!labelForm.errors.symbology}
+                                            >
+                                                <MenuItem value="CODE_128">Code 128 (Standard)</MenuItem>
+                                                <MenuItem value="EAN_13">EAN-13 (Retail)</MenuItem>
+                                                <MenuItem value="QR_CODE">QR Code</MenuItem>
+                                            </TextField>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+
+                                <Grid item xs={12} md={4}>
+                                    <LabelPreview />
+                                </Grid>
+                            </Grid>
+
+                            <Box sx={{ mt: 3 }}>
+                                <Button
+                                    type="submit"
+                                    variant="contained"
+                                    size="small"
+                                    startIcon={<SaveIcon />}
+                                    disabled={labelForm.processing}
+                                >
+                                    {labelForm.processing ? 'Saving…' : 'Save Label Settings'}
                                 </Button>
                             </Box>
                         </Box>

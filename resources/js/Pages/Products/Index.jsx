@@ -30,6 +30,8 @@ import {
     Tooltip,
     Checkbox,
     ListItemText,
+    FormControlLabel,
+    Switch,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -43,12 +45,18 @@ import {
     FilterAlt as FilterIcon,
     Clear as ClearIcon,
     AddCircleOutline as AddUnitIcon,
+    Print as PrintIcon,
 } from '@mui/icons-material';
 
 export default function ProductIndex({ auth, products, categories, taxes, units, filters, default_tax_id: defaultTaxId }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+
+    // Printing State
+    const [printDialogOpen, setPrintDialogOpen] = useState(false);
+    const [printItems, setPrintItems] = useState([]);
+    const [selectedForPrint, setSelectedForPrint] = useState([]);
 
     // Scanner State
     const scanBuffer = useRef('');
@@ -115,6 +123,45 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         setSelectedCategory('');
         setSelectedStatus('');
         router.get(route('products.index'));
+    };
+
+    const togglePrintSelection = (productId) => {
+        setSelectedForPrint(prev => 
+            prev.includes(productId) 
+                ? prev.filter(id => id !== productId) 
+                : [...prev, productId]
+        );
+    };
+
+    const handleOpenPrintDialog = () => {
+        const items = products
+            .filter(p => selectedForPrint.includes(p.id))
+            .map(p => ({
+                id: p.id,
+                name: p.name,
+                barcode: p.barcode,
+                quantity: 1
+            }));
+        setPrintItems(items);
+        setPrintDialogOpen(true);
+    };
+
+    const updatePrintQuantity = (id, qty) => {
+        setPrintItems(prev => prev.map(item => 
+            item.id === id ? { ...item, quantity: Math.max(1, parseInt(qty) || 1) } : item
+        ));
+    };
+
+    const removePrintItem = (id) => {
+        setPrintItems(prev => prev.filter(item => item.id !== id));
+        setSelectedForPrint(prev => prev.filter(pId => pId !== id));
+    };
+
+    const handlePrint = () => {
+        // We will implement the actual print logic in the next step
+        // For now, we'll open a new window with the print data
+        const printData = JSON.stringify(printItems);
+        window.open(route('products.labels.print', { items: printData }), '_blank');
     };
 
     const { data, setData, post, reset, errors, processing } = useForm({
@@ -328,6 +375,18 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                 variant="outlined" 
                                 sx={{ height: 20, fontSize: '10px' }} 
                             />
+                            {selectedForPrint.length > 0 && (
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    size="small"
+                                    startIcon={<PrintIcon />}
+                                    onClick={handleOpenPrintDialog}
+                                    sx={{ height: 24, fontSize: '10px' }}
+                                >
+                                    Print Labels ({selectedForPrint.length})
+                                </Button>
+                            )}
                         </Stack>
                         <Button 
                             variant="contained" 
@@ -344,6 +403,20 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
+                                    <TableCell padding="checkbox">
+                                        <Checkbox
+                                            size="small"
+                                            indeterminate={selectedForPrint.length > 0 && selectedForPrint.length < products.length}
+                                            checked={products.length > 0 && selectedForPrint.length === products.length}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedForPrint(products.map(p => p.id));
+                                                } else {
+                                                    setSelectedForPrint([]);
+                                                }
+                                            }}
+                                        />
+                                    </TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Medicine Info</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Generic/Brand</TableCell>
@@ -356,6 +429,13 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             <TableBody>
                                 {products.map((product) => (
                                     <TableRow key={product.id} hover>
+                                        <TableCell padding="checkbox">
+                                            <Checkbox
+                                                size="small"
+                                                checked={selectedForPrint.includes(product.id)}
+                                                onChange={() => togglePrintSelection(product.id)}
+                                            />
+                                        </TableCell>
                                         <TableCell>
                                             <Stack direction="row" spacing={1.5} alignItems="center">
                                                 <Avatar 
@@ -809,6 +889,66 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         </Button>
                     </DialogActions>
                 </form>
+            </Dialog>
+
+            {/* Print Labels Dialog */}
+            <Dialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Print Product Labels
+                    <IconButton size="small" onClick={() => setPrintDialogOpen(false)}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2" gutterBottom color="text.secondary">
+                        Adjust the quantity of labels to print for each selected product.
+                    </Typography>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: 100 }} align="center">Quantity</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: 50 }} align="right"></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {printItems.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{item.barcode}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <TextField
+                                            size="small"
+                                            type="number"
+                                            value={item.quantity}
+                                            onChange={(e) => updatePrintQuantity(item.id, e.target.value)}
+                                            inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <IconButton size="small" color="error" onClick={() => removePrintItem(item.id)}>
+                                            <DeleteIcon fontSize="inherit" />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setPrintDialogOpen(false)} size="small">Cancel</Button>
+                    <Button 
+                        onClick={handlePrint}
+                        variant="contained" 
+                        size="small" 
+                        startIcon={<PrintIcon />}
+                        disabled={printItems.length === 0}
+                    >
+                        Generate Labels
+                    </Button>
+                </DialogActions>
             </Dialog>
         </MainLayout>
     );

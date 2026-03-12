@@ -173,4 +173,80 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Medicine removed successfully.');
     }
+
+    public function printLabels(Request $request)
+    {
+        $itemsData = json_decode($request->get('items', '[]'), true);
+        if (empty($itemsData)) {
+            return "No items selected for printing.";
+        }
+
+        $productIds = collect($itemsData)->pluck('id')->all();
+        $products = Product::with(['product_units.unit', 'batches' => function($q) {
+            $q->where('quantity', '>', 0)->orderBy('expiry_date', 'asc');
+        }])->whereIn('id', $productIds)->get()->keyBy('id');
+
+        $labelSettings = [
+            'width' => (int) \App\Models\Setting::get('label.width', '50'),
+            'height' => (int) \App\Models\Setting::get('label.height', '30'),
+            'per_row' => (int) \App\Models\Setting::get('label.per_row', '1'),
+            'show_pharmacy' => \App\Models\Setting::get('label.show_pharmacy', '1') === '1',
+            'show_product' => \App\Models\Setting::get('label.show_product', '1') === '1',
+            'show_generic' => \App\Models\Setting::get('label.show_generic', '0') === '1',
+            'show_price' => \App\Models\Setting::get('label.show_price', '1') === '1',
+            'show_expiry' => \App\Models\Setting::get('label.show_expiry', '1') === '1',
+            'show_batch' => \App\Models\Setting::get('label.show_batch', '0') === '1',
+            'font_size' => (int) \App\Models\Setting::get('label.font_size', '8'),
+            'barcode_height' => (int) \App\Models\Setting::get('label.barcode_height', '10'),
+            'symbology' => \App\Models\Setting::get('label.symbology', 'CODE_128'),
+            'pharmacy_name' => \App\Models\Setting::get('invoice.pharmacy_name', config('app.name')),
+            'currency' => \App\Models\Setting::get('app.currency_symbol', '$'),
+        ];
+
+        $generator = new \Picqer\Barcode\BarcodeGeneratorSVG();
+        $barcodeType = match($labelSettings['symbology']) {
+            'EAN_13' => $generator::TYPE_EAN_13,
+            'QR_CODE' => 'QR',
+            default => $generator::TYPE_CODE_128,
+        };
+
+        $labels = [];
+        foreach ($itemsData as $item) {
+            $product = $products->get($item['id']);
+            if (!$product) continue;
+
+            $baseUnit = $product->product_units->where('is_base_unit', true)->first();
+            $price = $baseUnit ? $baseUnit->selling_price : 0;
+
+            // Get the earliest expiry date from active batches
+            $earliestBatch = $product->batches->first();
+            $expiryDate = $earliestBatch ? $earliestBatch->expiry_date->format('d/m/y') : 'N/A';
+            $batchNumber = $earliestBatch ? $earliestBatch->batch_number : 'N/A';
+
+            // Generate barcode SVG
+            $barcodeSvg = '';
+            if ($product->barcode) {
+                try {
+                    $barcodeSvg = $generator->getBarcode($product->barcode, $barcodeType, 2, $labelSettings['barcode_height']);
+                } catch (\Exception $e) {
+                    $barcodeSvg = 'Invalid Barcode';
+                }
+            }
+
+            for ($i = 0; $i < $item['quantity']; $i++) {
+                $labels[] = [
+                    'product' => $product,
+                    'price' => $price,
+                    'barcode_svg' => $barcodeSvg,
+                    'expiry_date' => $expiryDate,
+                    'batch_number' => $batchNumber,
+                ];
+            }
+        }
+
+        return view('print.labels', [
+            'labels' => $labels,
+            'settings' => $labelSettings
+        ]);
+    }
 }
