@@ -49,6 +49,34 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'pending_returns_count' => function () use ($request) {
+                if (!$request->user()) return 0;
+                
+                // Get accessible branch IDs using the same logic as elsewhere
+                $user = $request->user();
+                $branchIds = collect([$user->branch_id, $user->active_branch_id])->filter()->values();
+                if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+                    return \App\Models\ReturnEntry::where('status', 'Pending')->count();
+                }
+                
+                try {
+                    $extraIds = $user->branches()->pluck('branches.id');
+                    $branchIds = $branchIds->merge($extraIds)->unique()->values();
+                } catch (\Throwable $e) {}
+
+                return \App\Models\ReturnEntry::whereIn('branch_id', $branchIds)
+                    ->where('status', 'Pending')
+                    ->count();
+            },
+            'settings' => [
+                'app' => [
+                    'currency_symbol' => \App\Models\Setting::get('app.currency_symbol', '$'),
+                    'date_format' => \App\Models\Setting::get('app.date_format', 'Y-m-d'),
+                ],
+                'invoice' => [
+                    'pharmacy_name' => \App\Models\Setting::get('invoice.pharmacy_name', config('app.name')),
+                ]
+            ],
         ]);
     }
 

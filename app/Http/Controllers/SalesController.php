@@ -57,20 +57,22 @@ class SalesController extends Controller
 
     protected function parseDateRange(Request $request): array
     {
-        $today = now()->toDateString();
-        $from = $request->get('from_date', $today);
-        $to = $request->get('to_date', $today);
+        $defaultFrom = now()->startOfMonth()->toDateString();
+        $defaultTo = now()->endOfMonth()->toDateString();
+        
+        $from = $request->get('from_date', $defaultFrom);
+        $to = $request->get('to_date', $defaultTo);
 
         try {
             $fromDate = Carbon::parse($from)->startOfDay();
         } catch (\Throwable $e) {
-            $fromDate = Carbon::parse($today)->startOfDay();
+            $fromDate = Carbon::parse($defaultFrom)->startOfDay();
         }
 
         try {
             $toDate = Carbon::parse($to)->endOfDay();
         } catch (\Throwable $e) {
-            $toDate = Carbon::parse($today)->endOfDay();
+            $toDate = Carbon::parse($defaultTo)->endOfDay();
         }
 
         if ($fromDate->greaterThan($toDate)) {

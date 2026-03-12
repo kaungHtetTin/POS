@@ -1,2 +1,11 @@
-add a seeder for units from 
-smallest to largest possible unit
+If primary branch is main and 
+access branch is only main
+when I change primary branch to branch 2
+the access branch should not be main, branch 2
+it should be only branch 2.
+
+If primary branch is main and
+access branch is main and branch 2
+when i change primary branch to branch 2 
+the access branch should be main and branch 2.
+

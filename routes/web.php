@@ -60,7 +60,7 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index')->middleware('permission:manage_users');
     Route::post('/staff', [StaffController::class, 'store'])->name('staff.store')->middleware('permission:manage_users');
-    Route::patch('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update')->middleware('permission:manage_users');
+    Route::post('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update')->middleware('permission:manage_users');
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy')->middleware('permission:manage_users');
 
     Route::get('/branches', [BranchController::class, 'index'])->name('branches.index')->middleware('permission:manage_branches');
@@ -141,6 +141,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/active-branch', [ActiveBranchController::class, 'update'])->name('active-branch.update');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
+    Route::patch('/settings/pos-behavior', [SettingsController::class, 'updatePosBehavior'])->name('settings.pos-behavior.update')->middleware('permission:manage_branches');
+    Route::patch('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update')->middleware('permission:manage_branches');
+    Route::patch('/settings/localization', [SettingsController::class, 'updateLocalization'])->name('settings.localization.update')->middleware('permission:manage_branches');
+    Route::post('/settings/invoice', [SettingsController::class, 'updateInvoice'])->name('settings.invoice.update')->middleware('permission:manage_branches');
 });
 
 require __DIR__.'/auth.php';

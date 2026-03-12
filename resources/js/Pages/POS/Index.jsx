@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PosLayout from '@/Layouts/PosLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { usePage, Head, useForm } from '@inertiajs/react';
 import {
     Alert,
     Autocomplete,
@@ -45,7 +45,10 @@ import {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
+export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults }) {
+    const { settings = {} } = usePage().props;
+    const currencySymbol = settings.app?.currency_symbol || '$';
+
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [cart, setCart] = useState([]);
@@ -588,7 +591,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                                             {unitLabel ? `Unit: ${unitLabel}` : 'Unit'}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                            {price.toFixed(2)}
+                                                            {currencySymbol}{price.toFixed(2)}
                                                         </Typography>
                                                     </Stack>
                                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
@@ -692,7 +695,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                                     />
                                                 </TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                                    {lineTotal.toFixed(2)}
+                                                    {currencySymbol}{lineTotal.toFixed(2)}
                                                 </TableCell>
                                                 <TableCell align="right">
                                                     <IconButton size="small" color="error" onClick={() => removeCartLine(line.id)}>
@@ -723,7 +726,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                     Subtotal
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                    {totals.totalAmount.toFixed(2)}
+                                    {currencySymbol}{totals.totalAmount.toFixed(2)}
                                 </Typography>
                             </Stack>
                             <Stack direction="row" justifyContent="space-between">
@@ -731,7 +734,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                     Tax
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                    {totals.tax.toFixed(2)}
+                                    {currencySymbol}{totals.tax.toFixed(2)}
                                 </Typography>
                             </Stack>
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -743,6 +746,9 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                     type="number"
                                     value={data.discount}
                                     onChange={(e) => setData('discount', e.target.value)}
+                                    InputProps={{
+                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                    }}
                                     inputProps={{ min: 0, step: '0.01' }}
                                     sx={{ width: 120 }}
                                 />
@@ -752,7 +758,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses }) {
                                     Grand Total
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                    {totals.grandTotal.toFixed(2)}
+                                    {currencySymbol}{totals.grandTotal.toFixed(2)}
                                 </Typography>
                             </Stack>
                         </Stack>

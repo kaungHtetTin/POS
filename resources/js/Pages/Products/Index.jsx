@@ -45,7 +45,7 @@ import {
     AddCircleOutline as AddUnitIcon,
 } from '@mui/icons-material';
 
-export default function ProductIndex({ auth, products, categories, taxes, units, filters }) {
+export default function ProductIndex({ auth, products, categories, taxes, units, filters, default_tax_id: defaultTaxId }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -119,8 +119,8 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
 
     const { data, setData, post, reset, errors, processing } = useForm({
         category_id: '',
-        tax_id: '',
-        tax_ids: [],
+        tax_id: defaultTaxId || '',
+        tax_ids: defaultTaxId ? [defaultTaxId] : [],
         name: '',
         generic_name: '',
         brand_name: '',
@@ -171,6 +171,13 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             setEditMode(false);
             setEditingProduct(null);
             reset();
+            if (defaultTaxId) {
+                setData(prev => ({
+                    ...prev,
+                    tax_id: defaultTaxId,
+                    tax_ids: [defaultTaxId],
+                }));
+            }
         }
         setOpen(true);
     };

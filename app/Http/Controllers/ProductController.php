@@ -37,12 +37,15 @@ class ProductController extends Controller
             $query->where('status', $request->status);
         }
 
+        $defaultTaxId = \App\Models\Setting::get('invoice.default_tax_id', '');
+
         return Inertia::render('Products/Index', [
             'products' => $query->latest()->get(),
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
             'units' => Unit::all(),
             'filters' => $request->only(['search', 'category', 'status']),
+            'default_tax_id' => $defaultTaxId,
         ]);
     }
 

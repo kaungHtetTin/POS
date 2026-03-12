@@ -114,10 +114,6 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
             post(route('staff.update', editingStaff.id), {
                 forceFormData: true,
                 onSuccess: () => handleClose(),
-                data: {
-                    ...data,
-                    _method: 'PATCH'
-                }
             });
         } else {
             post(route('staff.store'), {
@@ -310,17 +306,35 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
 
                             <Stack direction="row" spacing={2}>
                                 <FormControl fullWidth size="small" error={!!errors.branch_id} required>
-                                    <InputLabel>Branch</InputLabel>
+                                    <InputLabel>Primary Branch</InputLabel>
                                     <Select
                                         value={data.branch_id}
-                                        label="Branch"
+                                        label="Primary Branch"
                                         onChange={(e) => {
-                                            const primaryBranchId = e.target.value;
-                                            setData((prev) => ({
-                                                ...prev,
-                                                branch_id: primaryBranchId,
-                                                branch_ids: ensurePrimaryBranchIncluded(primaryBranchId, prev.branch_ids),
-                                            }));
+                                            const newPrimaryId = e.target.value;
+                                            const oldPrimaryId = data.branch_id;
+                                            
+                                            setData((prev) => {
+                                                let newBranchIds = Array.isArray(prev.branch_ids) ? [...prev.branch_ids] : [];
+                                                
+                                                // 1. If the old primary was the ONLY branch in the access list,
+                                                //    replace it entirely with the new primary.
+                                                if (newBranchIds.length === 1 && newBranchIds.includes(oldPrimaryId)) {
+                                                    newBranchIds = [newPrimaryId];
+                                                } else {
+                                                    // 2. Otherwise, ensure the new primary is included, 
+                                                    //    but keep other existing access branches.
+                                                    if (!newBranchIds.includes(newPrimaryId)) {
+                                                        newBranchIds.push(newPrimaryId);
+                                                    }
+                                                }
+                                                
+                                                return {
+                                                    ...prev,
+                                                    branch_id: newPrimaryId,
+                                                    branch_ids: newBranchIds,
+                                                };
+                                            });
                                         }}
                                     >
                                         {branches.map(branch => (

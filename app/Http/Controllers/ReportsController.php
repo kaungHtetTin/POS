@@ -61,20 +61,22 @@ class ReportsController extends Controller
 
     protected function parseDateRange(Request $request): array
     {
-        $today = now()->toDateString();
-        $from = $request->get('from_date', $today);
-        $to = $request->get('to_date', $today);
+        $defaultFrom = now()->startOfMonth()->toDateString();
+        $defaultTo = now()->endOfMonth()->toDateString();
+
+        $from = $request->get('from_date', $defaultFrom);
+        $to = $request->get('to_date', $defaultTo);
 
         try {
             $fromDate = Carbon::parse($from)->startOfDay();
         } catch (\Throwable $e) {
-            $fromDate = Carbon::parse($today)->startOfDay();
+            $fromDate = Carbon::parse($defaultFrom)->startOfDay();
         }
 
         try {
             $toDate = Carbon::parse($to)->endOfDay();
         } catch (\Throwable $e) {
-            $toDate = Carbon::parse($today)->endOfDay();
+            $toDate = Carbon::parse($defaultTo)->endOfDay();
         }
 
         if ($fromDate->greaterThan($toDate)) {
@@ -92,7 +94,7 @@ class ReportsController extends Controller
         [$fromDate, $toDate] = $this->parseDateRange($request);
 
         $groupBy = $request->get('group_by', 'daily');
-        if (!in_array($groupBy, ['daily', 'monthly'], true)) {
+        if (!in_array($groupBy, ['daily', 'monthly', 'yearly'], true)) {
             $groupBy = 'daily';
         }
 
@@ -162,12 +164,18 @@ class ReportsController extends Controller
         $grossProfit = $salesNetOfTaxAndReturns - (float) $cogs;
         $netProfit = $grossProfit - (float) $expensesTotal;
 
-        $dateExpr = $groupBy === 'monthly'
-            ? DB::raw("DATE_FORMAT(sales.sale_date, '%Y-%m-01')")
-            : DB::raw("DATE(sales.sale_date)");
+        $dateExpr = match ($groupBy) {
+            'yearly' => DB::raw("DATE_FORMAT(sales.sale_date, '%Y-01-01')"),
+            'monthly' => DB::raw("DATE_FORMAT(sales.sale_date, '%Y-%m-01')"),
+            default => DB::raw("DATE(sales.sale_date)"),
+        };
 
         $salesTrend = (clone $salesBase)
-            ->selectRaw($groupBy === 'monthly' ? "DATE_FORMAT(sales.sale_date, '%Y-%m-01') as period" : "DATE(sales.sale_date) as period")
+            ->selectRaw(match ($groupBy) {
+                'yearly' => "DATE_FORMAT(sales.sale_date, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(sales.sale_date, '%Y-%m-01') as period",
+                default => "DATE(sales.sale_date) as period",
+            })
             ->selectRaw('COALESCE(SUM(grand_total), 0) as grand_total')
             ->selectRaw('COALESCE(SUM(tax), 0) as tax')
             ->selectRaw('COALESCE(SUM(discount), 0) as discount')
@@ -176,18 +184,26 @@ class ReportsController extends Controller
             ->orderBy($dateExpr)
             ->get();
 
-        $returnsPeriodExpr = $groupBy === 'monthly'
-            ? DB::raw("DATE_FORMAT(created_at, '%Y-%m-01')")
-            : DB::raw("DATE(created_at)");
+        $returnsPeriodExpr = match ($groupBy) {
+            'yearly' => DB::raw("DATE_FORMAT(created_at, '%Y-01-01')"),
+            'monthly' => DB::raw("DATE_FORMAT(created_at, '%Y-%m-01')"),
+            default => DB::raw("DATE(created_at)"),
+        };
 
-        $expensesPeriodExpr = $groupBy === 'monthly'
-            ? DB::raw("DATE_FORMAT(expense_date, '%Y-%m-01')")
-            : DB::raw("DATE(expense_date)");
+        $expensesPeriodExpr = match ($groupBy) {
+            'yearly' => DB::raw("DATE_FORMAT(expense_date, '%Y-01-01')"),
+            'monthly' => DB::raw("DATE_FORMAT(expense_date, '%Y-%m-01')"),
+            default => DB::raw("DATE(expense_date)"),
+        };
 
         $cogsTrend = (clone $salesBase)
             ->join('sale_items', 'sales.id', '=', 'sale_items.sale_id')
             ->join('inventory_batches', 'sale_items.batch_id', '=', 'inventory_batches.id')
-            ->selectRaw($groupBy === 'monthly' ? "DATE_FORMAT(sales.sale_date, '%Y-%m-01') as period" : "DATE(sales.sale_date) as period")
+            ->selectRaw(match ($groupBy) {
+                'yearly' => "DATE_FORMAT(sales.sale_date, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(sales.sale_date, '%Y-%m-01') as period",
+                default => "DATE(sales.sale_date) as period",
+            })
             ->selectRaw('COALESCE(SUM(sale_items.base_quantity * inventory_batches.purchase_price), 0) as cogs')
             ->groupBy($dateExpr)
             ->orderBy($dateExpr)
@@ -195,7 +211,11 @@ class ReportsController extends Controller
 
         $customerReturnsTrend = (clone $returnsBase)
             ->where('type', 'Customer')
-            ->selectRaw($groupBy === 'monthly' ? "DATE_FORMAT(created_at, '%Y-%m-01') as period" : "DATE(created_at) as period")
+            ->selectRaw(match ($groupBy) {
+                'yearly' => "DATE_FORMAT(created_at, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(created_at, '%Y-%m-01') as period",
+                default => "DATE(created_at) as period",
+            })
             ->selectRaw('COALESCE(SUM(refund_amount), 0) as customer_returns')
             ->groupBy($returnsPeriodExpr)
             ->orderBy($returnsPeriodExpr)
@@ -207,7 +227,11 @@ class ReportsController extends Controller
                 $q->where('branch_id', $branchScope['branch_id']);
             })
             ->whereBetween('expense_date', [$fromDate->toDateString(), $toDate->toDateString()])
-            ->selectRaw($groupBy === 'monthly' ? "DATE_FORMAT(expense_date, '%Y-%m-01') as period" : "DATE(expense_date) as period")
+            ->selectRaw(match ($groupBy) {
+                'yearly' => "DATE_FORMAT(expense_date, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(expense_date, '%Y-%m-01') as period",
+                default => "DATE(expense_date) as period",
+            })
             ->selectRaw('COALESCE(SUM(amount), 0) as expenses_total')
             ->groupBy($expensesPeriodExpr)
             ->orderBy($expensesPeriodExpr)

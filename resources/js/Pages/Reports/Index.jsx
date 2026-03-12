@@ -54,10 +54,61 @@ export default function ReportsIndex({
     expiring_batches,
 }) {
     const [branchId, setBranchId] = useState(filters?.branch_id || auth.user?.current_branch_id || '');
-    const [fromDate, setFromDate] = useState(filters?.from_date || new Date().toISOString().split('T')[0]);
-    const [toDate, setToDate] = useState(filters?.to_date || new Date().toISOString().split('T')[0]);
+    // Default to current month
+    const defaultFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const defaultTo = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const [fromDate, setFromDate] = useState(filters?.from_date || defaultFrom);
+    const [toDate, setToDate] = useState(filters?.to_date || defaultTo);
     const [groupBy, setGroupBy] = useState(filters?.group_by || 'daily');
     const [expiryDays, setExpiryDays] = useState(filters?.expiry_days || 30);
+    const [quickRange, setQuickRangeState] = useState(filters?.from_date === defaultFrom && filters?.to_date === defaultTo ? 'month' : '');
+
+    const setQuickRange = (range) => {
+        setQuickRangeState(range);
+        const today = new Date();
+        let from = new Date();
+        let to = new Date();
+
+        switch (range) {
+            case 'today':
+                from = today;
+                to = today;
+                break;
+            case 'month':
+                from = new Date(today.getFullYear(), today.getMonth(), 1);
+                to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                break;
+            case 'year':
+                from = new Date(today.getFullYear(), 0, 1);
+                to = new Date(today.getFullYear(), 11, 31);
+                break;
+            case 'all':
+                from = new Date(2000, 0, 1);
+                to = new Date(2100, 11, 31);
+                break;
+            default:
+                return;
+        }
+
+        const fromStr = from.toISOString().split('T')[0];
+        const toStr = to.toISOString().split('T')[0];
+        
+        setFromDate(fromStr);
+        setToDate(toStr);
+
+        router.get(
+            route('reports.index'),
+            {
+                branch_id: branchId || undefined,
+                from_date: fromStr,
+                to_date: toStr,
+                group_by: groupBy || undefined,
+                expiry_days: expiryDays || undefined,
+            },
+            { preserveState: true, replace: true }
+        );
+    };
 
     const applyFilters = () => {
         router.get(
@@ -151,6 +202,24 @@ export default function ReportsIndex({
     }, [profit_trend]);
 
     const formatMoney = (value) => money(value);
+
+    const formatXAxis = (value) => {
+        if (!value) return '';
+        try {
+            const date = new Date(value);
+            if (groupBy === 'yearly') {
+                return date.getFullYear().toString();
+            }
+            if (groupBy === 'monthly') {
+                return new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(date);
+            }
+            // Daily
+            return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short' }).format(date);
+        } catch {
+            return value;
+        }
+    };
+
     const pieColors = ['#1976d2', '#6a1b9a', '#2e7d32', '#f57c00', '#0288d1', '#7b1fa2', '#388e3c', '#ef6c00', '#455a64', '#c2185b', '#5d4037', '#00796b'];
     const chartHeight = 220;
     const chartMargin = { top: 6, right: 12, bottom: 6, left: 0 };
@@ -185,6 +254,20 @@ export default function ReportsIndex({
                             </Select>
                         </FormControl>
 
+                        <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 } }}>
+                            <InputLabel>Quick Range</InputLabel>
+                            <Select 
+                                value={quickRange} 
+                                label="Quick Range" 
+                                onChange={(e) => setQuickRange(e.target.value)}
+                            >
+                                <MenuItem value="today">Today</MenuItem>
+                                <MenuItem value="month">Current Month</MenuItem>
+                                <MenuItem value="year">Current Year</MenuItem>
+                                <MenuItem value="all">All Time</MenuItem>
+                            </Select>
+                        </FormControl>
+
                         <TextField
                             size="small"
                             type="date"
@@ -209,6 +292,7 @@ export default function ReportsIndex({
                             <Select value={groupBy} label="Group By" onChange={(e) => setGroupBy(e.target.value)}>
                                 <MenuItem value="daily">Daily</MenuItem>
                                 <MenuItem value="monthly">Monthly</MenuItem>
+                                <MenuItem value="yearly">Yearly</MenuItem>
                             </Select>
                         </FormControl>
 
@@ -265,9 +349,9 @@ export default function ReportsIndex({
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={salesTrendData} margin={chartMargin}>
                                         <CartesianGrid strokeDasharray="2 2" />
-                                        <XAxis dataKey="period" tick={axisTick} />
+                                        <XAxis dataKey="period" tick={axisTick} tickFormatter={formatXAxis} />
                                         <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
-                                        <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Tooltip labelFormatter={formatXAxis} formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
                                         <Legend iconSize={8} wrapperStyle={legendStyles} />
                                         <Line type="monotone" dataKey="grand_total" name="Gross Total" stroke="#1976d2" strokeWidth={1.75} dot={false} />
                                         <Line type="monotone" dataKey="tax" name="Tax" stroke="#f57c00" strokeWidth={1.75} dot={false} />
@@ -285,9 +369,9 @@ export default function ReportsIndex({
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={profitTrendData} margin={chartMargin}>
                                         <CartesianGrid strokeDasharray="2 2" />
-                                        <XAxis dataKey="period" tick={axisTick} />
+                                        <XAxis dataKey="period" tick={axisTick} tickFormatter={formatXAxis} />
                                         <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
-                                        <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Tooltip labelFormatter={formatXAxis} formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
                                         <Legend iconSize={8} wrapperStyle={legendStyles} />
                                         <Line type="monotone" dataKey="gross_profit" name="Gross Profit" stroke="#2e7d32" strokeWidth={1.75} dot={false} />
                                         <Line type="monotone" dataKey="net_profit" name="Net Profit" stroke="#6a1b9a" strokeWidth={1.75} dot={false} />

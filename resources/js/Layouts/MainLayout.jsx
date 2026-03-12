@@ -59,7 +59,9 @@ const drawerWidth = 200; // More compact sidebar
 export default function MainLayout({ children, header }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash } = usePage().props;
+    const { auth, flash, settings = {}, pending_returns_count = 0 } = usePage().props;
+    const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
+
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorElUser, setAnchorElUser] = useState(null);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -136,7 +138,7 @@ export default function MainLayout({ children, header }) {
         <div>
             <Toolbar sx={{ minHeight: '48px !important' }}>
                 <Typography variant="subtitle1" noWrap component="div" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                    Pharmacy POS
+                    {pharmacyName}
                 </Typography>
             </Toolbar>
             <Divider />
@@ -198,7 +200,33 @@ export default function MainLayout({ children, header }) {
                                             }}
                                         >
                                             <ListItemIcon sx={{ minWidth: 40, color: isActive ? 'primary.main' : 'inherit' }}>
-                                                {item.icon}
+                                                {item.text === 'Returns' && pending_returns_count > 0 ? (
+                                                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                                                        {item.icon}
+                                                        <Box
+                                                            sx={{
+                                                                position: 'absolute',
+                                                                top: -4,
+                                                                right: -4,
+                                                                width: 16,
+                                                                height: 16,
+                                                                borderRadius: '50%',
+                                                                bgcolor: 'error.main',
+                                                                color: 'white',
+                                                                fontSize: 10,
+                                                                fontWeight: 'bold',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                boxShadow: 1,
+                                                            }}
+                                                        >
+                                                            {pending_returns_count > 9 ? '9+' : pending_returns_count}
+                                                        </Box>
+                                                    </Box>
+                                                ) : (
+                                                    item.icon
+                                                )}
                                             </ListItemIcon>
                                             <ListItemText primary={item.text} primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} />
                                         </ListItemButton>
@@ -260,6 +288,13 @@ export default function MainLayout({ children, header }) {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {settings.invoice?.logo_path && (
+                            <Box 
+                                component="img" 
+                                src={`/storage/${settings.invoice.logo_path}`} 
+                                sx={{ height: 24, width: 'auto', objectFit: 'contain', mr: 1 }} 
+                            />
+                        )}
                         <IconButton onClick={colorMode.toggleColorMode} color="inherit" size="small">
                             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                         </IconButton>

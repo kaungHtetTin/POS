@@ -29,9 +29,61 @@ import {
 
 export default function SalesIndex({ auth, sales, branches, filters }) {
     const [branchId, setBranchId] = useState(filters?.branch_id || auth.user?.current_branch_id || '');
-    const [fromDate, setFromDate] = useState(filters?.from_date || new Date().toISOString().split('T')[0]);
-    const [toDate, setToDate] = useState(filters?.to_date || new Date().toISOString().split('T')[0]);
+    
+    // Default to current month
+    const defaultFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const defaultTo = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const [fromDate, setFromDate] = useState(filters?.from_date || defaultFrom);
+    const [toDate, setToDate] = useState(filters?.to_date || defaultTo);
     const [search, setSearch] = useState(filters?.search || '');
+    const [quickRange, setQuickRangeState] = useState(filters?.from_date === defaultFrom && filters?.to_date === defaultTo ? 'month' : '');
+
+    const setQuickRange = (range) => {
+        setQuickRangeState(range);
+        const today = new Date();
+        let from = new Date();
+        let to = new Date();
+
+        switch (range) {
+            case 'today':
+                from = today;
+                to = today;
+                break;
+            case 'month':
+                from = new Date(today.getFullYear(), today.getMonth(), 1);
+                to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                break;
+            case 'year':
+                from = new Date(today.getFullYear(), 0, 1);
+                to = new Date(today.getFullYear(), 11, 31);
+                break;
+            case 'all':
+                from = new Date(2000, 0, 1); // Far past
+                to = new Date(2100, 11, 31); // Far future
+                break;
+            default:
+                return;
+        }
+
+        const fromStr = from.toISOString().split('T')[0];
+        const toStr = to.toISOString().split('T')[0];
+        
+        setFromDate(fromStr);
+        setToDate(toStr);
+
+        // Auto-apply after selecting quick range
+        router.get(
+            route('sales.index'),
+            {
+                branch_id: branchId || undefined,
+                from_date: fromStr,
+                to_date: toStr,
+                search: search || undefined,
+            },
+            { preserveState: true, replace: true }
+        );
+    };
 
     const totalGrand = useMemo(() => {
         return (sales || []).reduce((sum, s) => sum + Number(s.grand_total || 0), 0);
@@ -111,6 +163,20 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                         {b.name}
                                     </MenuItem>
                                 ))}
+                            </Select>
+                        </FormControl>
+
+                        <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 } }}>
+                            <InputLabel>Quick Range</InputLabel>
+                            <Select 
+                                value={quickRange} 
+                                label="Quick Range" 
+                                onChange={(e) => setQuickRange(e.target.value)}
+                            >
+                                <MenuItem value="today">Today</MenuItem>
+                                <MenuItem value="month">Current Month</MenuItem>
+                                <MenuItem value="year">Current Year</MenuItem>
+                                <MenuItem value="all">All Time</MenuItem>
                             </Select>
                         </FormControl>
 
