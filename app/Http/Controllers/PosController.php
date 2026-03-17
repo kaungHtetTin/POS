@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -19,6 +20,14 @@ class PosController extends Controller
         return Inertia::render('POS/Index', [
             'paymentMethods' => ['Cash', 'Card', 'Mobile', 'Wallet'],
             'paymentStatuses' => ['Paid', 'Partial', 'Due'],
+            'posDefaults' => [
+                'default_view' => Setting::get('pos.default_view', 'table'),
+                'default_payment_method' => Setting::get('pos.default_payment_method', 'Cash'),
+                'auto_print_receipt' => Setting::get('pos.auto_print_receipt', '0') === '1',
+                'barcode_focus' => Setting::get('pos.barcode_focus', '1') === '1',
+                'show_generic_first' => Setting::get('pos.show_generic_first', '0') === '1',
+                'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
+            ],
         ]);
     }
 
@@ -45,6 +54,7 @@ class PosController extends Controller
             ->select([
                 'products.id',
                 'products.name',
+                'products.generic_name',
                 'products.barcode',
                 'products.image_path',
                 'products.tax_id',
@@ -74,6 +84,7 @@ class PosController extends Controller
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
+                    'generic_name' => $product->generic_name,
                     'barcode' => $product->barcode,
                     'image_path' => $product->image_path,
                     'tax_method' => $product->tax_method,
@@ -131,6 +142,7 @@ class PosController extends Controller
             ->select([
                 'products.id',
                 'products.name',
+                'products.generic_name',
                 'products.barcode',
                 'products.image_path',
                 'products.tax_id',
@@ -161,6 +173,7 @@ class PosController extends Controller
             return [
                 'id' => $product->id,
                 'name' => $product->name,
+                'generic_name' => $product->generic_name,
                 'barcode' => $product->barcode,
                 'image_path' => $product->image_path,
                 'tax_method' => $product->tax_method,
@@ -219,6 +232,7 @@ class PosController extends Controller
             ->select([
                 'products.id',
                 'products.name',
+                'products.generic_name',
                 'products.barcode',
                 'products.image_path',
                 'products.tax_id',
@@ -250,6 +264,7 @@ class PosController extends Controller
         return response()->json([
             'id' => $product->id,
             'name' => $product->name,
+            'generic_name' => $product->generic_name,
             'barcode' => $product->barcode,
             'image_path' => $product->image_path,
             'tax_method' => $product->tax_method,
@@ -378,7 +393,8 @@ class PosController extends Controller
 
         $grandTotal = max(($totalAmount + $taxAmount) - $discount, 0);
 
-        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $discount, $grandTotal) {
+        $createdSale = null;
+        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $discount, $grandTotal, &$createdSale) {
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $userId,
@@ -393,6 +409,8 @@ class PosController extends Controller
                 'sale_date' => now(),
                 'is_synced' => false,
             ]);
+
+            $createdSale = $sale;
 
             foreach ($lineComputations as $line) {
                 $baseToDeduct = (int) $line['base_quantity'];
@@ -452,7 +470,38 @@ class PosController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Sale completed successfully.');
+        $customerName = null;
+        if (!empty($validated['customer_id'])) {
+            $customerName = Customer::where('id', $validated['customer_id'])->value('name');
+        }
+
+        $receiptItems = collect($lineComputations)->map(function ($line) use ($products) {
+            $product = $products->get($line['product_id']);
+            return [
+                'name' => $product?->name ?? 'Item',
+                'quantity' => (float) $line['quantity'],
+                'unit_price' => (float) $line['unit_price'],
+                'total_price' => (float) $line['quantity'] * (float) $line['unit_price'],
+            ];
+        })->values();
+
+        $saleReceipt = [
+            'invoice_number' => $createdSale?->invoice_number,
+            'sale_date' => optional($createdSale?->sale_date)->toDateTimeString(),
+            'customer_name' => $customerName,
+            'payment_method' => $validated['payment_method'],
+            'payment_status' => $validated['payment_status'],
+            'subtotal' => (float) $totalAmount,
+            'tax' => (float) $taxAmount,
+            'discount' => (float) $discount,
+            'grand_total' => (float) $grandTotal,
+            'items' => $receiptItems,
+        ];
+
+        return redirect()
+            ->back()
+            ->with('success', 'Sale completed successfully.')
+            ->with('sale_receipt', $saleReceipt);
     }
 
     protected function generateInvoiceNumber(): string

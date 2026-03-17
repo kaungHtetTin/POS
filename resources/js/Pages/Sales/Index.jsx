@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -25,9 +25,14 @@ import {
     Search as SearchIcon,
     Receipt as SalesIcon,
     FilterAlt as FilterIcon,
+    Print as PrintIcon,
 } from '@mui/icons-material';
 
 export default function SalesIndex({ auth, sales, branches, filters }) {
+    const { settings = {}, ziggy = {}, translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
+    const appBase = ziggy?.base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
     const [branchId, setBranchId] = useState(filters?.branch_id || auth.user?.current_branch_id || '');
     
     // Default to current month
@@ -112,6 +117,11 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
     };
 
     const money = (n) => Number(n || 0).toFixed(2);
+    const currencySymbol = settings.app?.currency_symbol || '$';
+    const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
+    const logoUrl = settings.invoice?.logo_path ? withBase(`/storage/${String(settings.invoice.logo_path).replace(/^\/+/, '')}`) : '';
+    const receiptHeader = settings.invoice?.receipt_header || '';
+    const receiptFooter = settings.invoice?.receipt_footer || '';
 
     const formatDateTime = (value) => {
         try {
@@ -125,6 +135,71 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
         } catch {
             return value;
         }
+    };
+
+    const printInvoice = (sale) => {
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const printWindow = window.open('', '_blank', 'width=520,height=760');
+        if (!printWindow) {
+            return;
+        }
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>${escapeHtml(sale.invoice_number)}</title>
+                <style>
+                    @page { size: auto; margin: 10mm; }
+                    body { font-family: Arial, sans-serif; color: #111; }
+                    .receipt { max-width: 420px; margin: 0 auto; }
+                    .center { text-align: center; }
+                    .logo { max-width: 120px; max-height: 64px; object-fit: contain; margin-bottom: 8px; }
+                    .title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+                    .sub { font-size: 12px; color: #555; white-space: pre-wrap; }
+                    .line { border-top: 1px dashed #999; margin: 10px 0; }
+                    .row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; }
+                    .row .label { color: #555; }
+                    .row .value { font-weight: 600; }
+                    .grand { font-size: 15px; font-weight: 700; }
+                </style>
+            </head>
+            <body>
+                <div class="receipt">
+                    <div class="center">
+                        ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="logo" class="logo" />` : ''}
+                        <div class="title">${escapeHtml(pharmacyName)}</div>
+                        ${receiptHeader ? `<div class="sub">${escapeHtml(receiptHeader)}</div>` : ''}
+                    </div>
+                    <div class="line"></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Invoice'))}</span><span class="value">${escapeHtml(sale.invoice_number || '-')}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Date'))}</span><span class="value">${escapeHtml(formatDateTime(sale.sale_date))}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Branch'))}</span><span class="value">${escapeHtml(sale.branch?.name || '-')}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Cashier'))}</span><span class="value">${escapeHtml(sale.user?.name || '-')}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Customer'))}</span><span class="value">${escapeHtml(sale.customer?.name || '-')}</span></div>
+                    <div class="line"></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Subtotal'))}</span><span class="value">${currencySymbol}${money(sale.total_amount)}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Tax'))}</span><span class="value">${currencySymbol}${money(sale.tax)}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Discount'))}</span><span class="value">${currencySymbol}${money(sale.discount)}</span></div>
+                    <div class="row grand"><span>${escapeHtml(__('Grand Total'))}</span><span>${currencySymbol}${money(sale.grand_total)}</span></div>
+                    <div class="line"></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Payment'))}</span><span class="value">${escapeHtml(`${sale.payment_method} / ${sale.payment_status}`)}</span></div>
+                    ${receiptFooter ? `<div class="line"></div><div class="center sub">${escapeHtml(receiptFooter)}</div>` : ''}
+                </div>
+                <script>
+                    window.onload = function () { window.print(); };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     return (
@@ -248,6 +323,7 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                         Grand
                                     </TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Payment</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }} align="right">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -287,12 +363,22 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                                 {s.payment_method} / {s.payment_status}
                                             </Typography>
                                         </TableCell>
+                                        <TableCell align="right">
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<PrintIcon fontSize="small" />}
+                                                onClick={() => printInvoice(s)}
+                                            >
+                                                Print
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
 
                                 {(sales || []).length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={11} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No sales found for selected filters.
                                             </Typography>

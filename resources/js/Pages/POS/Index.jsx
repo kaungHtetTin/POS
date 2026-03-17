@@ -46,15 +46,25 @@ import {
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults }) {
-    const { settings = {} } = usePage().props;
+    const { settings = {}, translations = {}, ziggy = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const currencySymbol = settings.app?.currency_symbol || '$';
+    const appBase = ziggy?.base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const behavior = {
+        default_view: posDefaults?.default_view || 'table',
+        default_payment_method: posDefaults?.default_payment_method || paymentMethods?.[0] || 'Cash',
+        auto_print_receipt: Boolean(posDefaults?.auto_print_receipt ?? settings.pos?.auto_print_receipt),
+        barcode_focus: Boolean(posDefaults?.barcode_focus ?? true),
+        show_generic_first: Boolean(posDefaults?.show_generic_first),
+    };
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [cart, setCart] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [scanError, setScanError] = useState('');
-    const [resultsView, setResultsView] = useState('table');
+    const [resultsView, setResultsView] = useState(behavior.default_view === 'grid' ? 'grid' : 'table');
     const [catalogCategories, setCatalogCategories] = useState([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [catalogPage, setCatalogPage] = useState(1);
@@ -71,17 +81,33 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
+    const searchInputRef = useRef(null);
 
     const { data, setData, post, processing, errors } = useForm({
         customer_id: null,
         discount: 0,
-        payment_method: paymentMethods?.[0] || 'Cash',
+        payment_method: paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'),
         payment_status: paymentStatuses?.[0] || 'Paid',
         items: [],
     });
 
     const branchId = auth.user?.current_branch_id || auth.user?.branch_id;
     const branchName = auth.user?.accessible_branches?.find((b) => b.id === branchId)?.name;
+    const isOutOfStock = (product) => Number(product?.stock_quantity ?? 0) <= 0;
+    const getProductDisplayName = (product) => {
+        const generic = String(product?.generic_name || '').trim();
+        const name = String(product?.name || '').trim();
+        if (behavior.show_generic_first && generic) {
+            return `${generic}${name ? ` (${name})` : ''}`;
+        }
+        return name || generic;
+    };
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 
     useEffect(() => {
         setData('items', cart.map((line) => ({
@@ -94,6 +120,12 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     useEffect(() => {
         setData('customer_id', selectedCustomer?.id ?? null);
     }, [selectedCustomer, setData]);
+
+    useEffect(() => {
+        if (!behavior.barcode_focus) return;
+        const t = setTimeout(() => searchInputRef.current?.focus(), 150);
+        return () => clearTimeout(t);
+    }, [behavior.barcode_focus]);
 
     const fetchCustomers = useCallback(async (query) => {
         setCustomerLoading(true);
@@ -130,7 +162,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         e.preventDefault();
         setNewCustomerError('');
         if (!newCustomerForm.name?.trim()) {
-            setNewCustomerError('Name is required.');
+            setNewCustomerError(__('Name is required.'));
             return;
         }
         setNewCustomerSubmitting(true);
@@ -148,7 +180,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 const errors = data?.errors ? Object.values(data.errors).flat() : [];
-                const msg = errors.length ? errors.join(' ') : (data?.message || 'Failed to create customer.');
+                const msg = errors.length ? errors.join(' ') : (data?.message || __('Failed to create customer.'));
                 setNewCustomerError(msg);
                 return;
             }
@@ -156,7 +188,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             setCustomerOptions((prev) => (prev.some((c) => c.id === data.id) ? prev : [data, ...prev]));
             closeNewCustomer();
         } catch {
-            setNewCustomerError('Network error. Please try again.');
+            setNewCustomerError(__('Network error. Please try again.'));
         } finally {
             setNewCustomerSubmitting(false);
         }
@@ -255,22 +287,27 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         try {
             const response = await fetch(route('pos.scan', { barcode }));
             if (!response.ok) {
-                setScanError(`Barcode not found: ${barcode}`);
+                setScanError(`${__('Barcode not found')}: ${barcode}`);
                 return;
             }
             const product = await response.json();
             addProductToCart(product);
         } catch {
-            setScanError(`Barcode scan failed: ${barcode}`);
+            setScanError(`${__('Barcode scan failed')}: ${barcode}`);
         }
     };
 
     const addProductToCart = (product) => {
+        if (isOutOfStock(product)) {
+            setScanError(`${product?.name || __('Product')}: ${__('Out of stock')}`);
+            return;
+        }
+
         const units = product?.units || [];
         const preferredUnit = units.find((u) => u.is_base_unit) || units[0];
 
         if (!preferredUnit) {
-            setScanError('Selected product has no units configured.');
+            setScanError(__('Selected product has no units configured.'));
             return;
         }
 
@@ -293,7 +330,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                 {
                     id: makeId(),
                     product_id: product.id,
-                    name: product.name,
+                    name: getProductDisplayName(product),
+                    generic_name: product.generic_name || '',
                     barcode: product.barcode,
                     image_path: product.image_path || null,
                     tax_method: product.tax_method,
@@ -364,11 +402,114 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         };
     }, [cart, data.discount]);
 
+    const printSaleReceipt = (receipt) => {
+        if (!receipt) return;
+
+        const pharmacyName = settings.invoice?.pharmacy_name || __('Pharmacy POS');
+        const headerText = settings.invoice?.receipt_header || '';
+        const footerText = settings.invoice?.receipt_footer || '';
+        const logoUrl = settings.invoice?.logo_path ? withBase(`/storage/${String(settings.invoice.logo_path).replace(/^\/+/, '')}`) : '';
+        const receiptWidth = Number(settings.pos?.receipt_width || 80);
+        const saleDate = receipt.sale_date ? new Date(receipt.sale_date).toLocaleString() : new Date().toLocaleString();
+        const items = Array.isArray(receipt.items) ? receipt.items : [];
+
+        const itemRows = items.map((item) => {
+            const qty = Number(item.quantity || 0);
+            const total = Number(item.total_price || 0);
+            return `
+                <tr>
+                    <td class="name">${escapeHtml(item.name)}</td>
+                    <td class="qty">${qty}</td>
+                    <td class="amount">${currencySymbol}${total.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const printWindow = window.open('', '_blank', 'width=460,height=760');
+        if (!printWindow) {
+            setScanError('Pop-up blocked. Please allow pop-ups to print invoice.');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>${escapeHtml(receipt.invoice_number || 'Invoice')}</title>
+                <style>
+                    @page { size: ${receiptWidth}mm auto; margin: 4mm; }
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 8px; color: #111; }
+                    .receipt { width: ${receiptWidth}mm; max-width: 100%; margin: 0 auto; }
+                    .center { text-align: center; }
+                    .logo { max-width: 44mm; max-height: 22mm; object-fit: contain; margin-bottom: 6px; }
+                    .name { font-size: 15px; font-weight: 700; }
+                    .meta, .footer { font-size: 11px; color: #444; white-space: pre-wrap; }
+                    .line { border-top: 1px dashed #999; margin: 8px 0; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                    th, td { padding: 3px 0; vertical-align: top; }
+                    th { border-bottom: 1px solid #999; text-align: left; }
+                    .qty, .amount { text-align: right; white-space: nowrap; }
+                    .totals { margin-top: 6px; font-size: 12px; }
+                    .totals .row { display: flex; justify-content: space-between; padding: 2px 0; }
+                    .totals .grand { font-weight: 700; font-size: 13px; }
+                </style>
+            </head>
+            <body>
+                <div class="receipt">
+                    <div class="center">
+                        ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="logo" class="logo" />` : ''}
+                        <div class="name">${escapeHtml(pharmacyName)}</div>
+                        ${headerText ? `<div class="meta">${escapeHtml(headerText)}</div>` : ''}
+                    </div>
+                    <div class="line"></div>
+                    <div class="meta">Invoice: ${escapeHtml(receipt.invoice_number || '-')}</div>
+                    <div class="meta">Date: ${escapeHtml(saleDate)}</div>
+                    <div class="meta">Customer: ${escapeHtml(receipt.customer_name || 'Walk-in')}</div>
+                    <div class="meta">Payment: ${escapeHtml(receipt.payment_method || '-')} (${escapeHtml(receipt.payment_status || '-')})</div>
+                    <div class="line"></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="qty">Qty</th>
+                                <th class="amount">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemRows}
+                        </tbody>
+                    </table>
+                    <div class="line"></div>
+                    <div class="totals">
+                        <div class="row"><span>Subtotal</span><span>${currencySymbol}${Number(receipt.subtotal || 0).toFixed(2)}</span></div>
+                        <div class="row"><span>Tax</span><span>${currencySymbol}${Number(receipt.tax || 0).toFixed(2)}</span></div>
+                        <div class="row"><span>Discount</span><span>${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}</span></div>
+                        <div class="row grand"><span>Grand Total</span><span>${currencySymbol}${Number(receipt.grand_total || 0).toFixed(2)}</span></div>
+                    </div>
+                    ${footerText ? `<div class="line"></div><div class="center footer">${escapeHtml(footerText)}</div>` : ''}
+                </div>
+                <script>
+                    window.onload = function () {
+                        window.print();
+                        setTimeout(function () { window.close(); }, 300);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     const submit = (e) => {
         e.preventDefault();
         post(route('pos.checkout'), {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const receipt = page?.props?.flash?.sale_receipt;
+                if (receipt && behavior.auto_print_receipt) {
+                    printSaleReceipt(receipt);
+                }
                 setCart([]);
                 setSearchResults([]);
                 setSearchQuery('');
@@ -377,14 +518,17 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                 setCustomerSearchInput('');
                 setData('customer_id', null);
                 setData('discount', 0);
-                setData('payment_method', paymentMethods?.[0] || 'Cash');
+                setData('payment_method', paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'));
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
+                if (behavior.barcode_focus) {
+                    setTimeout(() => searchInputRef.current?.focus(), 100);
+                }
             },
         });
     };
 
     return (
-        <PosLayout header="POS Interface">
+        <PosLayout header={__('POS Interface')}>
             <Head title="POS" />
 
             <Box sx={{ p: 2 }}>
@@ -393,7 +537,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                             <ScanIcon color="primary" fontSize="small" />
                             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                                Product Search / Barcode Scan
+                                {__('Product Search / Barcode Scan')}
                             </Typography>
                             <Box sx={{ flex: 1 }} />
                             <ToggleButtonGroup
@@ -411,7 +555,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     <GridViewIcon fontSize="small" />
                                 </ToggleButton>
                             </ToggleButtonGroup>
-                            <Chip size="small" label={`Branch: ${branchName || branchId || '-'}`} variant="outlined" />
+                            <Chip size="small" label={`${__('Branch')}: ${branchName || branchId || '-'}`} variant="outlined" />
                         </Stack>
 
                         {scanError && (
@@ -425,7 +569,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    placeholder="Search by name, generic name, or barcode..."
+                                    inputRef={searchInputRef}
+                                    placeholder={__('Search by name, generic name, or barcode...')}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && fetchSearch()}
@@ -444,7 +589,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     disabled={searchLoading}
                                     sx={{ minWidth: 110 }}
                                 >
-                                    Search
+                                    {__('Search')}
                                 </Button>
                             </Stack>
                         ) : (
@@ -462,7 +607,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                         onClick={() => setSelectedCategoryId('')}
                                         sx={{ justifyContent: 'flex-start', textTransform: 'none', fontWeight: 700 }}
                                     >
-                                        All
+                                        {__('All')}
                                     </Button>
                                     {catalogCategories.map((cat) => (
                                         <Button
@@ -478,7 +623,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 </Box>
                                 {catalogLoading && (
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                                        Loading...
+                                        {__('Loading...')}
                                     </Typography>
                                 )}
                             </Box>
@@ -487,7 +632,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         <Divider sx={{ my: 2 }} />
 
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                            RESULTS
+                            {__('RESULTS')}
                         </Typography>
 
                         {resultsView === 'table' ? (
@@ -495,22 +640,29 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                            <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>Barcode</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>{__('Product')}</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>{__('Barcode')}</TableCell>
                                             <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Stock
+                                                {__('Stock')}
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 700 }} align="center">
-                                                Add
+                                                {__('Add')}
                                             </TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {searchResults.map((p) => (
-                                            <TableRow key={p.id} hover>
+                                        {searchResults.map((p) => {
+                                            const outOfStock = isOutOfStock(p);
+
+                                            return (
+                                            <TableRow
+                                                key={p.id}
+                                                hover
+                                                sx={outOfStock ? { bgcolor: 'error.lighter' } : undefined}
+                                            >
                                                 <TableCell>
                                                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                        {p.name}
+                                                        {getProductDisplayName(p)}
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
@@ -519,20 +671,31 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                                    {p.stock_quantity}
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{ fontWeight: 700, color: outOfStock ? 'error.main' : 'inherit' }}
+                                                    >
+                                                        {p.stock_quantity}
+                                                    </Typography>
                                                 </TableCell>
                                                 <TableCell align="center">
-                                                    <IconButton size="small" color="primary" onClick={() => addProductToCart(p)}>
+                                                    <IconButton
+                                                        size="small"
+                                                        color={outOfStock ? 'error' : 'primary'}
+                                                        onClick={() => addProductToCart(p)}
+                                                        disabled={outOfStock}
+                                                        title={outOfStock ? __('Out of stock') : __('Add')}
+                                                    >
                                                         <AddIcon fontSize="small" />
                                                     </IconButton>
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
+                                        )})}
                                         {searchResults.length === 0 && (
                                             <TableRow>
                                                 <TableCell colSpan={4} align="center" sx={{ py: 2 }}>
                                                     <Typography variant="body2" color="text.secondary italic">
-                                                        Search products or scan a barcode to add items.
+                                                        {__('Search products or scan a barcode to add items.')}
                                                     </Typography>
                                                 </TableCell>
                                             </TableRow>
@@ -550,6 +713,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 }}
                             >
                                 {searchResults.map((p) => {
+                                    const outOfStock = isOutOfStock(p);
                                     const units = p.units || [];
                                     const preferred = units.find((u) => u.is_base_unit) || units[0];
                                     const price = Number(preferred?.selling_price || 0);
@@ -557,8 +721,16 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     const imageUrl = p.image_path ? `/storage/${p.image_path}` : null;
 
                                     return (
-                                        <Card key={p.id} variant="outlined" sx={{ overflow: 'hidden' }}>
-                                            <CardActionArea onClick={() => addProductToCart(p)}>
+                                        <Card
+                                            key={p.id}
+                                            variant="outlined"
+                                            sx={{
+                                                overflow: 'hidden',
+                                                borderColor: outOfStock ? 'error.main' : undefined,
+                                                bgcolor: outOfStock ? 'error.lighter' : undefined,
+                                            }}
+                                        >
+                                            <CardActionArea onClick={() => addProductToCart(p)} disabled={outOfStock}>
                                                 <Box
                                                     sx={{
                                                         height: 120,
@@ -573,22 +745,22 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                         <Box
                                                             component="img"
                                                             src={imageUrl}
-                                                            alt={p.name}
+                                                            alt={getProductDisplayName(p)}
                                                             sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                         />
                                                     ) : (
                                                         <Typography variant="caption" color="text.secondary">
-                                                            No Image
+                                                            {__('No Image')}
                                                         </Typography>
                                                     )}
                                                 </Box>
                                                 <CardContent sx={{ py: 1.25 }}>
-                                                    <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap title={p.name}>
-                                                        {p.name}
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap title={getProductDisplayName(p)}>
+                                                        {getProductDisplayName(p)}
                                                     </Typography>
                                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            {unitLabel ? `Unit: ${unitLabel}` : 'Unit'}
+                                                            {unitLabel ? `${__('Unit')}: ${unitLabel}` : __('Unit')}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
                                                             {currencySymbol}{price.toFixed(2)}
@@ -596,11 +768,27 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                     </Stack>
                                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            Stock
+                                                            {__('Stock')}
                                                         </Typography>
-                                                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                                                            {p.stock_quantity}
-                                                        </Typography>
+                                                        {outOfStock ? (
+                                                            <Chip
+                                                                size="small"
+                                                                color="error"
+                                                                label={__('Out of stock')}
+                                                                sx={{
+                                                                    height: 20,
+                                                                    '& .MuiChip-label': {
+                                                                        px: 0.75,
+                                                                        fontSize: '0.68rem',
+                                                                        fontWeight: 600,
+                                                                    },
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                                                {p.stock_quantity}
+                                                            </Typography>
+                                                        )}
                                                     </Stack>
                                                 </CardContent>
                                             </CardActionArea>
@@ -610,7 +798,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 {searchResults.length === 0 && (
                                     <Paper variant="outlined" sx={{ p: 2, gridColumn: '1 / -1' }}>
                                         <Typography variant="body2" color="text.secondary italic" align="center">
-                                            Search products or scan a barcode to add items.
+                                            {__('Search products or scan a barcode to add items.')}
                                         </Typography>
                                     </Paper>
                                 )}
@@ -622,7 +810,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                             disabled={catalogLoading}
                                             onClick={() => fetchCatalog({ categoryId: selectedCategoryId, page: catalogPage + 1, append: true })}
                                         >
-                                            Load more
+                                            {__('Load more')}
                                         </Button>
                                     </Box>
                                 )}
@@ -632,20 +820,20 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
                     <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                            Cart
+                            {__('Cart')}
                         </Typography>
 
                         <TableContainer sx={{ minHeight: 260 }}>
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                        <TableCell sx={{ fontWeight: 700 }}>Item</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Unit</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{__('Item')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{__('Unit')}</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }} align="right">
-                                            Qty
+                                            {__('Qty')}
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 700 }} align="right">
-                                            Total
+                                            {__('Total')}
                                         </TableCell>
                                         <TableCell />
                                     </TableRow>
@@ -691,7 +879,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                         inputProps={{ min: 0.01, step: '0.01' }}
                                                         sx={{ width: 90 }}
                                                         error={maxQty >= 0 && qty > maxQty}
-                                                        helperText={maxQty >= 0 && qty > maxQty ? `Max ${maxQty}` : ''}
+                                                        helperText={maxQty >= 0 && qty > maxQty ? `${__('Max')} ${maxQty}` : ''}
                                                     />
                                                 </TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 700 }}>
@@ -709,7 +897,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                         <TableRow>
                                             <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
                                                 <Typography variant="body2" color="text.secondary italic">
-                                                    Cart is empty.
+                                                    {__('Cart is empty.')}
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>
@@ -723,7 +911,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         <Stack spacing={1}>
                             <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="body2" color="text.secondary">
-                                    Subtotal
+                                    {__('Subtotal')}
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                     {currencySymbol}{totals.totalAmount.toFixed(2)}
@@ -731,7 +919,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             </Stack>
                             <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="body2" color="text.secondary">
-                                    Tax
+                                    {__('Tax')}
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                     {currencySymbol}{totals.tax.toFixed(2)}
@@ -739,7 +927,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             </Stack>
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                 <Typography variant="body2" color="text.secondary">
-                                    Discount
+                                    {__('Discount')}
                                 </Typography>
                                 <TextField
                                     size="small"
@@ -755,7 +943,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             </Stack>
                             <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                    Grand Total
+                                    {__('Grand Total')}
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
                                     {currencySymbol}{totals.grandTotal.toFixed(2)}
@@ -769,7 +957,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             <Stack spacing={1.5}>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                        Customer (optional)
+                                        {__('Customer (optional)')}
                                     </Typography>
                                     <Stack direction="row" spacing={1} alignItems="flex-start">
                                         <Autocomplete
@@ -786,7 +974,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                     <Stack>
                                                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            {[option.phone, option.email].filter(Boolean).join(' · ') || 'No contact'}
+                                                            {[option.phone, option.email].filter(Boolean).join(' · ') || __('No contact')}
                                                         </Typography>
                                                     </Stack>
                                                 </li>
@@ -796,7 +984,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                             renderInput={(params) => (
                                                 <TextField
                                                     {...params}
-                                                    placeholder="Search by name, phone, or email..."
+                                                    placeholder={__('Search by name, phone, or email...')}
                                                     size="small"
                                                 />
                                             )}
@@ -809,7 +997,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                             onClick={openNewCustomer}
                                             sx={{ minWidth: 140 }}
                                         >
-                                            New customer
+                                            {__('New customer')}
                                         </Button>
                                     </Stack>
                                 </Box>
@@ -819,7 +1007,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                         select
                                         size="small"
                                         fullWidth
-                                        label="Payment Method"
+                                        label={__('Payment Method')}
                                         value={data.payment_method}
                                         onChange={(e) => setData('payment_method', e.target.value)}
                                         error={!!errors.payment_method}
@@ -835,7 +1023,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                         select
                                         size="small"
                                         fullWidth
-                                        label="Payment Status"
+                                        label={__('Payment Status')}
                                         value={data.payment_status}
                                         onChange={(e) => setData('payment_status', e.target.value)}
                                         error={!!errors.payment_status}
@@ -860,7 +1048,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     disabled={processing || cart.length === 0}
                                     fullWidth
                                 >
-                                    Complete Sale
+                                    {__('Complete Sale')}
                                 </Button>
                             </Stack>
                         </Box>
@@ -871,7 +1059,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             <Dialog open={newCustomerOpen} onClose={closeNewCustomer} maxWidth="sm" fullWidth>
                 <form onSubmit={submitNewCustomer}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        New customer
+                        {__('New customer')}
                         <IconButton size="small" onClick={closeNewCustomer}>
                             <CloseIcon />
                         </IconButton>
@@ -885,7 +1073,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             )}
                             <TextField
                                 size="small"
-                                label="Name"
+                                label={__('Name')}
                                 fullWidth
                                 value={newCustomerForm.name}
                                 onChange={(e) => setNewCustomerForm((p) => ({ ...p, name: e.target.value }))}
@@ -894,14 +1082,14 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                                 <TextField
                                     size="small"
-                                    label="Phone"
+                                    label={__('Phone')}
                                     fullWidth
                                     value={newCustomerForm.phone}
                                     onChange={(e) => setNewCustomerForm((p) => ({ ...p, phone: e.target.value }))}
                                 />
                                 <TextField
                                     size="small"
-                                    label="Email"
+                                    label={__('Email')}
                                     fullWidth
                                     type="email"
                                     value={newCustomerForm.email}
@@ -910,7 +1098,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             </Stack>
                             <TextField
                                 size="small"
-                                label="Address"
+                                label={__('Address')}
                                 fullWidth
                                 multiline
                                 rows={2}
@@ -921,10 +1109,10 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
                         <Button type="button" size="small" onClick={closeNewCustomer}>
-                            Cancel
+                            {__('Cancel')}
                         </Button>
                         <Button type="submit" variant="contained" size="small" disabled={newCustomerSubmitting}>
-                            {newCustomerSubmitting ? 'Creating…' : 'Create & use'}
+                            {newCustomerSubmitting ? __('Creating...') : __('Create & use')}
                         </Button>
                     </DialogActions>
                 </form>

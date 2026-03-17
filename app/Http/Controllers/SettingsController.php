@@ -15,7 +15,6 @@ class SettingsController extends Controller
             'default_payment_method' => Setting::get('pos.default_payment_method', 'Cash'),
             'auto_print_receipt' => Setting::get('pos.auto_print_receipt', '0') === '1',
             'barcode_focus' => Setting::get('pos.barcode_focus', '1') === '1',
-            'low_stock_sound' => Setting::get('pos.low_stock_sound', '1') === '1',
             'show_generic_first' => Setting::get('pos.show_generic_first', '0') === '1',
             'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
         ];
@@ -26,7 +25,8 @@ class SettingsController extends Controller
         ];
 
         $localization = [
-            'locale' => Setting::get('app.locale', 'en'),
+            // Keep selector aligned with current app-bar locale (URL locale).
+            'locale' => app()->getLocale(),
             'date_format' => Setting::get('app.date_format', 'Y-m-d'),
             'time_format' => Setting::get('app.time_format', 'H:i:s'),
             'timezone' => Setting::get('app.timezone', 'UTC'),
@@ -65,7 +65,10 @@ class SettingsController extends Controller
             'localization' => $localization,
             'invoice' => $invoice,
             'labels' => $labels,
-            'taxes' => \App\Models\Tax::where('status', 'Active')->get(['id', 'name', 'rate']),
+            // Tax status is stored as boolean in TaxController; keep compatibility with legacy string values.
+            'taxes' => \App\Models\Tax::query()
+                ->whereIn('status', [1, '1', true, 'Active', 'active'])
+                ->get(['id', 'name', 'rate']),
         ]);
     }
 
@@ -135,7 +138,6 @@ class SettingsController extends Controller
             'default_payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
             'auto_print_receipt' => 'required|boolean',
             'barcode_focus' => 'required|boolean',
-            'low_stock_sound' => 'required|boolean',
             'show_generic_first' => 'required|boolean',
             'receipt_width' => 'required|in:58,80',
         ]);
@@ -144,7 +146,6 @@ class SettingsController extends Controller
         Setting::set('pos.default_payment_method', $validated['default_payment_method']);
         Setting::set('pos.auto_print_receipt', $validated['auto_print_receipt'] ? '1' : '0');
         Setting::set('pos.barcode_focus', $validated['barcode_focus'] ? '1' : '0');
-        Setting::set('pos.low_stock_sound', $validated['low_stock_sound'] ? '1' : '0');
         Setting::set('pos.show_generic_first', $validated['show_generic_first'] ? '1' : '0');
         Setting::set('pos.receipt_width', (string) $validated['receipt_width']);
 
@@ -167,10 +168,10 @@ class SettingsController extends Controller
     public function updateLocalization(Request $request)
     {
         $validated = $request->validate([
-            'locale' => 'required|string|max:10',
+            'locale' => 'required|in:en,my',
             'date_format' => 'required|string|max:20',
             'time_format' => 'required|string|max:20',
-            'timezone' => 'required|string|max:50',
+            'timezone' => 'required|in:UTC,Asia/Yangon',
             'currency_code' => 'required|string|max:10',
             'currency_symbol' => 'required|string|max:5',
             'week_start' => 'required|integer|min:0|max:6',
@@ -184,6 +185,8 @@ class SettingsController extends Controller
         Setting::set('app.currency_symbol', $validated['currency_symbol']);
         Setting::set('app.week_start', (string) $validated['week_start']);
 
-        return redirect()->back()->with('success', 'Localization settings updated successfully.');
+        return redirect()
+            ->route('settings.index', ['locale' => $validated['locale']])
+            ->with('success', 'Localization settings updated successfully.');
     }
 }

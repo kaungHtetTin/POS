@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Expense;
 use App\Models\InventoryBatch;
+use App\Models\Product;
 use App\Models\ReturnEntry;
 use App\Models\Sale;
 use Illuminate\Http\Request;
@@ -357,6 +358,100 @@ class ReportsController extends Controller
             'expenses_by_category' => $expensesByCategory,
             'branch_performance' => $branchPerformance,
             'expiring_batches' => $expiringBatches,
+        ]);
+    }
+
+    public function expiry(Request $request)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+        $fromInput = trim((string) $request->get('from_date', ''));
+        $toInput = trim((string) $request->get('to_date', ''));
+
+        $fromDate = null;
+        if ($fromInput !== '') {
+            try {
+                $fromDate = Carbon::parse($fromInput)->startOfDay();
+            } catch (\Throwable $e) {
+                $fromDate = null;
+            }
+        }
+
+        $toDate = null;
+        if ($toInput !== '') {
+            try {
+                $toDate = Carbon::parse($toInput)->endOfDay();
+            } catch (\Throwable $e) {
+                $toDate = null;
+            }
+        }
+
+        if ($fromDate && $toDate && $fromDate->greaterThan($toDate)) {
+            [$fromDate, $toDate] = [$toDate->copy()->startOfDay(), $fromDate->copy()->endOfDay()];
+        }
+
+        $productId = (string) $request->get('product_id', '');
+        if ($productId !== '') {
+            $productExists = Product::where('id', $productId)->exists();
+            if (!$productExists) {
+                $productId = '';
+            }
+        }
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $products = Product::select('id', 'name')
+            ->where('status', 'Active')
+            ->orderBy('name')
+            ->get();
+
+        $batches = InventoryBatch::query()
+            ->whereIn('inventory_batches.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('inventory_batches.branch_id', $branchScope['branch_id']);
+            })
+            ->where('inventory_batches.quantity', '>', 0)
+            ->when($productId !== '', function ($q) use ($productId) {
+                $q->where('inventory_batches.product_id', $productId);
+            })
+            ->when($fromDate, function ($q) use ($fromDate) {
+                $q->whereDate('inventory_batches.expiry_date', '>=', $fromDate->toDateString());
+            })
+            ->when($toDate, function ($q) use ($toDate) {
+                $q->whereDate('inventory_batches.expiry_date', '<=', $toDate->toDateString());
+            })
+            ->with(['product:id,name', 'branch:id,name'])
+            ->orderBy('inventory_batches.expiry_date')
+            ->orderBy('inventory_batches.batch_number')
+            ->get()
+            ->map(function ($batch) {
+                $daysLeft = now()->startOfDay()->diffInDays(Carbon::parse($batch->expiry_date)->startOfDay(), false);
+                return [
+                    'id' => $batch->id,
+                    'batch_number' => $batch->batch_number,
+                    'product_name' => $batch->product?->name ?? '-',
+                    'branch_name' => $batch->branch?->name ?? '-',
+                    'quantity' => (int) $batch->quantity,
+                    'expiry_date' => Carbon::parse($batch->expiry_date)->toDateString(),
+                    'days_left' => $daysLeft,
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Reports/Expiry', [
+            'branches' => $branches,
+            'products' => $products,
+            'batches' => $batches,
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'product_id' => $productId,
+                'from_date' => $fromDate?->toDateString() ?? '',
+                'to_date' => $toDate?->toDateString() ?? '',
+            ],
         ]);
     }
 }

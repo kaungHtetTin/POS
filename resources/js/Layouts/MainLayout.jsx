@@ -26,18 +26,19 @@ import {
 } from '@mui/material';
 import {
     Menu as MenuIcon,
+    Brightness4 as DarkModeIcon,
+    Brightness7 as LightModeIcon,
     Dashboard as DashboardIcon,
     Inventory as InventoryIcon,
     Medication as ProductIcon,
     ShoppingCart as POSIcon,
     People as CustomersIcon,
     Assessment as ReportsIcon,
+    EventBusy as ExpiryReportIcon,
     Payments as ExpensesIcon,
     Settings as SettingsIcon,
     Logout as LogoutIcon,
     Person as PersonIcon,
-    Brightness4 as DarkModeIcon,
-    Brightness7 as LightModeIcon,
     AssignmentInd as RolesIcon,
     VerifiedUser as PermissionsIcon,
     PeopleAlt as StaffIcon,
@@ -52,6 +53,7 @@ import {
     CompareArrows as TransferIcon,
     AssignmentReturn as ReturnIcon,
     Label as ExpenseCategoryIcon,
+    Language as LanguageIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -59,11 +61,14 @@ const drawerWidth = 200; // More compact sidebar
 export default function MainLayout({ children, header }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash, settings = {}, pending_returns_count = 0 } = usePage().props;
+    const { auth, flash, settings = {}, pending_returns_count = 0, translations = {}, locale } = usePage().props;
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
+
+    const __ = (key) => translations[key] || key;
 
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorElUser, setAnchorElUser] = useState(null);
+    const [anchorElLang, setAnchorElLang] = useState(null);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
 
     React.useEffect(() => {
@@ -91,6 +96,18 @@ export default function MainLayout({ children, header }) {
         setAnchorElUser(null);
     };
 
+    const handleOpenLangMenu = (event) => {
+        setAnchorElLang(event.currentTarget);
+    };
+
+    const handleCloseLangMenu = () => {
+        setAnchorElLang(null);
+    };
+
+    const changeLanguage = (lang) => {
+        window.location.href = route('language.switch', { lang });
+    };
+
     const menuItems = {
         dashboard: { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
         pos: { text: 'POS', icon: <POSIcon fontSize="small" />, href: route('pos.index'), routePattern: 'pos.*', permission: 'process_sale' },
@@ -113,7 +130,8 @@ export default function MainLayout({ children, header }) {
         sales: { text: 'Sales', icon: <SalesIcon fontSize="small" />, href: route('sales.index'), routePattern: 'sales.*', permission: 'view_financial_reports' },
         expenses: { text: 'Expenses', icon: <ExpensesIcon fontSize="small" />, href: route('expenses.index'), routePattern: 'expenses.*', permission: 'view_financial_reports' },
         expenseCategories: { text: 'Expense Categories', icon: <ExpenseCategoryIcon fontSize="small" />, href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'view_financial_reports' },
-        reports: { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: route('reports.index'), routePattern: 'reports.*', permission: 'view_financial_reports' },
+        reports: { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: route('reports.index'), routePattern: 'reports.index', permission: 'view_financial_reports' },
+        expiryReport: { text: 'Expiry Report', icon: <ExpiryReportIcon fontSize="small" />, href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'view_financial_reports' },
 
         staff: { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
         roles: { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
@@ -128,7 +146,7 @@ export default function MainLayout({ children, header }) {
         { label: 'Purchasing', keys: ['suppliers', 'purchases'] },
         { label: 'Stock', keys: ['adjustments', 'transfers'] },
         { label: 'Sales', keys: ['customers', 'returns', 'sales'] },
-        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports'] },
+        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'expiryReport'] },
         { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'settings'] },
     ];
 
@@ -172,7 +190,7 @@ export default function MainLayout({ children, header }) {
                                         letterSpacing: 0.6,
                                     }}
                                 >
-                                    {group.label}
+                                    {__(group.label)}
                                 </ListSubheader>
                             }
                         >
@@ -228,7 +246,7 @@ export default function MainLayout({ children, header }) {
                                                     item.icon
                                                 )}
                                             </ListItemIcon>
-                                            <ListItemText primary={item.text} primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} />
+                                            <ListItemText primary={__(item.text)} primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} />
                                         </ListItemButton>
                                     </ListItem>
                                 );
@@ -241,18 +259,18 @@ export default function MainLayout({ children, header }) {
             <Divider sx={{ my: 1 }} />
             <List dense>
                 <ListItem disablePadding>
-                    <ListItemButton
-                        onClick={() => router.post(route('logout'))}
-                        sx={{ py: 0.5, color: 'error.main' }}
-                    >
-                        <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
-                            <LogoutIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText 
-                            primary="Logout" 
-                            primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} 
-                        />
-                    </ListItemButton>
+                        <ListItemButton
+                            onClick={() => router.post(route('logout'))}
+                            sx={{ py: 0.5, color: 'error.main' }}
+                        >
+                            <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+                                <LogoutIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText 
+                                primary={__('Logout')} 
+                                primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} 
+                            />
+                        </ListItemButton>
                 </ListItem>
             </List>
         </div>
@@ -299,7 +317,36 @@ export default function MainLayout({ children, header }) {
                             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                         </IconButton>
                         
-                        <Tooltip title="Open settings">
+                        <Tooltip title={__('Language')}>
+                            <IconButton onClick={handleOpenLangMenu} color="inherit" size="small">
+                                <LanguageIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Menu
+                            sx={{ mt: '45px' }}
+                            id="menu-lang"
+                            anchorEl={anchorElLang}
+                            anchorOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                            keepMounted
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                            open={Boolean(anchorElLang)}
+                            onClose={handleCloseLangMenu}
+                        >
+                            <MenuItem onClick={() => changeLanguage('en')} selected={locale === 'en'}>
+                                <Typography variant="body2">English</Typography>
+                            </MenuItem>
+                            <MenuItem onClick={() => changeLanguage('my')} selected={locale === 'my'}>
+                                <Typography variant="body2">မြန်မာ (Myanmar)</Typography>
+                            </MenuItem>
+                        </Menu>
+
+                        <Tooltip title={__('Open settings')}>
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar 
                                     alt={auth.user?.name || 'User'} 
@@ -326,11 +373,11 @@ export default function MainLayout({ children, header }) {
                         >
                             <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-                                <Typography variant="body2">Profile</Typography>
+                                <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
                             <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }}>
                                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                                <Typography variant="body2">Logout</Typography>
+                                <Typography variant="body2">{__('Logout')}</Typography>
                             </MenuItem>
                         </Menu>
                     </Box>

@@ -14,6 +14,11 @@ use Illuminate\Validation\Rules;
 
 class StaffController extends Controller
 {
+    protected function resolveStaff(string $staff): User
+    {
+        return User::query()->findOrFail($staff);
+    }
+
     public function index()
     {
         return Inertia::render('Staff/Index', [
@@ -73,8 +78,10 @@ class StaffController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, User $staff)
+    public function update(Request $request, string $locale, string $staff)
     {
+        $staff = $this->resolveStaff($staff);
+
         // Prevent modifying Root users
         if ($staff->hasRole('Root')) {
             abort(403);
@@ -129,8 +136,10 @@ class StaffController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(User $staff)
+    public function destroy(string $locale, string $staff)
     {
+        $staff = $this->resolveStaff($staff);
+
         if ($staff->hasRole('Root') || $staff->id === auth()->id()) {
             abort(403);
         }

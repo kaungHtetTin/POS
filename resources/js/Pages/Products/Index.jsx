@@ -61,6 +61,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     // Scanner State
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
+    const barcodeInputRef = useRef(null);
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
@@ -91,6 +92,18 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [open, products]);
+
+    useEffect(() => {
+        if (!open || editMode) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            barcodeInputRef.current?.focus();
+        }, 120);
+
+        return () => clearTimeout(timer);
+    }, [open, editMode]);
 
     const processScan = (barcode) => {
         const existingProduct = products.find(p => p.barcode === barcode);
@@ -642,6 +655,8 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         label="Barcode / SKU"
                                         fullWidth
                                         size="small"
+                                        autoFocus={!editMode}
+                                        inputRef={barcodeInputRef}
                                         value={data.barcode}
                                         onChange={e => setData('barcode', e.target.value)}
                                         error={!!errors.barcode}

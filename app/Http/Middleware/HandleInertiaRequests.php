@@ -40,18 +40,33 @@ class HandleInertiaRequests extends Middleware
                     'accessible_branches' => $this->getAccessibleBranches($request),
                 ]) : null,
             ],
+            'locale' => app()->getLocale(),
+            'translations' => function () {
+                $locale = app()->getLocale();
+                $file = base_path("lang/{$locale}.json");
+                if (file_exists($file)) {
+                    return json_decode(file_get_contents($file), true);
+                }
+                return [];
+            },
             'ziggy' => function () use ($request) {
-                $ziggy = (new Ziggy)->toArray();
+                $locale = app()->getLocale();
+                $ziggy = (new Ziggy(null, $request->url()))->toArray();
                 $path = parse_url(url('/'), PHP_URL_PATH) ?: '';
                 
                 return array_merge($ziggy, [
                     'location' => $request->url(),
                     'base' => $path,
+                    'locale' => $locale,
+                    'defaults' => array_merge($ziggy['defaults'] ?? [], [
+                        'locale' => $locale,
+                    ]),
                 ]);
             },
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                'sale_receipt' => $request->session()->get('sale_receipt'),
             ],
             'pending_returns_count' => function () use ($request) {
                 if (!$request->user()) return 0;
@@ -79,7 +94,14 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'invoice' => [
                     'pharmacy_name' => \App\Models\Setting::get('invoice.pharmacy_name', config('app.name')),
-                ]
+                    'logo_path' => \App\Models\Setting::get('invoice.logo_path', ''),
+                    'receipt_header' => \App\Models\Setting::get('invoice.receipt_header', ''),
+                    'receipt_footer' => \App\Models\Setting::get('invoice.receipt_footer', ''),
+                ],
+                'pos' => [
+                    'receipt_width' => (int) \App\Models\Setting::get('pos.receipt_width', '80'),
+                    'auto_print_receipt' => \App\Models\Setting::get('pos.auto_print_receipt', '0') === '1',
+                ],
             ],
         ]);
     }

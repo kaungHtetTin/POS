@@ -24,19 +24,24 @@ import {
     Brightness4 as DarkModeIcon,
     Brightness7 as LightModeIcon,
     Dashboard as DashboardIcon,
+    PointOfSale as SalesIcon,
     Inventory as InventoryIcon,
     ReceiptLong as PurchaseIcon,
     Logout as LogoutIcon,
     Person as PersonIcon,
     ShoppingCart as PosIcon,
+    Language as LanguageIcon,
 } from '@mui/icons-material';
 
 export default function PosLayout({ children, header = 'POS' }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash } = usePage().props;
+    const { auth, flash, translations = {}, locale } = usePage().props;
     const [anchorElUser, setAnchorElUser] = useState(null);
+    const [anchorElLang, setAnchorElLang] = useState(null);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+    const __ = (key) => translations[key] || key;
 
     React.useEffect(() => {
         if (flash.success || flash.error) {
@@ -59,6 +64,18 @@ export default function PosLayout({ children, header = 'POS' }) {
         setAnchorElUser(null);
     };
 
+    const handleOpenLangMenu = (event) => {
+        setAnchorElLang(event.currentTarget);
+    };
+
+    const handleCloseLangMenu = () => {
+        setAnchorElLang(null);
+    };
+
+    const changeLanguage = (lang) => {
+        window.location.href = route('language.switch', { lang });
+    };
+
     const permissions = auth.user?.permissions || [];
     const canManageInventory = permissions.includes('manage_inventory');
     const accessibleBranches = auth.user?.accessible_branches || [];
@@ -67,6 +84,7 @@ export default function PosLayout({ children, header = 'POS' }) {
     const navItems = [
         { text: 'POS', href: route('pos.index'), icon: <PosIcon fontSize="small" />, active: route().current('pos.*') },
         { text: 'Dashboard', href: route('dashboard'), icon: <DashboardIcon fontSize="small" />, active: route().current('dashboard') },
+        { text: 'Sales', href: route('sales.index'), icon: <SalesIcon fontSize="small" />, active: route().current('sales.*') },
         ...(canManageInventory ? [
             { text: 'Inventory', href: route('inventory.index'), icon: <InventoryIcon fontSize="small" />, active: route().current('inventory.index') },
             { text: 'Purchases', href: route('purchases.index'), icon: <PurchaseIcon fontSize="small" />, active: route().current('purchases.*') },
@@ -102,7 +120,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 variant={item.active ? 'contained' : 'text'}
                                 sx={{ textTransform: 'none', fontWeight: item.active ? 700 : 500 }}
                             >
-                                {item.text}
+                                {__(item.text)}
                             </Button>
                         ))}
                     </Stack>
@@ -119,7 +137,15 @@ export default function PosLayout({ children, header = 'POS' }) {
                                     { preserveScroll: true }
                                 );
                             }}
-                            sx={{ minWidth: 220 }}
+                            sx={{
+                                width: { xs: 120, sm: 150 },
+                                '& .MuiSelect-select': {
+                                    py: 0.75,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                },
+                            }}
                         >
                             {accessibleBranches.map((branch) => (
                                 <MenuItem key={branch.id} value={branch.id}>
@@ -138,7 +164,36 @@ export default function PosLayout({ children, header = 'POS' }) {
                             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                         </IconButton>
 
-                        <Tooltip title="User menu">
+                        <Tooltip title={__('Language')}>
+                            <IconButton onClick={handleOpenLangMenu} color="inherit" size="small">
+                                <LanguageIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Menu
+                            sx={{ mt: '45px' }}
+                            id="pos-lang-menu"
+                            anchorEl={anchorElLang}
+                            anchorOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                            keepMounted
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                            open={Boolean(anchorElLang)}
+                            onClose={handleCloseLangMenu}
+                        >
+                            <MenuItem onClick={() => changeLanguage('en')} selected={locale === 'en'}>
+                                <Typography variant="body2">English</Typography>
+                            </MenuItem>
+                            <MenuItem onClick={() => changeLanguage('my')} selected={locale === 'my'}>
+                                <Typography variant="body2">မြန်မာ (Myanmar)</Typography>
+                            </MenuItem>
+                        </Menu>
+
+                        <Tooltip title={__('User menu')}>
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar
                                     alt={auth.user?.name || 'User'}
@@ -165,11 +220,11 @@ export default function PosLayout({ children, header = 'POS' }) {
                         >
                             <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-                                <Typography variant="body2">Profile</Typography>
+                                <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
                             <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }}>
                                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                                <Typography variant="body2">Logout</Typography>
+                                <Typography variant="body2">{__('Logout')}</Typography>
                             </MenuItem>
                         </Menu>
                     </Box>

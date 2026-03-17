@@ -16,6 +16,13 @@
             window.laravel_base = "{{ url('/') }}";
         </script>
         @routes
+        <script>
+            if (typeof Ziggy !== 'undefined') {
+                Ziggy.defaults = Object.assign({}, Ziggy.defaults || {}, {
+                    locale: "{{ app()->getLocale() }}",
+                });
+            }
+        </script>
         @viteReactRefresh
         @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
         @inertiaHead
