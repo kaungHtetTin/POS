@@ -110,6 +110,41 @@ const scheduleStaticTranslations = (translations) => {
     });
 };
 
+const normalizeCurrentBrowserUrl = (base) => {
+    const correctedPath = normalizeDuplicatedBasePath(window.location.pathname, base);
+    if (correctedPath !== window.location.pathname) {
+        window.history.replaceState(null, '', `${correctedPath}${window.location.search}${window.location.hash}`);
+    }
+};
+
+const buildGetUrl = (rawUrl, data = {}) => {
+    const parsed = new URL(rawUrl, window.location.origin);
+    const params = new URLSearchParams(parsed.search);
+
+    Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') {
+            params.delete(key);
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            params.delete(key);
+            value.forEach((item) => {
+                if (item !== undefined && item !== null && item !== '') {
+                    params.append(`${key}[]`, String(item));
+                }
+            });
+            return;
+        }
+
+        params.set(key, String(value));
+    });
+
+    const query = params.toString();
+    parsed.search = query ? `?${query}` : '';
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+};
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
@@ -117,45 +152,28 @@ createInertiaApp({
         // Fix for subfolder routing duplication
         const base = props.initialPage.props.ziggy?.base || '';
         props.initialPage.url = normalizeDuplicatedBase(props.initialPage.url, base);
+        normalizeCurrentBrowserUrl(base);
 
-        const correctedCurrentPath = normalizeDuplicatedBasePath(window.location.pathname, base);
-        if (correctedCurrentPath !== window.location.pathname) {
-            window.history.replaceState(null, '', `${correctedCurrentPath}${window.location.search}${window.location.hash}`);
-        }
+        if (!window.__forceBrowserGetNavigation && typeof router.visit === 'function') {
+            const originalVisit = router.visit.bind(router);
+            window.__forceBrowserGetNavigation = true;
 
-        if (!window.__inertiaNormalizeBound) {
-            window.__inertiaNormalizeBound = true;
-
-            if (typeof window.route === 'function' && !window.__routeNormalizePatched) {
-                const originalRoute = window.route.bind(window);
-                const wrappedRoute = (...args) => {
-                    const result = originalRoute(...args);
-                    if (typeof result === 'string') {
-                        return normalizeDuplicatedBase(result, base);
-                    }
-                    return result;
-                };
-                Object.assign(wrappedRoute, originalRoute);
-                window.route = wrappedRoute;
-                window.__routeNormalizePatched = true;
-            }
-
-            if (!window.__inertiaVisitPatched && typeof router.visit === 'function') {
-                const originalVisit = router.visit.bind(router);
-                router.visit = (url, options = {}) => originalVisit(normalizeDuplicatedBase(url, base), options);
-                window.__inertiaVisitPatched = true;
-            }
-
-            router.on('navigate', (event) => {
-                const page = event?.detail?.page;
-                if (!page || !page.url) {
+            router.visit = (url, options = {}) => {
+                const method = String(options?.method || 'get').toLowerCase();
+                if (method === 'get') {
+                    const rawUrl = typeof url === 'string' ? url : (url?.url || String(url));
+                    const withQuery = buildGetUrl(rawUrl, options?.data || {});
+                    const target = normalizeDuplicatedBase(withQuery, base);
+                    window.location.assign(target);
                     return;
                 }
 
-                const pageBase = page.props?.ziggy?.base || base;
-                page.url = normalizeDuplicatedBase(page.url, pageBase);
-            });
+                return originalVisit(url, options);
+            };
         }
+
+        // Force browser-native navigation for GET requests to avoid SPA history
+        // rewriting duplicated base paths in subfolder deployments.
 
         // Set global locale/defaults for Ziggy
         if (props.initialPage.props.locale) {
@@ -170,6 +188,14 @@ createInertiaApp({
 
         if (props.initialPage.props.locale === 'my') {
             scheduleStaticTranslations(props.initialPage.props.translations || {});
+        }
+
+        if (!window.__inertiaUrlGuardBound) {
+            window.__inertiaUrlGuardBound = true;
+            router.on('navigate', (event) => {
+                const pageBase = event?.detail?.page?.props?.ziggy?.base || base;
+                normalizeCurrentBrowserUrl(pageBase);
+            });
         }
 
         if (!el.dataset.rendered) {

@@ -39,12 +39,12 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return redirect('/en/dashboard');
+    return redirect()->route('dashboard', ['locale' => config('app.locale')]);
 });
 
 Route::get('/language/{lang}', [LanguageController::class, 'switch'])->name('language.switch');
 
-Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my'], 'middleware' => 'web'], function () {
+Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], function () {
     
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware(['auth', 'verified'])

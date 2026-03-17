@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Link, usePage, router } from '@inertiajs/react';
+import { usePage, router } from '@inertiajs/react';
 import { ColorModeContext } from '../app';
 import {
     AppBar,
@@ -108,6 +108,46 @@ export default function MainLayout({ children, header }) {
         window.location.href = route('language.switch', { lang });
     };
 
+    const normalizePath = (value) => {
+        try {
+            const parsed = new URL(value, window.location.origin);
+            return parsed.pathname.replace(/\/+$/, '') || '/';
+        } catch {
+            return '/';
+        }
+    };
+
+    const stripBase = (path) => {
+        const base = normalizePath(window.laravel_base || window.Ziggy?.base || '/');
+        if (base === '/' || !path.startsWith(base)) {
+            return path;
+        }
+        return path.substring(base.length) || '/';
+    };
+
+    const isActiveRoute = (pattern, href) => {
+        if (pattern && route().current(pattern)) {
+            return true;
+        }
+
+        const currentPath = normalizePath(window.location.pathname);
+        const targetPath = normalizePath(href);
+        const currentPathNoBase = stripBase(currentPath);
+        const targetPathNoBase = stripBase(targetPath);
+        const wildcardPattern = typeof pattern === 'string' && pattern.endsWith('.*');
+
+        if (wildcardPattern) {
+            return (
+                currentPath === targetPath ||
+                currentPath.startsWith(`${targetPath}/`) ||
+                currentPathNoBase === targetPathNoBase ||
+                currentPathNoBase.startsWith(`${targetPathNoBase}/`)
+            );
+        }
+
+        return currentPath === targetPath || currentPathNoBase === targetPathNoBase;
+    };
+
     const menuItems = {
         dashboard: { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
         pos: { text: 'POS', icon: <POSIcon fontSize="small" />, href: route('pos.index'), routePattern: 'pos.*', permission: 'process_sale' },
@@ -195,12 +235,12 @@ export default function MainLayout({ children, header }) {
                             }
                         >
                             {visibleItems.map((item) => {
-                                const isActive = item.routePattern ? route().current(item.routePattern) : false;
+                                const isActive = isActiveRoute(item.routePattern, item.href);
 
                                 return (
                                     <ListItem key={item.text} disablePadding>
                                         <ListItemButton
-                                            component={Link}
+                                            component="a"
                                             href={item.href}
                                             selected={isActive}
                                             sx={{
@@ -371,7 +411,7 @@ export default function MainLayout({ children, header }) {
                             open={Boolean(anchorElUser)}
                             onClose={handleCloseUserMenu}
                         >
-                            <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
+                            <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>

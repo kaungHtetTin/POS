@@ -16,16 +16,21 @@ class LanguageController extends Controller
         // Keep localization setting in sync with app-bar language selector.
         Setting::set('app.locale', $lang);
 
-        // Get the previous URL
-        $previousUrl = url()->previous();
-        $baseUrl = url('/');
-        
-        // Remove base URL from previous URL to get the path
-        $path = str_replace($baseUrl, '', $previousUrl);
-        $path = ltrim($path, '/');
-        
-        $segments = explode('/', $path);
-        
+        $previousPath = parse_url(url()->previous(), PHP_URL_PATH) ?: '/';
+        $appBasePath = parse_url(config('app.url'), PHP_URL_PATH) ?: '';
+        $normalizedBasePath = '/' . trim($appBasePath, '/');
+
+        if ($normalizedBasePath !== '/' && str_starts_with($previousPath, $normalizedBasePath)) {
+            $previousPath = substr($previousPath, strlen($normalizedBasePath)) ?: '/';
+        }
+
+        $segments = array_values(array_filter(explode('/', trim($previousPath, '/'))));
+
+        // When served from /.../public without a vhost, "public" can leak into path parsing.
+        if (($segments[0] ?? null) === 'public') {
+            array_shift($segments);
+        }
+
         // Check if the first segment is a locale
         if (isset($segments[0]) && in_array($segments[0], ['en', 'my'])) {
             $segments[0] = $lang;
@@ -33,9 +38,9 @@ class LanguageController extends Controller
             // Prepend the new locale
             array_unshift($segments, $lang);
         }
-        
-        $newPath = implode('/', $segments);
-        
-        return redirect($baseUrl . '/' . $newPath);
+
+        $newPath = '/' . implode('/', $segments);
+
+        return redirect()->to(url($newPath));
     }
 }
