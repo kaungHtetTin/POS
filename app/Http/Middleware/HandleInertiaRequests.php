@@ -41,8 +41,12 @@ class HandleInertiaRequests extends Middleware
                 ]) : null,
             ],
             'ziggy' => function () use ($request) {
-                return array_merge((new Ziggy)->toArray(), [
+                $ziggy = (new Ziggy)->toArray();
+                $path = parse_url(url('/'), PHP_URL_PATH) ?: '';
+                
+                return array_merge($ziggy, [
                     'location' => $request->url(),
+                    'base' => $path,
                 ]);
             },
             'flash' => [

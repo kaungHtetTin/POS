@@ -13,36 +13,54 @@ export const ColorModeContext = createContext({ toggleColorMode: () => {} });
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
 
+// Fix for subfolder routing duplication (XAMPP)
+if (window.laravel_base) {
+    const base = new URL(window.laravel_base).pathname.replace(/\/$/, '');
+    if (base && base !== '/' && window.location.pathname.startsWith(base + base)) {
+        const correctPath = window.location.pathname.substring(base.length);
+        window.history.replaceState(null, '', correctPath);
+    }
+}
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
     setup({ el, App, props }) {
-        const root = createRoot(el);
+        // Ensure initialPage.url is also corrected if duplication happened
+        const base = props.initialPage.props.ziggy?.base || '';
+        if (base && base !== '/' && props.initialPage.url.startsWith(base + base)) {
+            props.initialPage.url = props.initialPage.url.substring(base.length);
+        }
 
-        const Root = () => {
-            const [mode, setMode] = useState('light');
-            const colorMode = useMemo(
-                () => ({
-                    toggleColorMode: () => {
-                        setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
-                    },
-                }),
-                [],
-            );
+        if (!el.dataset.rendered) {
+            const root = createRoot(el);
+            el.dataset.rendered = 'true';
 
-            const theme = useMemo(() => getTheme(mode), [mode]);
+            const Root = () => {
+                const [mode, setMode] = useState('light');
+                const colorMode = useMemo(
+                    () => ({
+                        toggleColorMode: () => {
+                            setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+                        },
+                    }),
+                    [],
+                );
 
-            return (
-                <ColorModeContext.Provider value={colorMode}>
-                    <ThemeProvider theme={theme}>
-                        <CssBaseline />
-                        <App {...props} />
-                    </ThemeProvider>
-                </ColorModeContext.Provider>
-            );
-        };
+                const theme = useMemo(() => getTheme(mode), [mode]);
 
-        root.render(<Root />);
+                return (
+                    <ColorModeContext.Provider value={colorMode}>
+                        <ThemeProvider theme={theme}>
+                            <CssBaseline />
+                            <App {...props} />
+                        </ThemeProvider>
+                    </ColorModeContext.Provider>
+                );
+            };
+
+            root.render(<Root />);
+        }
     },
     progress: {
         color: '#4B5563',
