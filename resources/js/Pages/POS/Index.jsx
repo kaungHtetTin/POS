@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PosLayout from '@/Layouts/PosLayout';
-import { usePage, Head, useForm } from '@inertiajs/react';
+import { usePage, Head, useForm, router } from '@inertiajs/react';
 import {
     Alert,
     Autocomplete,
@@ -10,6 +10,7 @@ import {
     CardActionArea,
     CardContent,
     Chip,
+    Collapse,
     Dialog,
     DialogActions,
     DialogContent,
@@ -41,12 +42,16 @@ import {
     ShoppingCartCheckout as CheckoutIcon,
     ViewList as ListViewIcon,
     ViewModule as GridViewIcon,
+    ExpandLess as ExpandLessIcon,
+    ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults }) {
-    const { settings = {}, translations = {}, ziggy = {} } = usePage().props;
+export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults, activeSession = null }) {
+    const page = usePage();
+    const { settings = {}, translations = {}, ziggy = {} } = page.props;
+    const pageErrors = page.props?.errors || {};
     const __ = (key) => translations[key] || key;
     const currencySymbol = settings.app?.currency_symbol || '$';
     const appBase = ziggy?.base || '';
@@ -57,6 +62,9 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         auto_print_receipt: Boolean(posDefaults?.auto_print_receipt ?? settings.pos?.auto_print_receipt),
         barcode_focus: Boolean(posDefaults?.barcode_focus ?? true),
         show_generic_first: Boolean(posDefaults?.show_generic_first),
+        receipt_width: Number(posDefaults?.receipt_width ?? settings.pos?.receipt_width ?? 80),
+        silent_print: Boolean(posDefaults?.silent_print ?? settings.pos?.silent_print),
+        silent_printer_name: String(posDefaults?.silent_printer_name ?? settings.pos?.silent_printer_name ?? '').trim(),
     };
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -78,14 +86,21 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     const [newCustomerForm, setNewCustomerForm] = useState({ name: '', phone: '', email: '', address: '' });
     const [newCustomerSubmitting, setNewCustomerSubmitting] = useState(false);
     const [newCustomerError, setNewCustomerError] = useState('');
+    const [openingAmountInput, setOpeningAmountInput] = useState('0');
+    const [closingCountedInput, setClosingCountedInput] = useState('');
+    const [closingNotesInput, setClosingNotesInput] = useState('');
+    const [sessionSubmitting, setSessionSubmitting] = useState(false);
+    const [cashierSectionExpanded, setCashierSectionExpanded] = useState(true);
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
     const searchInputRef = useRef(null);
+    const silentPrintFallbackRef = useRef(false);
 
     const { data, setData, post, processing, errors } = useForm({
         customer_id: null,
         discount: 0,
+        amount_received: 0,
         payment_method: paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'),
         payment_status: paymentStatuses?.[0] || 'Paid',
         items: [],
@@ -120,6 +135,22 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     useEffect(() => {
         setData('customer_id', selectedCustomer?.id ?? null);
     }, [selectedCustomer, setData]);
+
+    useEffect(() => {
+        if (data.payment_method !== 'Cash' && Number(data.amount_received || 0) !== 0) {
+            setData('amount_received', 0);
+        }
+    }, [data.payment_method, data.amount_received, setData]);
+
+    useEffect(() => {
+        if (activeSession?.id) {
+            setClosingCountedInput(String(Number(activeSession.expected_amount || 0).toFixed(2)));
+            setClosingNotesInput('');
+        } else {
+            setClosingCountedInput('');
+            setClosingNotesInput('');
+        }
+    }, [activeSession?.id, activeSession?.expected_amount]);
 
     useEffect(() => {
         if (!behavior.barcode_focus) return;
@@ -222,7 +253,14 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, []);
 
-    const fetchSearch = async () => {
+    const normalizeBarcode = (value) => String(value ?? '').trim().toLowerCase();
+    const isLikelyBarcode = (value) => {
+        const query = String(value ?? '').trim();
+        return query.length >= 3 && !/\s/.test(query);
+    };
+
+    const fetchSearch = async (options = {}) => {
+        const { autoAddFromBarcode = false, clearInputAfterSearch = false } = options;
         const query = searchQuery.trim();
         setScanError('');
 
@@ -235,9 +273,24 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         try {
             const response = await fetch(route('pos.products', { query }));
             const data = await response.json();
-            setSearchResults(Array.isArray(data) ? data : []);
+            const products = Array.isArray(data) ? data : [];
+            setSearchResults(products);
+
+            if (autoAddFromBarcode && isLikelyBarcode(query)) {
+                const normalizedQuery = normalizeBarcode(query);
+                const match = products.find((product) => normalizeBarcode(product?.barcode) === normalizedQuery);
+                if (match) {
+                    addProductToCart(match);
+                }
+            }
         } finally {
             setSearchLoading(false);
+            if (clearInputAfterSearch) {
+                setSearchQuery('');
+                if (behavior.barcode_focus) {
+                    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+                }
+            }
         }
     };
 
@@ -402,7 +455,16 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         };
     }, [cart, data.discount]);
 
-    const printSaleReceipt = (receipt) => {
+    const isCashPayment = data.payment_method === 'Cash';
+    const amountReceivedValue = Math.max(Number(data.amount_received || 0), 0);
+    const changeDueValue = isCashPayment ? Math.max(amountReceivedValue - totals.grandTotal, 0) : 0;
+    const cashShortageValue = isCashPayment ? Math.max(totals.grandTotal - amountReceivedValue, 0) : 0;
+    const isPaidCashSale = isCashPayment && data.payment_status === 'Paid';
+    const hasActiveSession = Boolean(activeSession?.id);
+    const activeSessionExpected = Number(activeSession?.expected_amount || 0);
+    const activeSessionDifference = activeSession?.difference == null ? null : Number(activeSession.difference || 0);
+
+    const printSaleReceiptBrowser = (receipt) => {
         if (!receipt) return;
 
         const pharmacyName = settings.invoice?.pharmacy_name || __('Pharmacy POS');
@@ -486,6 +548,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         <div class="row"><span>Tax</span><span>${currencySymbol}${Number(receipt.tax || 0).toFixed(2)}</span></div>
                         <div class="row"><span>Discount</span><span>${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}</span></div>
                         <div class="row grand"><span>Grand Total</span><span>${currencySymbol}${Number(receipt.grand_total || 0).toFixed(2)}</span></div>
+                        ${Number(receipt.amount_received || 0) > 0 ? `<div class="row"><span>Cash Received</span><span>${currencySymbol}${Number(receipt.amount_received || 0).toFixed(2)}</span></div>` : ''}
+                        ${Number(receipt.amount_received || 0) > 0 ? `<div class="row"><span>Change</span><span>${currencySymbol}${Number(receipt.change_due || 0).toFixed(2)}</span></div>` : ''}
                     </div>
                     ${footerText ? `<div class="line"></div><div class="center footer">${escapeHtml(footerText)}</div>` : ''}
                 </div>
@@ -501,29 +565,211 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         printWindow.document.close();
     };
 
+    const loadQzTrayScript = async () => {
+        if (window.qz) {
+            return window.qz;
+        }
+
+        const scriptCandidates = [
+            'https://localhost:8181/qz-tray.js',
+            'http://localhost:8182/qz-tray.js',
+            'https://cdn.jsdelivr.net/npm/qz-tray/qz-tray.js',
+        ];
+        const failures = [];
+
+        for (const src of scriptCandidates) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const existing = document.querySelector(`script[data-qz-src="${src}"]`);
+                    if (existing) {
+                        existing.addEventListener('load', () => resolve(), { once: true });
+                        existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+                        return;
+                    }
+
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.async = true;
+                    script.dataset.qzSrc = src;
+                    script.onload = () => resolve();
+                    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                    document.head.appendChild(script);
+                });
+
+                if (window.qz) {
+                    return window.qz;
+                }
+                failures.push(`${src}: loaded but window.qz was not found`);
+            } catch {
+                failures.push(`${src}: blocked or unreachable`);
+                // Try next source.
+            }
+        }
+
+        const detail = failures.length ? ` ${failures.join(' | ')}` : '';
+        throw new Error(`QZ Tray bridge is not available.${detail}`);
+    };
+
+    const connectQzTray = async () => {
+        const qz = await loadQzTrayScript();
+
+        if (!window.__qzUnsignedConfigured && qz?.security) {
+            // Development-friendly setup: local unsigned jobs.
+            qz.security.setCertificatePromise((resolve) => resolve());
+            qz.security.setSignaturePromise(() => (resolve) => resolve());
+            window.__qzUnsignedConfigured = true;
+        }
+
+        if (!qz.websocket.isActive()) {
+            await qz.websocket.connect({ retries: 2, delay: 1 });
+        }
+
+        return qz;
+    };
+
+    const buildThermalReceiptText = (receipt) => {
+        const receiptWidth = Number(settings.pos?.receipt_width || behavior.receipt_width || 80);
+        const lineWidth = receiptWidth <= 58 ? 32 : 48;
+        const divider = '-'.repeat(lineWidth);
+        const padRight = (text, len) => String(text ?? '').slice(0, len).padEnd(len, ' ');
+        const padLeft = (text, len) => String(text ?? '').slice(0, len).padStart(len, ' ');
+
+        const pharmacyName = settings.invoice?.pharmacy_name || __('Pharmacy POS');
+        const saleDate = receipt.sale_date ? new Date(receipt.sale_date).toLocaleString() : new Date().toLocaleString();
+        const items = Array.isArray(receipt.items) ? receipt.items : [];
+
+        const rows = [
+            String(pharmacyName),
+            divider,
+            `Invoice: ${receipt.invoice_number || '-'}`,
+            `Date: ${saleDate}`,
+            `Customer: ${receipt.customer_name || 'Walk-in'}`,
+            `Payment: ${receipt.payment_method || '-'} (${receipt.payment_status || '-'})`,
+            divider,
+        ];
+
+        items.forEach((item) => {
+            const itemName = String(item.name || 'Item');
+            const qty = Number(item.quantity || 0);
+            const total = Number(item.total_price || 0);
+            rows.push(itemName.slice(0, lineWidth));
+            rows.push(`${padRight(`Qty ${qty}`, lineWidth - 12)}${padLeft(`${currencySymbol}${total.toFixed(2)}`, 12)}`);
+        });
+
+        rows.push(divider);
+        rows.push(`${padRight('Subtotal', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.subtotal || 0).toFixed(2)}`, 12)}`);
+        rows.push(`${padRight('Tax', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.tax || 0).toFixed(2)}`, 12)}`);
+        rows.push(`${padRight('Discount', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}`, 12)}`);
+        rows.push(`${padRight('Grand Total', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.grand_total || 0).toFixed(2)}`, 12)}`);
+        if (Number(receipt.amount_received || 0) > 0) {
+            rows.push(`${padRight('Cash Received', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.amount_received || 0).toFixed(2)}`, 12)}`);
+            rows.push(`${padRight('Change', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.change_due || 0).toFixed(2)}`, 12)}`);
+        }
+
+        if (settings.invoice?.receipt_footer) {
+            rows.push(divider);
+            rows.push(String(settings.invoice.receipt_footer));
+        }
+
+        // Add feed + full cut command for most ESC/POS printers.
+        return `${rows.join('\n')}\n\n\n\x1dV\x41\x10`;
+    };
+
+    const printSaleReceiptSilent = async (receipt) => {
+        if (!behavior.silent_print) {
+            return false;
+        }
+
+        const printerName = behavior.silent_printer_name;
+        if (!printerName) {
+            throw new Error('Silent print is enabled but QZ printer name is empty.');
+        }
+
+        const qz = await connectQzTray();
+        const config = qz.configs.create(printerName);
+        const payload = buildThermalReceiptText(receipt);
+        await qz.print(config, [{ type: 'raw', format: 'plain', data: payload }]);
+        return true;
+    };
+
+    const printSaleReceipt = async (receipt) => {
+        if (!receipt) return;
+
+        if (behavior.silent_print) {
+            try {
+                const printed = await printSaleReceiptSilent(receipt);
+                if (printed) {
+                    return;
+                }
+            } catch (error) {
+                // Fall back to browser print when QZ tray is unavailable/misconfigured.
+                const reason = error?.message ? ` (${error.message})` : '';
+                silentPrintFallbackRef.current = true;
+                setScanError(`Silent print failed${reason}. Falling back to browser print.`);
+            }
+        }
+
+        printSaleReceiptBrowser(receipt);
+    };
+
     const submit = (e) => {
         e.preventDefault();
+        if (!hasActiveSession) {
+            setScanError(__('Open cashier session before completing sale.'));
+            return;
+        }
+        silentPrintFallbackRef.current = false;
         post(route('pos.checkout'), {
             preserveScroll: true,
-            onSuccess: (page) => {
+            onSuccess: async (page) => {
                 const receipt = page?.props?.flash?.sale_receipt;
                 if (receipt && behavior.auto_print_receipt) {
-                    printSaleReceipt(receipt);
+                    await printSaleReceipt(receipt);
                 }
                 setCart([]);
-                setSearchResults([]);
-                setSearchQuery('');
-                setScanError('');
+                if (resultsView === 'table') {
+                    setSearchResults([]);
+                    setSearchQuery('');
+                }
+                if (!silentPrintFallbackRef.current) {
+                    setScanError('');
+                }
                 setSelectedCustomer(null);
                 setCustomerSearchInput('');
                 setData('customer_id', null);
                 setData('discount', 0);
+                setData('amount_received', 0);
                 setData('payment_method', paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'));
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
                 if (behavior.barcode_focus) {
                     setTimeout(() => searchInputRef.current?.focus(), 100);
                 }
             },
+        });
+    };
+
+    const startCashSession = () => {
+        const openingAmount = Math.max(Number(openingAmountInput || 0), 0);
+        setSessionSubmitting(true);
+        router.post(route('pos.session.open'), {
+            opening_amount: openingAmount,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSessionSubmitting(false),
+            onError: () => setSessionSubmitting(false),
+        });
+    };
+
+    const closeCashSession = () => {
+        const countedAmount = Math.max(Number(closingCountedInput || 0), 0);
+        setSessionSubmitting(true);
+        router.post(route('pos.session.close'), {
+            closing_counted_amount: countedAmount,
+            notes: closingNotesInput,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSessionSubmitting(false),
+            onError: () => setSessionSubmitting(false),
         });
     };
 
@@ -573,7 +819,12 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     placeholder={__('Search by name, generic name, or barcode...')}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && fetchSearch()}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            fetchSearch({ autoAddFromBarcode: true, clearInputAfterSearch: true });
+                                        }
+                                    }}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -819,6 +1070,117 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                     </Paper>
 
                     <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                    {__('Cashier Session')}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    {hasActiveSession ? __('Session is active') : __('No active session')}
+                                </Typography>
+                            </Box>
+                            <Button
+                                size="small"
+                                variant="text"
+                                endIcon={cashierSectionExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                onClick={() => setCashierSectionExpanded((prev) => !prev)}
+                            >
+                                {cashierSectionExpanded ? __('Collapse') : __('Expand')}
+                            </Button>
+                        </Stack>
+
+                        <Collapse in={cashierSectionExpanded} timeout="auto" unmountOnExit>
+                            <Box sx={{ pt: 1.25 }}>
+                                {pageErrors.session && (
+                                    <Alert severity="error" sx={{ mb: 1.25 }}>
+                                        {pageErrors.session}
+                                    </Alert>
+                                )}
+
+                                {!hasActiveSession ? (
+                                    <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                                        <TextField
+                                            size="small"
+                                            fullWidth
+                                            type="number"
+                                            label={__('Opening Cash')}
+                                            value={openingAmountInput}
+                                            onChange={(e) => setOpeningAmountInput(e.target.value)}
+                                            inputProps={{ min: 0, step: '0.01' }}
+                                            InputProps={{
+                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                            }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            onClick={startCashSession}
+                                            disabled={sessionSubmitting}
+                                        >
+                                            {__('Start')}
+                                        </Button>
+                                    </Stack>
+                                ) : (
+                                    <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {__('Opened at')}: {activeSession?.opened_at ? new Date(activeSession.opened_at).toLocaleString() : '-'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {__('Opening')}: {currencySymbol}{Number(activeSession?.opening_amount || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {__('Cash Received')}: {currencySymbol}{Number(activeSession?.cash_received_total || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {__('Change Given')}: {currencySymbol}{Number(activeSession?.change_given_total || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {__('Net Cash Sales')}: {currencySymbol}{Number(activeSession?.net_cash_sales || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                            {__('Expected Drawer')}: {currencySymbol}{activeSessionExpected.toFixed(2)}
+                                        </Typography>
+                                        <Stack direction="row" spacing={1} sx={{ pt: 0.75 }}>
+                                            <TextField
+                                                size="small"
+                                                fullWidth
+                                                type="number"
+                                                label={__('Counted Cash')}
+                                                value={closingCountedInput}
+                                                onChange={(e) => setClosingCountedInput(e.target.value)}
+                                                inputProps={{ min: 0, step: '0.01' }}
+                                                InputProps={{
+                                                    startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                                }}
+                                            />
+                                            <Button
+                                                variant="outlined"
+                                                color="warning"
+                                                size="small"
+                                                onClick={closeCashSession}
+                                                disabled={sessionSubmitting}
+                                            >
+                                                {__('End')}
+                                            </Button>
+                                        </Stack>
+                                        <TextField
+                                            size="small"
+                                            label={__('Closing Notes (optional)')}
+                                            value={closingNotesInput}
+                                            onChange={(e) => setClosingNotesInput(e.target.value)}
+                                        />
+                                        {activeSessionDifference !== null && (
+                                            <Typography variant="caption" color={activeSessionDifference === 0 ? 'success.main' : (activeSessionDifference > 0 ? 'warning.main' : 'error.main')}>
+                                                {__('Difference')}: {currencySymbol}{activeSessionDifference.toFixed(2)}
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                )}
+                            </Box>
+                        </Collapse>
+
+                        <Divider sx={{ mb: 1.5, mt: cashierSectionExpanded ? 0 : 1.25 }} />
+
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                             {__('Cart')}
                         </Typography>
@@ -1037,6 +1399,41 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     </TextField>
                                 </Stack>
 
+                                {isCashPayment && (
+                                    <Stack direction="row" spacing={1}>
+                                        <TextField
+                                            size="small"
+                                            fullWidth
+                                            type="number"
+                                            label={__('Amount Received')}
+                                            value={data.amount_received}
+                                            onChange={(e) => setData('amount_received', e.target.value)}
+                                            error={!!errors.amount_received || (isPaidCashSale && cashShortageValue > 0)}
+                                            helperText={
+                                                errors.amount_received
+                                                || (isPaidCashSale && cashShortageValue > 0 ? `${__('Need')} ${currencySymbol}${cashShortageValue.toFixed(2)} ${__('more')}` : '')
+                                            }
+                                            InputProps={{
+                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                            }}
+                                            inputProps={{ min: 0, step: '0.01' }}
+                                        />
+                                        <TextField
+                                            size="small"
+                                            fullWidth
+                                            label={__('Change')}
+                                            value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
+                                            InputProps={{ readOnly: true }}
+                                        />
+                                    </Stack>
+                                )}
+
+                                {!hasActiveSession && (
+                                    <Alert severity="warning">
+                                        {__('Open cashier session before completing sale.')}
+                                    </Alert>
+                                )}
+
                                 {errors.items && (
                                     <Alert severity="error">{errors.items}</Alert>
                                 )}
@@ -1045,7 +1442,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     type="submit"
                                     variant="contained"
                                     startIcon={<CheckoutIcon />}
-                                    disabled={processing || cart.length === 0}
+                                    disabled={processing || cart.length === 0 || !hasActiveSession || (isPaidCashSale && cashShortageValue > 0)}
                                     fullWidth
                                 >
                                     {__('Complete Sale')}

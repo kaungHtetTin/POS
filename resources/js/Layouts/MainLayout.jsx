@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { ColorModeContext } from '../app';
+import { ColorModeContext } from '@/contexts/ColorModeContext';
 import {
     AppBar,
     Box,
@@ -35,6 +35,7 @@ import {
     People as CustomersIcon,
     Assessment as ReportsIcon,
     EventBusy as ExpiryReportIcon,
+    PointOfSale as CashSessionReportIcon,
     Payments as ExpensesIcon,
     Settings as SettingsIcon,
     Logout as LogoutIcon,
@@ -54,6 +55,7 @@ import {
     AssignmentReturn as ReturnIcon,
     Label as ExpenseCategoryIcon,
     Language as LanguageIcon,
+    History as ActivityLogIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -61,8 +63,11 @@ const drawerWidth = 200; // More compact sidebar
 export default function MainLayout({ children, header }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash, settings = {}, pending_returns_count = 0, translations = {}, locale } = usePage().props;
+    const { auth, flash, settings = {}, pending_returns_count = 0, translations = {}, locale, ziggy = {} } = usePage().props;
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
+    const appBase = ziggy?.base || window.laravel_base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
 
     const __ = (key) => translations[key] || key;
 
@@ -172,11 +177,13 @@ export default function MainLayout({ children, header }) {
         expenseCategories: { text: 'Expense Categories', icon: <ExpenseCategoryIcon fontSize="small" />, href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'view_financial_reports' },
         reports: { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: route('reports.index'), routePattern: 'reports.index', permission: 'view_financial_reports' },
         expiryReport: { text: 'Expiry Report', icon: <ExpiryReportIcon fontSize="small" />, href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'view_financial_reports' },
+        cashSessionReport: { text: 'Cash Session Report', icon: <CashSessionReportIcon fontSize="small" />, href: route('reports.cash-sessions'), routePattern: 'reports.cash-sessions', permission: 'view_financial_reports' },
 
         staff: { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
         roles: { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
         branches: { text: 'Branch Management', icon: <StoreIcon fontSize="small" />, href: route('branches.index'), routePattern: 'branches.*', permission: 'manage_branches' },
         permissions: { text: 'Permission', icon: <PermissionsIcon fontSize="small" />, href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_users' },
+        activityLogs: { text: 'Activity Logs', icon: <ActivityLogIcon fontSize="small" />, href: route('activity-logs.index'), routePattern: 'activity-logs.*', permission: 'manage_users' },
         settings: { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_branches' },
     };
 
@@ -186,8 +193,8 @@ export default function MainLayout({ children, header }) {
         { label: 'Purchasing', keys: ['suppliers', 'purchases'] },
         { label: 'Stock', keys: ['adjustments', 'transfers'] },
         { label: 'Sales', keys: ['customers', 'returns', 'sales'] },
-        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'expiryReport'] },
-        { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'settings'] },
+        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'expiryReport', 'cashSessionReport'] },
+        { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'activityLogs', 'settings'] },
     ];
 
     const canSee = (item) => !item.permission || auth.user?.permissions?.includes(item.permission);
@@ -260,7 +267,23 @@ export default function MainLayout({ children, header }) {
                                             <ListItemIcon sx={{ minWidth: 40, color: isActive ? 'primary.main' : 'inherit' }}>
                                                 {item.text === 'Returns' && pending_returns_count > 0 ? (
                                                     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                                        {item.icon}
+                                                        <Box
+                                                            sx={{
+                                                                width: 22,
+                                                                height: 22,
+                                                                borderRadius: 1.5,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                border: '1px solid',
+                                                                borderColor: isActive ? 'primary.main' : 'divider',
+                                                                bgcolor: isActive ? 'primary.main' : 'action.hover',
+                                                                color: isActive ? 'primary.contrastText' : 'text.secondary',
+                                                                transition: 'all 180ms ease',
+                                                            }}
+                                                        >
+                                                            {item.icon}
+                                                        </Box>
                                                         <Box
                                                             sx={{
                                                                 position: 'absolute',
@@ -283,7 +306,23 @@ export default function MainLayout({ children, header }) {
                                                         </Box>
                                                     </Box>
                                                 ) : (
-                                                    item.icon
+                                                    <Box
+                                                        sx={{
+                                                            width: 22,
+                                                            height: 22,
+                                                            borderRadius: 1.5,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            border: '1px solid',
+                                                            borderColor: isActive ? 'primary.main' : 'divider',
+                                                            bgcolor: isActive ? 'primary.main' : 'action.hover',
+                                                            color: isActive ? 'primary.contrastText' : 'text.secondary',
+                                                            transition: 'all 180ms ease',
+                                                        }}
+                                                    >
+                                                        {item.icon}
+                                                    </Box>
                                                 )}
                                             </ListItemIcon>
                                             <ListItemText primary={__(item.text)} primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} />
@@ -349,16 +388,44 @@ export default function MainLayout({ children, header }) {
                         {settings.invoice?.logo_path && (
                             <Box 
                                 component="img" 
-                                src={`/storage/${settings.invoice.logo_path}`} 
+                                src={storageUrl(settings.invoice.logo_path)}
                                 sx={{ height: 24, width: 'auto', objectFit: 'contain', mr: 1 }} 
                             />
                         )}
-                        <IconButton onClick={colorMode.toggleColorMode} color="inherit" size="small">
+                        <IconButton
+                            onClick={colorMode.toggleColorMode}
+                            color="inherit"
+                            size="small"
+                            sx={{
+                                borderRadius: 2,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: 'background.paper',
+                                '&:hover': {
+                                    bgcolor: 'action.hover',
+                                    borderColor: 'primary.main',
+                                },
+                            }}
+                        >
                             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                         </IconButton>
                         
                         <Tooltip title={__('Language')}>
-                            <IconButton onClick={handleOpenLangMenu} color="inherit" size="small">
+                            <IconButton
+                                onClick={handleOpenLangMenu}
+                                color="inherit"
+                                size="small"
+                                sx={{
+                                    borderRadius: 2,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.paper',
+                                    '&:hover': {
+                                        bgcolor: 'action.hover',
+                                        borderColor: 'primary.main',
+                                    },
+                                }}
+                            >
                                 <LanguageIcon />
                             </IconButton>
                         </Tooltip>
@@ -390,7 +457,7 @@ export default function MainLayout({ children, header }) {
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar 
                                     alt={auth.user?.name || 'User'} 
-                                    src={auth.user?.image_path ? `/storage/${auth.user.image_path}` : null} 
+                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
                                     sx={{ width: 32, height: 32 }}
                                 />
                             </IconButton>

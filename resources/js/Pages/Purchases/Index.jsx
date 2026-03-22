@@ -117,26 +117,56 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         return product?.product_units || [];
     };
 
+    const ensureOptionValue = (value, options) => {
+        const normalized = value ?? '';
+        return options.some((option) => option === normalized) ? normalized : '';
+    };
+
     const handleOpen = (purchase = null) => {
         if (purchase) {
             setEditingPurchase(purchase);
+            const supplierId = ensureOptionValue(
+                purchase?.supplier_id ?? '',
+                suppliers.map((supplier) => supplier.id)
+            );
+            const branchId = ensureOptionValue(
+                purchase?.branch_id ?? '',
+                branches.map((branch) => branch.id)
+            );
+            const paymentStatus = ensureOptionValue(
+                purchase?.payment_status ?? '',
+                ['Paid', 'Partial', 'Due']
+            ) || 'Due';
+
             setData({
-                supplier_id: purchase.supplier_id,
-                branch_id: purchase.branch_id,
-                invoice_number: purchase.invoice_number,
+                supplier_id: supplierId,
+                branch_id: branchId,
+                invoice_number: purchase?.invoice_number || '',
                 purchase_date: purchase.purchase_date?.split('T')[0] || '',
-                payment_status: purchase.payment_status,
-                paid_amount: purchase.paid_amount,
-                items: (purchase.items || []).map(item => ({
-                    product_id: item.product_id,
-                    unit_id: item.unit_id,
-                    batch_number: item.batch_number,
+                payment_status: paymentStatus,
+                paid_amount: Number(purchase?.paid_amount || 0),
+                items: (purchase.items || []).map(item => {
+                    const productId = item?.product_id ?? '';
+                    const unitsForProduct = getUnitsForProduct(productId);
+                    const hasSelectedUnit = unitsForProduct.some((u) => u.unit_id === item?.unit_id);
+                    const fallbackUnit = unitsForProduct.find((u) => u.is_base_unit) || unitsForProduct[0];
+                    const selectedUnitId = hasSelectedUnit ? (item?.unit_id ?? '') : (fallbackUnit?.unit_id || '');
+
+                    return ({
+                    product_id: productId,
+                    unit_id: selectedUnitId,
+                    batch_number: item?.batch_number || '',
                     expiry_date: item.expiry_date?.split('T')[0] || '',
-                    quantity: item.quantity,
-                    unit_price: item.unit_price,
+                    quantity: Number(item?.quantity || 1),
+                    unit_price: Number(item?.unit_price || 0),
                     // Try to find the matching selling_price from product units
-                    selling_price: products.find(p => p.id === item.product_id)?.product_units?.find(u => u.unit_id === item.unit_id)?.selling_price || item.unit_price
-                }))
+                    selling_price: Number(
+                        products.find(p => p.id === productId)?.product_units?.find(u => u.unit_id === selectedUnitId)?.selling_price
+                        || item?.unit_price
+                        || 0
+                    ),
+                });
+                }),
             });
         } else {
             setEditingPurchase(null);
@@ -162,7 +192,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
     const handleDelete = (purchase) => {
         if (confirm('Are you sure you want to delete this purchase? This will reverse the stock increase.')) {
-            destroy(route('purchases.destroy', purchase.id), {
+            destroy(route('purchases.destroy', { purchase: purchase?.id }), {
                 preserveScroll: true,
             });
         }
@@ -226,7 +256,12 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
     const submit = (event) => {
         event.preventDefault();
         if (editingPurchase) {
-            patch(route('purchases.update', editingPurchase.id), {
+            const purchaseId = editingPurchase?.id || editingPurchase?.purchase_id || '';
+            if (!purchaseId) {
+                return;
+            }
+
+            patch(route('purchases.update', { purchase: purchaseId }), {
                 preserveScroll: true,
                 onSuccess: () => handleClose(),
             });
@@ -265,7 +300,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                 sx={{ minWidth: { sm: 250 } }}
                             />
                             <Button variant="outlined" size="small" onClick={handleSearch}>Search</Button>
-                            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleOpen}>
+                            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
                                 Create Purchase
                             </Button>
                         </Stack>

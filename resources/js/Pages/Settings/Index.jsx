@@ -42,6 +42,8 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         barcode_focus: posBehavior.barcode_focus !== false,
         show_generic_first: !!posBehavior.show_generic_first,
         receipt_width: Number(posBehavior.receipt_width ?? 80),
+        silent_print: !!posBehavior.silent_print,
+        silent_printer_name: posBehavior.silent_printer_name ?? '',
     });
 
     const notificationForm = useForm({
@@ -69,7 +71,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
     });
 
     const labelForm = useForm({
-        width: labelSettings.width ?? 50,
+        width: labelSettings.width ?? 40,
         height: labelSettings.height ?? 30,
         labels_per_row: labelSettings.labels_per_row ?? 1,
         show_pharmacy_name: !!labelSettings.show_pharmacy_name,
@@ -274,6 +276,8 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
             barcode_focus: posBehavior.barcode_focus !== false,
             show_generic_first: !!posBehavior.show_generic_first,
             receipt_width: Number(posBehavior.receipt_width ?? 80),
+            silent_print: !!posBehavior.silent_print,
+            silent_printer_name: posBehavior.silent_printer_name ?? '',
         });
     }, [posBehavior]);
 
@@ -319,7 +323,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
 
     useEffect(() => {
         labelForm.setData({
-            width: labelSettings.width ?? 50,
+            width: labelSettings.width ?? 40,
             height: labelSettings.height ?? 30,
             labels_per_row: labelSettings.labels_per_row ?? 1,
             show_pharmacy_name: !!labelSettings.show_pharmacy_name,
@@ -431,6 +435,20 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                     </Stack>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
+                                    <Stack sx={{ height: '100%' }} justifyContent="center">
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    size="small"
+                                                    checked={!!posForm.data.silent_print}
+                                                    onChange={(e) => posForm.setData('silent_print', e.target.checked)}
+                                                />
+                                            }
+                                            label={<Typography variant="body2">{__('Silent print via QZ Tray')}</Typography>}
+                                        />
+                                    </Stack>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
                                     <FormControlLabel
                                         control={
                                             <Switch
@@ -452,6 +470,18 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                             />
                                         }
                                         label={<Typography variant="body2">{__('Show generic name first')}</Typography>}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label={__('QZ Tray Printer Name')}
+                                        placeholder={__('Example: EPSON TM-T82X Receipt')}
+                                        value={posForm.data.silent_printer_name}
+                                        onChange={(e) => posForm.setData('silent_printer_name', e.target.value)}
+                                        error={!!posForm.errors.silent_printer_name}
+                                        helperText={posForm.errors.silent_printer_name || __('Exact Windows printer name used by QZ Tray for silent printing.')}
                                     />
                                 </Grid>
                             </Grid>

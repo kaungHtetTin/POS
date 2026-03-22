@@ -101,6 +101,8 @@ class HandleInertiaRequests extends Middleware
                 'pos' => [
                     'receipt_width' => (int) \App\Models\Setting::get('pos.receipt_width', '80'),
                     'auto_print_receipt' => \App\Models\Setting::get('pos.auto_print_receipt', '0') === '1',
+                    'silent_print' => \App\Models\Setting::get('pos.silent_print', '0') === '1',
+                    'silent_printer_name' => \App\Models\Setting::get('pos.silent_printer_name', ''),
                 ],
             ],
         ]);

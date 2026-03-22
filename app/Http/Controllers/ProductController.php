@@ -187,7 +187,7 @@ class ProductController extends Controller
         }])->whereIn('id', $productIds)->get()->keyBy('id');
 
         $labelSettings = [
-            'width' => (int) \App\Models\Setting::get('label.width', '50'),
+            'width' => (int) \App\Models\Setting::get('label.width', '40'),
             'height' => (int) \App\Models\Setting::get('label.height', '30'),
             'per_row' => (int) \App\Models\Setting::get('label.per_row', '1'),
             'show_pharmacy' => \App\Models\Setting::get('label.show_pharmacy', '1') === '1',
@@ -227,7 +227,7 @@ class ProductController extends Controller
             $barcodeSvg = '';
             if ($product->barcode) {
                 try {
-                    $barcodeSvg = $generator->getBarcode($product->barcode, $barcodeType, 2, $labelSettings['barcode_height']);
+                    $barcodeSvg = $generator->getBarcode($product->barcode, $barcodeType, 1, $labelSettings['barcode_height']);
                 } catch (\Exception $e) {
                     $barcodeSvg = 'Invalid Barcode';
                 }

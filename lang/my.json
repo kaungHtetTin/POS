@@ -178,7 +178,9 @@
     "Labels Per Row": "တစ်ကြောင်းလျှင် လေဘယ်အရေအတွက်",
     "Font Size (pt)": "ဖောင့်အရွယ်အစား (pt)",
     "Barcode Height (mm)": "ဘားကုဒ်အမြင့် (mm)",
-    "Barcode Type": "ဘားကုဒ်အမျိုးအစား"
+    "Barcode Type": "ဘားကုဒ်အမျိုးအစား",
+    "Barcode Printer Name": "ဘားကုဒ်ပုံနှိပ်စက် အမည်",
+    "Default barcode label printer (e.g. XP365B). Used when printing labels.": "လေဘယ်ပုံနှိပ်သည့်အခါ သုံးမည့် ဘားကုဒ်ပုံနှိပ်စက် (ဥပမာ XP365B)။"
     ,
     "Pharmacy POS": "ဆေးဆိုင် POS",
     "Suppliers - Pharmacy POS": "ကုန်သွင်းသူများ - ဆေးဆိုင် POS",

@@ -25,6 +25,7 @@ use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -120,6 +121,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
 
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index')->middleware('permission:view_financial_reports');
         Route::get('/reports/expiry', [ReportsController::class, 'expiry'])->name('reports.expiry')->middleware('permission:view_financial_reports');
+        Route::get('/reports/cash-sessions', [ReportsController::class, 'cashSessions'])->name('reports.cash-sessions')->middleware('permission:view_financial_reports');
         Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
 
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('permission:process_sale');
@@ -140,6 +142,8 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/pos/scan', [PosController::class, 'scan'])->name('pos.scan')->middleware('permission:process_sale');
         Route::get('/pos/customers', [PosController::class, 'customers'])->name('pos.customers')->middleware('permission:process_sale');
         Route::post('/pos/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store')->middleware('permission:process_sale');
+        Route::post('/pos/session/open', [PosController::class, 'openSession'])->name('pos.session.open')->middleware('permission:process_sale');
+        Route::post('/pos/session/close', [PosController::class, 'closeSession'])->name('pos.session.close')->middleware('permission:process_sale');
         Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout')->middleware('permission:process_sale');
 
         Route::post('/active-branch', [ActiveBranchController::class, 'update'])->name('active-branch.update');
@@ -150,6 +154,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::patch('/settings/localization', [SettingsController::class, 'updateLocalization'])->name('settings.localization.update')->middleware('permission:manage_branches');
         Route::patch('/settings/labels', [SettingsController::class, 'updateLabels'])->name('settings.labels.update')->middleware('permission:manage_branches');
         Route::post('/settings/invoice', [SettingsController::class, 'updateInvoice'])->name('settings.invoice.update')->middleware('permission:manage_branches');
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index')->middleware('permission:manage_users');
 
         Route::get('/products/labels/print', [ProductController::class, 'printLabels'])->name('products.labels.print')->middleware('permission:manage_inventory');
     });

@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { ColorModeContext } from '../app';
+import { ColorModeContext } from '@/contexts/ColorModeContext';
 import {
     Alert,
     AppBar,
@@ -36,7 +36,10 @@ import {
 export default function PosLayout({ children, header = 'POS' }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash, translations = {}, locale } = usePage().props;
+    const { auth, flash, translations = {}, locale, ziggy = {} } = usePage().props;
+    const appBase = ziggy?.base || window.laravel_base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
     const [anchorElUser, setAnchorElUser] = useState(null);
     const [anchorElLang, setAnchorElLang] = useState(null);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -158,7 +161,24 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 size="small"
                                 startIcon={item.icon}
                                 variant={item.active ? 'contained' : 'text'}
-                                sx={{ textTransform: 'none', fontWeight: item.active ? 700 : 500 }}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: item.active ? 700 : 500,
+                                    borderRadius: 2,
+                                    '& .MuiButton-startIcon': {
+                                        width: 18,
+                                        height: 18,
+                                        mr: 0.75,
+                                        borderRadius: 1.25,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: '1px solid',
+                                        borderColor: item.active ? 'primary.main' : 'divider',
+                                        bgcolor: item.active ? 'primary.main' : 'action.hover',
+                                        color: item.active ? 'primary.contrastText' : 'text.secondary',
+                                    },
+                                }}
                             >
                                 {__(item.text)}
                             </Button>
@@ -200,12 +220,40 @@ export default function PosLayout({ children, header = 'POS' }) {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton onClick={colorMode.toggleColorMode} color="inherit" size="small">
+                        <IconButton
+                            onClick={colorMode.toggleColorMode}
+                            color="inherit"
+                            size="small"
+                            sx={{
+                                borderRadius: 2,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: 'background.paper',
+                                '&:hover': {
+                                    bgcolor: 'action.hover',
+                                    borderColor: 'primary.main',
+                                },
+                            }}
+                        >
                             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                         </IconButton>
 
                         <Tooltip title={__('Language')}>
-                            <IconButton onClick={handleOpenLangMenu} color="inherit" size="small">
+                            <IconButton
+                                onClick={handleOpenLangMenu}
+                                color="inherit"
+                                size="small"
+                                sx={{
+                                    borderRadius: 2,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.paper',
+                                    '&:hover': {
+                                        bgcolor: 'action.hover',
+                                        borderColor: 'primary.main',
+                                    },
+                                }}
+                            >
                                 <LanguageIcon />
                             </IconButton>
                         </Tooltip>
@@ -237,7 +285,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar
                                     alt={auth.user?.name || 'User'}
-                                    src={auth.user?.image_path ? `/storage/${auth.user.image_path}` : null}
+                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
                                     sx={{ width: 32, height: 32 }}
                                 />
                             </IconButton>

@@ -17,6 +17,8 @@ class SettingsController extends Controller
             'barcode_focus' => Setting::get('pos.barcode_focus', '1') === '1',
             'show_generic_first' => Setting::get('pos.show_generic_first', '0') === '1',
             'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
+            'silent_print' => Setting::get('pos.silent_print', '0') === '1',
+            'silent_printer_name' => Setting::get('pos.silent_printer_name', ''),
         ];
 
         $notifications = [
@@ -45,7 +47,7 @@ class SettingsController extends Controller
         ];
 
         $labels = [
-            'width' => (int) Setting::get('label.width', '50'),
+            'width' => (int) Setting::get('label.width', '40'),
             'height' => (int) Setting::get('label.height', '30'),
             'labels_per_row' => (int) Setting::get('label.per_row', '1'),
             'show_pharmacy_name' => Setting::get('label.show_pharmacy', '1') === '1',
@@ -140,6 +142,8 @@ class SettingsController extends Controller
             'barcode_focus' => 'required|boolean',
             'show_generic_first' => 'required|boolean',
             'receipt_width' => 'required|in:58,80',
+            'silent_print' => 'required|boolean',
+            'silent_printer_name' => 'nullable|string|max:255',
         ]);
 
         Setting::set('pos.default_view', $validated['default_view']);
@@ -148,6 +152,8 @@ class SettingsController extends Controller
         Setting::set('pos.barcode_focus', $validated['barcode_focus'] ? '1' : '0');
         Setting::set('pos.show_generic_first', $validated['show_generic_first'] ? '1' : '0');
         Setting::set('pos.receipt_width', (string) $validated['receipt_width']);
+        Setting::set('pos.silent_print', $validated['silent_print'] ? '1' : '0');
+        Setting::set('pos.silent_printer_name', trim((string) ($validated['silent_printer_name'] ?? '')));
 
         return redirect()->back()->with('success', 'POS behavior settings updated successfully.');
     }

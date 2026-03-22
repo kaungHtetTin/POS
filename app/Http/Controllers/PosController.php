@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Category;
+use App\Models\CashSession;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
@@ -17,6 +18,10 @@ class PosController extends Controller
 {
     public function index()
     {
+        $branchId = request()->user()->currentBranchId();
+        $userId = request()->user()->id;
+        $activeSession = $this->getActiveSession($branchId, $userId);
+
         return Inertia::render('POS/Index', [
             'paymentMethods' => ['Cash', 'Card', 'Mobile', 'Wallet'],
             'paymentStatuses' => ['Paid', 'Partial', 'Due'],
@@ -27,7 +32,10 @@ class PosController extends Controller
                 'barcode_focus' => Setting::get('pos.barcode_focus', '1') === '1',
                 'show_generic_first' => Setting::get('pos.show_generic_first', '0') === '1',
                 'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
+                'silent_print' => Setting::get('pos.silent_print', '0') === '1',
+                'silent_printer_name' => Setting::get('pos.silent_printer_name', ''),
             ],
+            'activeSession' => $activeSession ? $this->buildSessionPayload($activeSession) : null,
         ]);
     }
 
@@ -296,6 +304,7 @@ class PosController extends Controller
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'discount' => 'nullable|numeric|min:0|max:999999999999.99',
+            'amount_received' => 'nullable|numeric|min:0|max:999999999999.99',
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
             'payment_status' => 'required|in:Paid,Partial,Due',
             'items' => 'required|array|min:1',
@@ -307,6 +316,13 @@ class PosController extends Controller
         $branchId = $request->user()->currentBranchId();
         $userId = $request->user()->id;
         $discount = (float) ($validated['discount'] ?? 0);
+        $activeSession = $this->getActiveSession($branchId, $userId);
+
+        if (!$activeSession) {
+            return redirect()->back()->withErrors([
+                'session' => 'Open a cashier session before completing a sale.',
+            ]);
+        }
 
         $items = collect($validated['items'])->map(function ($item) {
             $item['quantity'] = (float) $item['quantity'];
@@ -392,18 +408,32 @@ class PosController extends Controller
         }
 
         $grandTotal = max(($totalAmount + $taxAmount) - $discount, 0);
+        $amountReceived = 0.0;
+        $changeDue = 0.0;
+        if ($validated['payment_method'] === 'Cash') {
+            $amountReceived = max((float) ($validated['amount_received'] ?? 0), 0);
+            if ($validated['payment_status'] === 'Paid' && $amountReceived < $grandTotal) {
+                return redirect()->back()->withErrors([
+                    'amount_received' => 'Cash received must be at least equal to the grand total for paid cash sales.',
+                ]);
+            }
+            $changeDue = max($amountReceived - $grandTotal, 0);
+        }
 
         $createdSale = null;
-        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $discount, $grandTotal, &$createdSale) {
+        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $discount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $userId,
                 'customer_id' => $validated['customer_id'] ?? null,
+                'cash_session_id' => $activeSession->id,
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'total_amount' => $totalAmount,
                 'discount' => $discount,
                 'tax' => $taxAmount,
                 'grand_total' => $grandTotal,
+                'amount_received' => $amountReceived,
+                'change_due' => $changeDue,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => $validated['payment_status'],
                 'sale_date' => now(),
@@ -495,13 +525,91 @@ class PosController extends Controller
             'tax' => (float) $taxAmount,
             'discount' => (float) $discount,
             'grand_total' => (float) $grandTotal,
+            'amount_received' => (float) $amountReceived,
+            'change_due' => (float) $changeDue,
             'items' => $receiptItems,
         ];
 
         return redirect()
-            ->back()
+            ->route('pos.index', ['locale' => app()->getLocale()])
             ->with('success', 'Sale completed successfully.')
             ->with('sale_receipt', $saleReceipt);
+    }
+
+    public function openSession(Request $request)
+    {
+        $validated = $request->validate([
+            'opening_amount' => 'required|numeric|min:0|max:999999999999.99',
+        ]);
+
+        $branchId = $request->user()->currentBranchId();
+        $userId = $request->user()->id;
+
+        $existing = $this->getActiveSession($branchId, $userId);
+        if ($existing) {
+            return redirect()
+                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->withErrors(['session' => 'You already have an open cashier session.']);
+        }
+
+        $openingAmount = (float) $validated['opening_amount'];
+        CashSession::create([
+            'branch_id' => $branchId,
+            'user_id' => $userId,
+            'opening_amount' => $openingAmount,
+            'cash_received_total' => 0,
+            'change_given_total' => 0,
+            'net_cash_sales' => 0,
+            'expected_amount' => $openingAmount,
+            'opened_at' => now(),
+            'status' => 'open',
+        ]);
+
+        return redirect()
+            ->route('pos.index', ['locale' => app()->getLocale()])
+            ->with('success', 'Cashier session started.');
+    }
+
+    public function closeSession(Request $request)
+    {
+        $validated = $request->validate([
+            'closing_counted_amount' => 'required|numeric|min:0|max:999999999999.99',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $branchId = $request->user()->currentBranchId();
+        $userId = $request->user()->id;
+        $activeSession = $this->getActiveSession($branchId, $userId);
+
+        if (!$activeSession) {
+            return redirect()
+                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->withErrors(['session' => 'No open cashier session to close.']);
+        }
+
+        $totals = $this->getSessionCashTotals($activeSession);
+        $expectedAmount = (float) $activeSession->opening_amount + (float) $totals['net_cash_sales'];
+        $countedAmount = (float) $validated['closing_counted_amount'];
+        $difference = $countedAmount - $expectedAmount;
+
+        $activeSession->update([
+            'cash_received_total' => $totals['cash_received_total'],
+            'change_given_total' => $totals['change_given_total'],
+            'net_cash_sales' => $totals['net_cash_sales'],
+            'expected_amount' => $expectedAmount,
+            'closing_counted_amount' => $countedAmount,
+            'difference' => $difference,
+            'notes' => $validated['notes'] ?? null,
+            'closed_by_user_id' => $userId,
+            'closed_at' => now(),
+            'status' => 'closed',
+        ]);
+
+        $statusText = $difference === 0.0 ? 'balanced' : ($difference > 0 ? 'over' : 'short');
+
+        return redirect()
+            ->route('pos.index', ['locale' => app()->getLocale()])
+            ->with('success', "Cashier session closed ({$statusText}).");
     }
 
     protected function generateInvoiceNumber(): string
@@ -561,5 +669,57 @@ class PosController extends Controller
             'email' => $customer->email,
             'address' => $customer->address,
         ]);
+    }
+
+    protected function getActiveSession(string $branchId, string $userId): ?CashSession
+    {
+        return CashSession::query()
+            ->where('branch_id', $branchId)
+            ->where('user_id', $userId)
+            ->where('status', 'open')
+            ->whereNull('closed_at')
+            ->latest('opened_at')
+            ->first();
+    }
+
+    protected function getSessionCashTotals(CashSession $session): array
+    {
+        $totals = Sale::query()
+            ->where('cash_session_id', $session->id)
+            ->where('payment_method', 'Cash')
+            ->selectRaw('COALESCE(SUM(amount_received), 0) as cash_received_total')
+            ->selectRaw('COALESCE(SUM(change_due), 0) as change_given_total')
+            ->first();
+
+        $cashReceivedTotal = (float) ($totals?->cash_received_total ?? 0);
+        $changeGivenTotal = (float) ($totals?->change_given_total ?? 0);
+
+        return [
+            'cash_received_total' => $cashReceivedTotal,
+            'change_given_total' => $changeGivenTotal,
+            'net_cash_sales' => $cashReceivedTotal - $changeGivenTotal,
+        ];
+    }
+
+    protected function buildSessionPayload(CashSession $session): array
+    {
+        $totals = $this->getSessionCashTotals($session);
+        $expectedAmount = (float) $session->opening_amount + (float) $totals['net_cash_sales'];
+        $countedAmount = $session->closing_counted_amount !== null ? (float) $session->closing_counted_amount : null;
+
+        return [
+            'id' => $session->id,
+            'status' => $session->status,
+            'opening_amount' => (float) $session->opening_amount,
+            'opened_at' => optional($session->opened_at)->toDateTimeString(),
+            'closed_at' => optional($session->closed_at)->toDateTimeString(),
+            'cash_received_total' => (float) $totals['cash_received_total'],
+            'change_given_total' => (float) $totals['change_given_total'],
+            'net_cash_sales' => (float) $totals['net_cash_sales'],
+            'expected_amount' => (float) $expectedAmount,
+            'closing_counted_amount' => $countedAmount,
+            'difference' => $countedAmount !== null ? $countedAmount - $expectedAmount : null,
+            'notes' => $session->notes,
+        ];
     }
 }

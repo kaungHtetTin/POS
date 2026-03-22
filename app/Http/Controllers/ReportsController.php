@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\CashSession;
 use App\Models\Expense;
 use App\Models\InventoryBatch;
 use App\Models\Product;
@@ -452,6 +453,121 @@ class ReportsController extends Controller
                 'from_date' => $fromDate?->toDateString() ?? '',
                 'to_date' => $toDate?->toDateString() ?? '',
             ],
+        ]);
+    }
+
+    public function cashSessions(Request $request)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+        [$fromDate, $toDate] = $this->parseDateRange($request);
+
+        $status = (string) $request->get('status', 'all');
+        if (!in_array($status, ['all', 'open', 'closed'], true)) {
+            $status = 'all';
+        }
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $baseQuery = CashSession::query()
+            ->whereIn('cash_sessions.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('cash_sessions.branch_id', $branchScope['branch_id']);
+            })
+            ->whereBetween('cash_sessions.opened_at', [$fromDate, $toDate])
+            ->when($status !== 'all', function ($q) use ($status) {
+                $q->where('cash_sessions.status', $status);
+            });
+
+        $sessions = (clone $baseQuery)
+            ->with([
+                'branch:id,name',
+                'user:id,name',
+                'closedByUser:id,name',
+            ])
+            ->orderByDesc('cash_sessions.opened_at')
+            ->limit(500)
+            ->get()
+            ->map(function ($session) {
+                return [
+                    'id' => $session->id,
+                    'branch_name' => $session->branch?->name ?? '-',
+                    'opened_by' => $session->user?->name ?? '-',
+                    'closed_by' => $session->closedByUser?->name ?? null,
+                    'status' => $session->status,
+                    'opened_at' => optional($session->opened_at)->toDateTimeString(),
+                    'closed_at' => optional($session->closed_at)->toDateTimeString(),
+                    'opening_amount' => (float) $session->opening_amount,
+                    'cash_received_total' => (float) $session->cash_received_total,
+                    'change_given_total' => (float) $session->change_given_total,
+                    'net_cash_sales' => (float) $session->net_cash_sales,
+                    'expected_amount' => (float) $session->expected_amount,
+                    'closing_counted_amount' => $session->closing_counted_amount !== null ? (float) $session->closing_counted_amount : null,
+                    'difference' => $session->difference !== null ? (float) $session->difference : null,
+                    'notes' => $session->notes,
+                ];
+            })
+            ->values();
+
+        $summary = (clone $baseQuery)
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('SUM(CASE WHEN status = "open" THEN 1 ELSE 0 END) as open_sessions')
+            ->selectRaw('SUM(CASE WHEN status = "closed" THEN 1 ELSE 0 END) as closed_sessions')
+            ->selectRaw('COALESCE(SUM(opening_amount), 0) as opening_amount_total')
+            ->selectRaw('COALESCE(SUM(cash_received_total), 0) as cash_received_total')
+            ->selectRaw('COALESCE(SUM(change_given_total), 0) as change_given_total')
+            ->selectRaw('COALESCE(SUM(net_cash_sales), 0) as net_cash_sales_total')
+            ->selectRaw('COALESCE(SUM(expected_amount), 0) as expected_amount_total')
+            ->selectRaw('COALESCE(SUM(closing_counted_amount), 0) as counted_amount_total')
+            ->selectRaw('COALESCE(SUM(difference), 0) as difference_total')
+            ->first();
+
+        $byBranch = (clone $baseQuery)
+            ->join('branches', 'cash_sessions.branch_id', '=', 'branches.id')
+            ->selectRaw('branches.id as branch_id, branches.name as branch_name')
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('COALESCE(SUM(cash_sessions.net_cash_sales), 0) as net_cash_sales_total')
+            ->selectRaw('COALESCE(SUM(cash_sessions.difference), 0) as difference_total')
+            ->groupBy('branches.id', 'branches.name')
+            ->orderByDesc('net_cash_sales_total')
+            ->get();
+
+        $byDate = (clone $baseQuery)
+            ->selectRaw('DATE(opened_at) as session_date')
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('COALESCE(SUM(net_cash_sales), 0) as net_cash_sales_total')
+            ->selectRaw('COALESCE(SUM(difference), 0) as difference_total')
+            ->groupBy(DB::raw('DATE(opened_at)'))
+            ->orderBy(DB::raw('DATE(opened_at)'))
+            ->get();
+
+        return Inertia::render('Reports/CashSessions', [
+            'branches' => $branches,
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'from_date' => $fromDate->toDateString(),
+                'to_date' => $toDate->toDateString(),
+                'status' => $status,
+            ],
+            'summary' => [
+                'sessions_count' => (int) ($summary?->sessions_count ?? 0),
+                'open_sessions' => (int) ($summary?->open_sessions ?? 0),
+                'closed_sessions' => (int) ($summary?->closed_sessions ?? 0),
+                'opening_amount_total' => (float) ($summary?->opening_amount_total ?? 0),
+                'cash_received_total' => (float) ($summary?->cash_received_total ?? 0),
+                'change_given_total' => (float) ($summary?->change_given_total ?? 0),
+                'net_cash_sales_total' => (float) ($summary?->net_cash_sales_total ?? 0),
+                'expected_amount_total' => (float) ($summary?->expected_amount_total ?? 0),
+                'counted_amount_total' => (float) ($summary?->counted_amount_total ?? 0),
+                'difference_total' => (float) ($summary?->difference_total ?? 0),
+            ],
+            'by_branch' => $byBranch,
+            'by_date' => $byDate,
+            'sessions' => $sessions,
         ]);
     }
 }

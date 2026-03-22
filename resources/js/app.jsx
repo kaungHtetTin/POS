@@ -7,10 +7,9 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import getTheme from './Theme/theme';
-import { useState, useMemo, createContext } from 'react';
+import { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
-
-export const ColorModeContext = createContext({ toggleColorMode: () => {} });
+import { ColorModeContext } from './contexts/ColorModeContext';
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
 const translatableAttributes = ['title', 'placeholder', 'aria-label'];
@@ -45,10 +44,6 @@ const normalizeDuplicatedBase = (url, base) => {
     try {
         const parsed = new URL(url, window.location.origin);
         const normalizedPath = normalizeDuplicatedBasePath(parsed.pathname, base);
-        if (normalizedPath === parsed.pathname) {
-            return url;
-        }
-
         parsed.pathname = normalizedPath;
         return isAbsolute
             ? `${parsed.origin}${parsed.pathname}${parsed.search}${parsed.hash}`
@@ -56,6 +51,20 @@ const normalizeDuplicatedBase = (url, base) => {
     } catch {
         return url;
     }
+};
+
+const coerceNavigationUrl = (url, base) => {
+    if (url === undefined || url === null || url === '') {
+        return url;
+    }
+
+    const raw = String(url);
+    const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw);
+    const normalizedInput = hasScheme || raw.startsWith('/')
+        ? raw
+        : `/${raw.replace(/^\/+/, '')}`;
+
+    return normalizeDuplicatedBase(normalizedInput, base);
 };
 
 const translateValue = (value, translations) => {
@@ -160,16 +169,32 @@ createInertiaApp({
 
             router.visit = (url, options = {}) => {
                 const method = String(options?.method || 'get').toLowerCase();
+                const rawUrl = typeof url === 'string' ? url : (url?.url || String(url));
+                const withQuery = method === 'get' ? buildGetUrl(rawUrl, options?.data || {}) : rawUrl;
+                const target = coerceNavigationUrl(withQuery, base);
+
                 if (method === 'get') {
-                    const rawUrl = typeof url === 'string' ? url : (url?.url || String(url));
-                    const withQuery = buildGetUrl(rawUrl, options?.data || {});
-                    const target = normalizeDuplicatedBase(withQuery, base);
                     window.location.assign(target);
                     return;
                 }
 
-                return originalVisit(url, options);
+                return originalVisit(target, options);
             };
+        }
+
+        if (!window.__historyUrlGuardBound) {
+            const originalPushState = window.history.pushState.bind(window.history);
+            const originalReplaceState = window.history.replaceState.bind(window.history);
+
+            window.history.pushState = (state, title, url) => (
+                originalPushState(state, title, coerceNavigationUrl(url, base))
+            );
+
+            window.history.replaceState = (state, title, url) => (
+                originalReplaceState(state, title, coerceNavigationUrl(url, base))
+            );
+
+            window.__historyUrlGuardBound = true;
         }
 
         // Force browser-native navigation for GET requests to avoid SPA history

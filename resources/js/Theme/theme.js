@@ -260,6 +260,40 @@ export const getTheme = (mode) => createTheme({
             defaultProps: {
                 size: 'small',
             },
+            styleOverrides: {
+                root: {
+                    borderRadius: 10,
+                    border: '1px solid',
+                    borderColor: mode === 'light' ? 'rgba(0, 121, 107, 0.18)' : 'rgba(72, 169, 153, 0.28)',
+                    backgroundColor: mode === 'light' ? 'rgba(0, 121, 107, 0.06)' : 'rgba(72, 169, 153, 0.12)',
+                    transition: 'all 180ms ease',
+                    '&:hover': {
+                        transform: 'translateY(-1px)',
+                        backgroundColor: mode === 'light' ? 'rgba(0, 121, 107, 0.12)' : 'rgba(72, 169, 153, 0.2)',
+                        borderColor: mode === 'light' ? 'rgba(0, 121, 107, 0.3)' : 'rgba(72, 169, 153, 0.42)',
+                        boxShadow: mode === 'light'
+                            ? '0 6px 16px rgba(0, 121, 107, 0.2)'
+                            : '0 6px 16px rgba(0, 0, 0, 0.45)',
+                    },
+                },
+            },
+        },
+        MuiSvgIcon: {
+            styleOverrides: {
+                root: {
+                    fontSize: '1.02rem',
+                    strokeLinejoin: 'round',
+                    strokeLinecap: 'round',
+                },
+            },
+        },
+        MuiListItemIcon: {
+            styleOverrides: {
+                root: {
+                    minWidth: 38,
+                    color: mode === 'light' ? '#0f766e' : '#7dd3c6',
+                },
+            },
         },
     },
 });

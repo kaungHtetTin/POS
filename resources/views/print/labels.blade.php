@@ -64,7 +64,7 @@
         }
         .barcode svg {
             max-width: 100%;
-            height: {{ $settings['barcode_height'] -12 }}mm;
+            height: {{ $settings['barcode_height'] - 27}}mm;
         }
         .barcode-text {
             font-size: 6pt;

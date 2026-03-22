@@ -72,10 +72,10 @@ class InventoryAdjustmentController extends Controller
         return redirect()->back()->with('success', 'Inventory adjustment recorded successfully.');
     }
 
-    public function getBatches(Product $product, Branch $branch)
+    public function getBatches(string $product, string $branch)
     {
-        $batches = InventoryBatch::where('product_id', $product->id)
-            ->where('branch_id', $branch->id)
+        $batches = InventoryBatch::where('product_id', $product)
+            ->where('branch_id', $branch)
             ->where('quantity', '>', 0)
             ->select('id', 'batch_number', 'quantity', 'expiry_date')
             ->orderBy('expiry_date')

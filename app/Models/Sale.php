@@ -14,11 +14,14 @@ class Sale extends Model
         'branch_id',
         'user_id',
         'customer_id',
+        'cash_session_id',
         'invoice_number',
         'total_amount',
         'discount',
         'tax',
         'grand_total',
+        'amount_received',
+        'change_due',
         'payment_method',
         'payment_status',
         'sale_date',
@@ -31,6 +34,8 @@ class Sale extends Model
         'discount' => 'decimal:2',
         'tax' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'amount_received' => 'decimal:2',
+        'change_due' => 'decimal:2',
         'is_synced' => 'boolean',
     ];
 
@@ -47,6 +52,11 @@ class Sale extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function cashSession()
+    {
+        return $this->belongsTo(CashSession::class);
     }
 
     public function items()
