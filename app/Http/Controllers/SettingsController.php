@@ -34,6 +34,7 @@ class SettingsController extends Controller
             'timezone' => Setting::get('app.timezone', 'UTC'),
             'currency_code' => Setting::get('app.currency_code', 'USD'),
             'currency_symbol' => Setting::get('app.currency_symbol', '$'),
+            'theme_primary_color' => Setting::get('app.theme_primary_color', '#00796b'),
             'week_start' => (int) Setting::get('app.week_start', '0'), // 0 = Sunday
         ];
 
@@ -180,6 +181,7 @@ class SettingsController extends Controller
             'timezone' => 'required|in:UTC,Asia/Yangon',
             'currency_code' => 'required|string|max:10',
             'currency_symbol' => 'required|string|max:5',
+            'theme_primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'week_start' => 'required|integer|min:0|max:6',
         ]);
 
@@ -189,6 +191,7 @@ class SettingsController extends Controller
         Setting::set('app.timezone', $validated['timezone']);
         Setting::set('app.currency_code', $validated['currency_code']);
         Setting::set('app.currency_symbol', $validated['currency_symbol']);
+        Setting::set('app.theme_primary_color', strtoupper($validated['theme_primary_color']));
         Setting::set('app.week_start', (string) $validated['week_start']);
 
         return redirect()

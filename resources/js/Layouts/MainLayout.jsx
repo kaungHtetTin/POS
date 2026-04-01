@@ -176,8 +176,8 @@ export default function MainLayout({ children, header }) {
         expenses: { text: 'Expenses', icon: <ExpensesIcon fontSize="small" />, href: route('expenses.index'), routePattern: 'expenses.*', permission: 'view_financial_reports' },
         expenseCategories: { text: 'Expense Categories', icon: <ExpenseCategoryIcon fontSize="small" />, href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'view_financial_reports' },
         reports: { text: 'Reports', icon: <ReportsIcon fontSize="small" />, href: route('reports.index'), routePattern: 'reports.index', permission: 'view_financial_reports' },
-        expiryReport: { text: 'Expiry Report', icon: <ExpiryReportIcon fontSize="small" />, href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'view_financial_reports' },
         cashSessionReport: { text: 'Cash Session Report', icon: <CashSessionReportIcon fontSize="small" />, href: route('reports.cash-sessions'), routePattern: 'reports.cash-sessions', permission: 'view_financial_reports' },
+        expiryReport: { text: 'Expiry Report', icon: <ExpiryReportIcon fontSize="small" />, href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'manage_inventory' },
 
         staff: { text: 'Staff Management', icon: <StaffIcon fontSize="small" />, href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
         roles: { text: 'Role Management', icon: <RolesIcon fontSize="small" />, href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
@@ -189,34 +189,87 @@ export default function MainLayout({ children, header }) {
 
     const menuGroups = [
         { label: 'Main', keys: ['dashboard', 'pos'] },
-        { label: 'Inventory', keys: ['inventory', 'medicines', 'categories', 'units', 'taxes'] },
+        { label: 'Inventory', keys: ['inventory', 'medicines', 'expiryReport', 'categories', 'units', 'taxes'] },
         { label: 'Purchasing', keys: ['suppliers', 'purchases'] },
         { label: 'Stock', keys: ['adjustments', 'transfers'] },
         { label: 'Sales', keys: ['customers', 'returns', 'sales'] },
-        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'expiryReport', 'cashSessionReport'] },
+        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'cashSessionReport'] },
         { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'activityLogs', 'settings'] },
     ];
 
     const canSee = (item) => !item.permission || auth.user?.permissions?.includes(item.permission);
 
+    const visibleMenuGroups = menuGroups
+        .map((group) => ({
+            ...group,
+            visibleItems: group.keys
+                .map((k) => menuItems[k])
+                .filter(Boolean)
+                .filter((item) => canSee(item)),
+        }))
+        .filter((group) => group.visibleItems.length > 0);
+
     const drawer = (
         <div>
-            <Toolbar sx={{ minHeight: '48px !important' }}>
-                <Typography variant="subtitle1" noWrap component="div" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                    {pharmacyName}
-                </Typography>
+            <Toolbar 
+                sx={{ 
+                    minHeight: '64px !important',
+                    display: 'flex',
+                    alignItems: 'center',
+                    px: 2,
+                    background: theme.palette.mode === 'dark' 
+                        ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' 
+                        : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                }}
+            >
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        width: '100%',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 1,
+                            bgcolor: settings.invoice?.logo_path ? 'transparent' : 'primary.main',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: settings.invoice?.logo_path ? 'none' : '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {settings.invoice?.logo_path ? (
+                            <Box 
+                                component="img" 
+                                src={storageUrl(settings.invoice.logo_path)}
+                                sx={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                            />
+                        ) : (
+                            <ProductIcon sx={{ color: 'white', fontSize: 20 }} />
+                        )}
+                    </Box>
+                    <Typography 
+                        variant="subtitle1" 
+                        noWrap 
+                        component="div" 
+                        sx={{ 
+                            color: 'text.primary', 
+                            fontWeight: 800,
+                            letterSpacing: -0.5,
+                            fontSize: '1.1rem',
+                        }}
+                    >
+                        {pharmacyName}
+                    </Typography>
+                </Box>
             </Toolbar>
-            <Divider />
-            {menuGroups.map((group, groupIndex) => {
-                const visibleItems = group.keys
-                    .map((k) => menuItems[k])
-                    .filter(Boolean)
-                    .filter((item) => canSee(item));
-
-                if (visibleItems.length === 0) {
-                    return null;
-                }
-
+            <Divider sx={{ opacity: 0.6 }} />
+            {visibleMenuGroups.map((group, groupIndex) => {
                 return (
                     <Box key={group.label}>
                         <List
@@ -241,7 +294,7 @@ export default function MainLayout({ children, header }) {
                                 </ListSubheader>
                             }
                         >
-                            {visibleItems.map((item) => {
+                            {group.visibleItems.map((item) => {
                                 const isActive = isActiveRoute(item.routePattern, item.href);
 
                                 return (
@@ -331,7 +384,7 @@ export default function MainLayout({ children, header }) {
                                 );
                             })}
                         </List>
-                        {groupIndex < menuGroups.length - 1 && <Divider sx={{ my: 0.75 }} />}
+                        {groupIndex < visibleMenuGroups.length - 1 && <Divider sx={{ my: 0.75 }} />}
                     </Box>
                 );
             })}

@@ -120,7 +120,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::delete('/expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy')->middleware('permission:view_financial_reports');
 
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index')->middleware('permission:view_financial_reports');
-        Route::get('/reports/expiry', [ReportsController::class, 'expiry'])->name('reports.expiry')->middleware('permission:view_financial_reports');
+        Route::get('/reports/expiry', [ReportsController::class, 'expiry'])->name('reports.expiry')->middleware('permission:manage_inventory');
         Route::get('/reports/cash-sessions', [ReportsController::class, 'cashSessions'])->name('reports.cash-sessions')->middleware('permission:view_financial_reports');
         Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
 

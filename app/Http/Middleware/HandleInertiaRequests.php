@@ -91,6 +91,7 @@ class HandleInertiaRequests extends Middleware
                 'app' => [
                     'currency_symbol' => \App\Models\Setting::get('app.currency_symbol', '$'),
                     'date_format' => \App\Models\Setting::get('app.date_format', 'Y-m-d'),
+                    'theme_primary_color' => \App\Models\Setting::get('app.theme_primary_color', '#00796b'),
                 ],
                 'invoice' => [
                     'pharmacy_name' => \App\Models\Setting::get('invoice.pharmacy_name', config('app.name')),

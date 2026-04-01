@@ -1,12 +1,12 @@
-import { createTheme } from '@mui/material/styles';
+import { alpha, createTheme, darken, lighten } from '@mui/material/styles';
 
-export const getTheme = (mode) => createTheme({
+export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
     palette: {
         mode,
         primary: {
-            main: '#00796b', // Medical Teal
-            light: '#48a999',
-            dark: '#004c40',
+            main: primaryColor,
+            light: lighten(primaryColor, 0.22),
+            dark: darken(primaryColor, 0.22),
             contrastText: '#ffffff',
         },
         secondary: {
@@ -154,7 +154,7 @@ export const getTheme = (mode) => createTheme({
                         borderColor: mode === 'light' ? '#bdbdbd' : '#334155',
                     },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#00796b',
+                        borderColor: primaryColor,
                         borderWidth: '1.5px',
                         boxShadow: 'none !important',
                         outline: 'none !important',
@@ -264,15 +264,15 @@ export const getTheme = (mode) => createTheme({
                 root: {
                     borderRadius: 10,
                     border: '1px solid',
-                    borderColor: mode === 'light' ? 'rgba(0, 121, 107, 0.18)' : 'rgba(72, 169, 153, 0.28)',
-                    backgroundColor: mode === 'light' ? 'rgba(0, 121, 107, 0.06)' : 'rgba(72, 169, 153, 0.12)',
+                    borderColor: mode === 'light' ? alpha(primaryColor, 0.22) : alpha(primaryColor, 0.38),
+                    backgroundColor: mode === 'light' ? alpha(primaryColor, 0.07) : alpha(primaryColor, 0.18),
                     transition: 'all 180ms ease',
                     '&:hover': {
                         transform: 'translateY(-1px)',
-                        backgroundColor: mode === 'light' ? 'rgba(0, 121, 107, 0.12)' : 'rgba(72, 169, 153, 0.2)',
-                        borderColor: mode === 'light' ? 'rgba(0, 121, 107, 0.3)' : 'rgba(72, 169, 153, 0.42)',
+                        backgroundColor: mode === 'light' ? alpha(primaryColor, 0.14) : alpha(primaryColor, 0.28),
+                        borderColor: mode === 'light' ? alpha(primaryColor, 0.34) : alpha(primaryColor, 0.56),
                         boxShadow: mode === 'light'
-                            ? '0 6px 16px rgba(0, 121, 107, 0.2)'
+                            ? `0 6px 16px ${alpha(primaryColor, 0.24)}`
                             : '0 6px 16px rgba(0, 0, 0, 0.45)',
                     },
                 },

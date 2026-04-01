@@ -58,6 +58,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         timezone: localizationSettings.timezone ?? 'UTC',
         currency_code: localizationSettings.currency_code ?? 'USD',
         currency_symbol: localizationSettings.currency_symbol ?? '$',
+        theme_primary_color: localizationSettings.theme_primary_color ?? '#00796b',
         week_start: localizationSettings.week_start ?? 0,
     });
 
@@ -296,6 +297,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
             timezone: localizationSettings.timezone ?? 'UTC',
             currency_code: localizationSettings.currency_code ?? 'USD',
             currency_symbol: localizationSettings.currency_symbol ?? '$',
+            theme_primary_color: localizationSettings.theme_primary_color ?? '#00796b',
             week_start: localizationSettings.week_start ?? 0,
         });
     }, [localizationSettings, locale]);
@@ -669,6 +671,30 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                         error={!!localizationForm.errors.currency_symbol}
                                         helperText={localizationForm.errors.currency_symbol}
                                     />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Stack direction="row" spacing={1.5} alignItems="center">
+                                        <TextField
+                                            type="color"
+                                            size="small"
+                                            label={__('Theme Color')}
+                                            value={localizationForm.data.theme_primary_color}
+                                            onChange={(e) => localizationForm.setData('theme_primary_color', e.target.value.toUpperCase())}
+                                            error={!!localizationForm.errors.theme_primary_color}
+                                            sx={{ width: 120 }}
+                                            InputLabelProps={{ shrink: true }}
+                                            inputProps={{ 'aria-label': __('Theme Color') }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            size="small"
+                                            label={__('Theme Hex')}
+                                            value={localizationForm.data.theme_primary_color}
+                                            onChange={(e) => localizationForm.setData('theme_primary_color', e.target.value.toUpperCase())}
+                                            error={!!localizationForm.errors.theme_primary_color}
+                                            helperText={localizationForm.errors.theme_primary_color || __('Use a HEX color like #00796B.')}
+                                        />
+                                    </Stack>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField

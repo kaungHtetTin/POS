@@ -7,7 +7,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import getTheme from './Theme/theme';
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import { ColorModeContext } from './contexts/ColorModeContext';
 
@@ -229,6 +229,9 @@ createInertiaApp({
 
             const Root = () => {
                 const [mode, setMode] = useState('light');
+                const [primaryColor, setPrimaryColor] = useState(
+                    props.initialPage.props?.settings?.app?.theme_primary_color || '#00796b',
+                );
                 const colorMode = useMemo(
                     () => ({
                         toggleColorMode: () => {
@@ -238,7 +241,22 @@ createInertiaApp({
                     [],
                 );
 
-                const theme = useMemo(() => getTheme(mode), [mode]);
+                useEffect(() => {
+                    const removeListener = router.on('navigate', (event) => {
+                        const nextColor = event?.detail?.page?.props?.settings?.app?.theme_primary_color;
+                        if (typeof nextColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(nextColor)) {
+                            setPrimaryColor(nextColor.toUpperCase());
+                        }
+                    });
+
+                    return () => {
+                        if (typeof removeListener === 'function') {
+                            removeListener();
+                        }
+                    };
+                }, []);
+
+                const theme = useMemo(() => getTheme(mode, primaryColor), [mode, primaryColor]);
 
                 return (
                     <ColorModeContext.Provider value={colorMode}>
