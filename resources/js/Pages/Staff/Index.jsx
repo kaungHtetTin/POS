@@ -413,7 +413,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     onChange={e => setData('password', e.target.value)}
                                     error={!!errors.password}
                                     helperText={errors.password}
-                                    required={!editMode}
+                                    autoComplete="new-password"
                                 />
                                 <TextField
                                     label="Confirm Password"
@@ -422,7 +422,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     type="password"
                                     value={data.password_confirmation}
                                     onChange={e => setData('password_confirmation', e.target.value)}
-                                    required={!editMode || data.password}
+                                    autoComplete="new-password"
                                 />
                             </Stack>
                         </Stack>

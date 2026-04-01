@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import { ColorModeContext } from '@/contexts/ColorModeContext';
 import {
+    Badge,
     AppBar,
     Box,
     CssBaseline,
@@ -17,6 +18,7 @@ import {
     Toolbar,
     Typography,
     Avatar,
+    Chip,
     Menu,
     MenuItem,
     Tooltip,
@@ -25,6 +27,7 @@ import {
     Alert,
 } from '@mui/material';
 import {
+    Verified as VerifiedIcon,
     Menu as MenuIcon,
     Brightness4 as DarkModeIcon,
     Brightness7 as LightModeIcon,
@@ -213,7 +216,7 @@ export default function MainLayout({ children, header }) {
 
     const drawer = (
         <div>
-            <Toolbar 
+            {/* <Toolbar 
                 sx={{ 
                     minHeight: '64px !important',
                     display: 'flex',
@@ -236,24 +239,50 @@ export default function MainLayout({ children, header }) {
                         sx={{
                             width: 32,
                             height: 32,
-                            borderRadius: 1,
-                            bgcolor: settings.invoice?.logo_path ? 'transparent' : 'primary.main',
+                            borderRadius: '50%',
+                            p: '1.5px',
+                            position: 'relative',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: settings.invoice?.logo_path ? 'none' : '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                            overflow: 'hidden',
+                            '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                inset: 0,
+                                borderRadius: '50%',
+                                background: `conic-gradient(${theme.palette.primary.light}, #ffffff, ${theme.palette.primary.main}, #ffffff, ${theme.palette.primary.dark})`,
+                                animation: 'logoBorderSpin 3.2s linear infinite',
+                            },
+                            '@keyframes logoBorderSpin': {
+                                from: { transform: 'rotate(0deg)' },
+                                to: { transform: 'rotate(360deg)' },
+                            },
                         }}
                     >
-                        {settings.invoice?.logo_path ? (
-                            <Box 
-                                component="img" 
-                                src={storageUrl(settings.invoice.logo_path)}
-                                sx={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                            />
-                        ) : (
-                            <ProductIcon sx={{ color: 'white', fontSize: 20 }} />
-                        )}
+                        <Box
+                            sx={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: '50%',
+                                bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.94)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                zIndex: 1,
+                            }}
+                        >
+                            {settings.invoice?.logo_path ? (
+                                <Box 
+                                    component="img" 
+                                    src={storageUrl(settings.invoice.logo_path)}
+                                    sx={{ width: '80%', height: '80%', objectFit: 'contain' }} 
+                                />
+                            ) : (
+                                <ProductIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                            )}
+                        </Box>
                     </Box>
                     <Typography 
                         variant="subtitle1" 
@@ -269,8 +298,92 @@ export default function MainLayout({ children, header }) {
                         {pharmacyName}
                     </Typography>
                 </Box>
-            </Toolbar>
+            </Toolbar> */}
             <Divider sx={{ opacity: 0.6 }} />
+            
+            {/* User Info Section */}
+            <Box sx={{ px: 2, py: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                    <Badge
+                        overlap="circular"
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        badgeContent={
+                            auth.user?.roles?.includes('Root') ? (
+                                <VerifiedIcon 
+                                    sx={{ 
+                                        color: '#1877F2', // Facebook Blue
+                                        fontSize: '0.9rem',
+                                        bgcolor: 'white',
+                                        borderRadius: '50%',
+                                        p: '0.5px'
+                                    }} 
+                                />
+                            ) : null
+                        }
+                    >
+                        <Avatar 
+                            src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
+                            sx={{ 
+                                width: 36, 
+                                height: 36, 
+                                bgcolor: 'primary.main',
+                                fontSize: '1rem',
+                                fontWeight: 700,
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            {auth.user?.name?.charAt(0).toUpperCase()}
+                        </Avatar>
+                    </Badge>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography 
+                            variant="subtitle2" 
+                            noWrap 
+                            sx={{ 
+                                fontWeight: 700, 
+                                lineHeight: 1.2,
+                                color: 'text.primary'
+                            }}
+                        >
+                            {auth.user?.name}
+                        </Typography>
+                        <Typography 
+                            variant="caption" 
+                            noWrap 
+                            display="block"
+                            sx={{ 
+                                color: 'text.secondary',
+                                fontSize: '0.7rem',
+                                mb: 0.5
+                            }}
+                        >
+                            {auth.user?.email}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {auth.user?.roles?.map((roleName) => (
+                                <Chip
+                                    key={roleName}
+                                    label={__(roleName)}
+                                    size="small"
+                                    sx={{
+                                        height: 16,
+                                        fontSize: '0.6rem',
+                                        fontWeight: 800,
+                                        textTransform: 'uppercase',
+                                        bgcolor: roleName === 'Root' ? 'primary.main' : 'action.selected',
+                                        color: roleName === 'Root' ? 'white' : 'text.secondary',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        '& .MuiChip-label': { px: 0.75 }
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    </Box>
+                </Box>
+            </Box>
+            <Divider sx={{ opacity: 0.6 }} />
+
             {visibleMenuGroups.map((group, groupIndex) => {
                 return (
                     <Box key={group.label}>

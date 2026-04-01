@@ -89,7 +89,7 @@ class StaffController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:users,email,'.$staff->id,
+            'email' => 'required|string|lowercase|email|max:255|unique:'.User::class.',email,'.$staff->id,
             'phone' => 'nullable|string|max:20',
             'branch_id' => 'required|exists:branches,id',
             'branch_ids' => 'nullable|array',

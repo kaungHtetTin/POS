@@ -19,6 +19,14 @@ class PosController extends Controller
     public function index()
     {
         $branchId = request()->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return Inertia::render('POS/Index', [
+                'error' => 'No branch assigned. Please contact the administrator to assign you to a branch.',
+                'activeSession' => null,
+            ]);
+        }
+
         $userId = request()->user()->id;
         $activeSession = $this->getActiveSession($branchId, $userId);
 
@@ -42,6 +50,11 @@ class PosController extends Controller
     public function products(Request $request)
     {
         $branchId = $request->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return response()->json([]);
+        }
+
         $query = trim((string) $request->query('query', ''));
 
         if ($query === '') {
@@ -224,6 +237,11 @@ class PosController extends Controller
     public function scan(Request $request)
     {
         $branchId = $request->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return response()->json(['error' => 'No branch assigned.'], 403);
+        }
+
         $barcode = trim((string) $request->query('barcode', ''));
 
         if ($barcode === '') {
@@ -314,6 +332,13 @@ class PosController extends Controller
         ]);
 
         $branchId = $request->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return redirect()->back()->withErrors([
+                'branch' => 'No branch assigned to user.',
+            ]);
+        }
+
         $userId = $request->user()->id;
         $discount = (float) ($validated['discount'] ?? 0);
         $activeSession = $this->getActiveSession($branchId, $userId);
@@ -543,6 +568,13 @@ class PosController extends Controller
         ]);
 
         $branchId = $request->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return redirect()
+                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->withErrors(['session' => 'No branch assigned to user.']);
+        }
+
         $userId = $request->user()->id;
 
         $existing = $this->getActiveSession($branchId, $userId);
@@ -578,6 +610,13 @@ class PosController extends Controller
         ]);
 
         $branchId = $request->user()->currentBranchId();
+        
+        if (!$branchId) {
+            return redirect()
+                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->withErrors(['session' => 'No branch assigned to user.']);
+        }
+
         $userId = $request->user()->id;
         $activeSession = $this->getActiveSession($branchId, $userId);
 

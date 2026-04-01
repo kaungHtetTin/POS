@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -24,7 +25,18 @@ class BranchController extends Controller
             'email' => 'nullable|email|max:255',
         ]);
 
-        Branch::create($validated);
+        $branch = Branch::create($validated);
+
+        // Automatically assign new branch to all Root users
+        $rootUsers = User::whereHas('roles', function($q) {
+            $q->where('name', 'Root');
+        })->get();
+
+        foreach ($rootUsers as $user) {
+            if (!$user->branches()->where('branches.id', $branch->id)->exists()) {
+                $user->branches()->attach($branch->id);
+            }
+        }
 
         return redirect()->back();
     }

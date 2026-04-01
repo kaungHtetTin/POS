@@ -37,17 +37,12 @@ class PermissionSeeder extends Seeder
         }
 
         // Role Assignments
-        $owner = Role::where('name', 'Owner')->first();
         $manager = Role::where('name', 'Manager')->first();
         $cashier = Role::where('name', 'Cashier')->first();
         $root = Role::where('name', 'Root')->first();
 
         if ($root) {
             $root->permissions()->sync(Permission::all());
-        }
-
-        if ($owner) {
-            $owner->permissions()->sync(Permission::all());
         }
 
         if ($manager) {

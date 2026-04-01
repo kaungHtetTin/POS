@@ -48,10 +48,11 @@ import {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults, activeSession = null }) {
+export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults, activeSession = null, error = null }) {
     const page = usePage();
-    const { settings = {}, translations = {}, ziggy = {} } = page.props;
+    const { settings = {}, translations = {}, ziggy = {}, flash = {} } = page.props;
     const pageErrors = page.props?.errors || {};
+    const displayError = error || flash?.error || pageErrors?.error;
     const __ = (key) => translations[key] || key;
     const currencySymbol = settings.app?.currency_symbol || '$';
     const appBase = ziggy?.base || '';
@@ -778,6 +779,11 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             <Head title="POS" />
 
             <Box sx={{ p: 2 }}>
+                {displayError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        {displayError}
+                    </Alert>
+                )}
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>

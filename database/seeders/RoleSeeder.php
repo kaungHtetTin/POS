@@ -16,7 +16,6 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             'Root',
-            'Owner',
             'Manager',
             'Cashier',
         ];
