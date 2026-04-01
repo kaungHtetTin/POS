@@ -3,7 +3,7 @@ import MainLayout from '@/Layouts/MainLayout';
 import { Head, Link } from '@inertiajs/react';
 import { Box, Typography, Button, Paper, useTheme } from '@mui/material';
 import { 
-    ShieldAlert as ShieldAlertIcon, 
+    GppBad as GppBadIcon, 
     Home as HomeIcon 
 } from '@mui/icons-material';
 
@@ -66,7 +66,7 @@ export default function Error({ status, message, auth }) {
                             mb: 1
                         }}
                     >
-                        <ShieldAlertIcon sx={{ fontSize: 48 }} />
+                        <GppBadIcon sx={{ fontSize: 48 }} />
                     </Box>
 
                     <Box>
