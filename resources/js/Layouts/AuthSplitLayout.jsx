@@ -13,18 +13,70 @@ import {
     ArrowBack as BackIcon,
     ShoppingCart as POSIcon,
     Inventory as InventoryIcon,
-    Sync as SyncIcon,
+    VerifiedUser as SecurityIcon,
 } from '@mui/icons-material';
 
 export default function AuthSplitLayout({ children, title, subtitle, topBarContent }) {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const { settings = {}, ziggy = {} } = usePage().props;
+    const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
+    const appBase = ziggy?.base || window.laravel_base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const logoPath = settings.invoice?.logo_path ? withBase(`/storage/${String(settings.invoice.logo_path).replace(/^\/+/, '')}`) : null;
+    const LogoBadge = ({ size = 44 }) => (
+        <Box
+            sx={{
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                p: '2px',
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '50%',
+                    background: `conic-gradient(${theme.palette.primary.light}, #ffffff, ${theme.palette.primary.main}, #ffffff, ${theme.palette.primary.dark})`,
+                    animation: 'logoBorderSpin 3.2s linear infinite',
+                },
+                '@keyframes logoBorderSpin': {
+                    from: { transform: 'rotate(0deg)' },
+                    to: { transform: 'rotate(360deg)' },
+                },
+            }}
+        >
+            <Box
+                sx={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.94)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    zIndex: 1,
+                }}
+            >
+                {logoPath ? (
+                    <Box component="img" src={logoPath} alt={pharmacyName} sx={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+                ) : (
+                    <ApplicationLogo sx={{ width: '74%', height: '74%', color: theme.palette.primary.main }} />
+                )}
+            </Box>
+        </Box>
+    );
 
     // Left panel feature items adapted for Pharmacy POS
     const features = [
         { icon: <POSIcon />, title: 'Fast Checkout', desc: 'Process sales in seconds with barcode support' },
         { icon: <InventoryIcon />, title: 'Inventory Control', desc: 'FEFO-based tracking and expiry alerts' },
-        { icon: <SyncIcon />, title: 'Offline Sync', desc: 'Keep working even without internet' },
+        { icon: <SecurityIcon />, title: 'Role-Based Access', desc: 'Control modules and actions with permission-based security' },
     ];
 
     return (
@@ -70,10 +122,10 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                     {/* Logo + Brand */}
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 6, position: 'relative', zIndex: 1 }}>
                         <Link href="/" style={{ display: 'flex' }}>
-                            <ApplicationLogo sx={{ height: 44, width: 44, color: 'white' }} />
+                            <LogoBadge size={48} />
                         </Link>
                         <Typography variant="h6" fontWeight={700}>
-                            Pharmacy POS
+                            {pharmacyName}
                         </Typography>
                     </Stack>
 
@@ -82,7 +134,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                             Manage Your Pharmacy{'\n'}With Confidence
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 5, opacity: 0.85, lineHeight: 1.7 }}>
-                            Streamline sales, track every batch, and never lose data with our offline-first approach.
+                            Streamline sales, track every batch, and run operations with secure role-based access control.
                         </Typography>
 
                         {/* Feature list */}
@@ -147,9 +199,9 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
 
                     {isMobile && (
                         <Stack direction="row" alignItems="center" spacing={1}>
-                            <ApplicationLogo sx={{ height: 28, width: 28, color: 'primary.main' }} />
+                            <LogoBadge size={30} />
                             <Typography variant="subtitle2" fontWeight={700} color="text.primary">
-                                Pharmacy POS
+                                {pharmacyName}
                             </Typography>
                         </Stack>
                     )}

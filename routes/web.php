@@ -150,6 +150,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
 
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
         Route::patch('/settings/pos-behavior', [SettingsController::class, 'updatePosBehavior'])->name('settings.pos-behavior.update')->middleware('permission:manage_branches');
+        Route::post('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general.update')->middleware('permission:manage_branches');
         Route::patch('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update')->middleware('permission:manage_branches');
         Route::patch('/settings/localization', [SettingsController::class, 'updateLocalization'])->name('settings.localization.update')->middleware('permission:manage_branches');
         Route::patch('/settings/labels', [SettingsController::class, 'updateLabels'])->name('settings.labels.update')->middleware('permission:manage_branches');

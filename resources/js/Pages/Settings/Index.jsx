@@ -33,6 +33,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
     const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
     const [tabValue, setTabValue] = React.useState(0);
+    const [generalLogoPreview, setGeneralLogoPreview] = React.useState(invoiceSettings.logo_path ? storageUrl(invoiceSettings.logo_path) : '');
     const [invoiceLogoPreview, setInvoiceLogoPreview] = React.useState(invoiceSettings.logo_path ? storageUrl(invoiceSettings.logo_path) : '');
 
     const posForm = useForm({
@@ -46,9 +47,12 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         silent_printer_name: posBehavior.silent_printer_name ?? '',
     });
 
-    const notificationForm = useForm({
+    const generalForm = useForm({
         expiry_alert_days: notificationSettings.expiry_alert_days ?? 90,
         low_stock_sound: !!notificationSettings.low_stock_sound,
+        pharmacy_name: invoiceSettings.pharmacy_name ?? '',
+        logo: null,
+        theme_primary_color: localizationSettings.theme_primary_color ?? '#00796b',
     });
 
     const localizationForm = useForm({
@@ -283,11 +287,24 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
     }, [posBehavior]);
 
     useEffect(() => {
-        notificationForm.setData({
+        generalForm.setData({
             expiry_alert_days: notificationSettings.expiry_alert_days ?? 90,
             low_stock_sound: !!notificationSettings.low_stock_sound,
+            pharmacy_name: invoiceSettings.pharmacy_name ?? '',
+            logo: null,
+            theme_primary_color: localizationSettings.theme_primary_color ?? '#00796b',
         });
-    }, [notificationSettings]);
+    }, [notificationSettings, invoiceSettings.pharmacy_name, localizationSettings.theme_primary_color]);
+
+    useEffect(() => {
+        if (generalForm.data.logo instanceof File) {
+            const objectUrl = URL.createObjectURL(generalForm.data.logo);
+            setGeneralLogoPreview(objectUrl);
+            return () => URL.revokeObjectURL(objectUrl);
+        }
+
+        setGeneralLogoPreview(invoiceSettings.logo_path ? storageUrl(invoiceSettings.logo_path) : '');
+    }, [generalForm.data.logo, invoiceSettings.logo_path, appBase]);
 
     useEffect(() => {
         localizationForm.setData({
@@ -352,7 +369,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                 <Paper sx={{ mb: 2 }}>
                     <Tabs value={tabValue} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <Tab icon={<PosIcon fontSize="small" />} iconPosition="start" label={__('POS Behavior')} />
-                        <Tab icon={<NotificationsIcon fontSize="small" />} iconPosition="start" label={__('Notifications')} />
+                        <Tab icon={<NotificationsIcon fontSize="small" />} iconPosition="start" label={__('General')} />
                         <Tab icon={<LanguageIcon fontSize="small" />} iconPosition="start" label={__('Localization')} />
                         <Tab icon={<InvoiceIcon fontSize="small" />} iconPosition="start" label={__('Invoice & Receipt')} />
                         <Tab icon={<LabelIcon fontSize="small" />} iconPosition="start" label={__('Labels & Barcodes')} />
@@ -506,7 +523,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                 {tabValue === 1 && (
                     <Paper sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                            {__('NOTIFICATION SETTINGS')}
+                            {__('GENERAL SETTINGS')}
                         </Typography>
                         <Divider sx={{ my: 1.5 }} />
 
@@ -514,7 +531,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                             component="form"
                             onSubmit={(e) => {
                                 e.preventDefault();
-                                notificationForm.patch(route('settings.notifications.update'));
+                                generalForm.post(route('settings.general.update'), { forceFormData: true });
                             }}
                         >
                             <Grid container spacing={3}>
@@ -525,11 +542,81 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                         type="number"
                                         label={__('Expiry Alert Threshold (Days)')}
                                         helperText={__('Show alerts for batches expiring within this many days.')}
-                                        value={notificationForm.data.expiry_alert_days}
-                                        onChange={(e) => notificationForm.setData('expiry_alert_days', e.target.value)}
-                                        error={!!notificationForm.errors.expiry_alert_days}
+                                        value={generalForm.data.expiry_alert_days}
+                                        onChange={(e) => generalForm.setData('expiry_alert_days', e.target.value)}
+                                        error={!!generalForm.errors.expiry_alert_days}
                                         inputProps={{ min: 1, max: 365 }}
                                     />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label={__('Shop Name')}
+                                        value={generalForm.data.pharmacy_name}
+                                        onChange={(e) => generalForm.setData('pharmacy_name', e.target.value)}
+                                        error={!!generalForm.errors.pharmacy_name}
+                                        helperText={generalForm.errors.pharmacy_name || __('This name appears in drawer header and receipts.')}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Stack direction="row" spacing={2} alignItems="center">
+                                        {generalLogoPreview && (
+                                            <Box
+                                                component="img"
+                                                src={generalLogoPreview}
+                                                alt={__('App Icon')}
+                                                sx={{ width: 50, height: 50, objectFit: 'contain', border: '1px solid', borderColor: 'divider' }}
+                                            />
+                                        )}
+                                        <Button
+                                            variant="outlined"
+                                            component="label"
+                                            size="small"
+                                        >
+                                            {__('Upload Icon')}
+                                            <input
+                                                type="file"
+                                                hidden
+                                                accept="image/*"
+                                                onChange={(e) => generalForm.setData('logo', e.target.files[0])}
+                                            />
+                                        </Button>
+                                        {generalForm.data.logo && (
+                                            <Typography variant="caption">
+                                                {generalForm.data.logo.name}
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                    {generalForm.errors.logo && (
+                                        <Typography variant="caption" color="error">
+                                            {generalForm.errors.logo}
+                                        </Typography>
+                                    )}
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Stack direction="row" spacing={1.5} alignItems="center">
+                                        <TextField
+                                            type="color"
+                                            size="small"
+                                            label={__('Theme Color')}
+                                            value={generalForm.data.theme_primary_color}
+                                            onChange={(e) => generalForm.setData('theme_primary_color', e.target.value.toUpperCase())}
+                                            error={!!generalForm.errors.theme_primary_color}
+                                            sx={{ width: 120 }}
+                                            InputLabelProps={{ shrink: true }}
+                                            inputProps={{ 'aria-label': __('Theme Color') }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            size="small"
+                                            label={__('Theme Hex')}
+                                            value={generalForm.data.theme_primary_color}
+                                            onChange={(e) => generalForm.setData('theme_primary_color', e.target.value.toUpperCase())}
+                                            error={!!generalForm.errors.theme_primary_color}
+                                            helperText={generalForm.errors.theme_primary_color || __('Use a HEX color like #00796B.')}
+                                        />
+                                    </Stack>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Stack sx={{ height: '100%' }} justifyContent="flex-start">
@@ -537,8 +624,8 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                             control={
                                                 <Switch
                                                     size="small"
-                                                    checked={!!notificationForm.data.low_stock_sound}
-                                                    onChange={(e) => notificationForm.setData('low_stock_sound', e.target.checked)}
+                                                    checked={!!generalForm.data.low_stock_sound}
+                                                    onChange={(e) => generalForm.setData('low_stock_sound', e.target.checked)}
                                                 />
                                             }
                                             label={
@@ -560,9 +647,9 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                     variant="contained"
                                     size="small"
                                     startIcon={<SaveIcon />}
-                                    disabled={notificationForm.processing}
+                                    disabled={generalForm.processing}
                                 >
-                                    {notificationForm.processing ? __('Saving…') : __('Save Notification Settings')}
+                                    {generalForm.processing ? __('Saving…') : __('Save General Settings')}
                                 </Button>
                             </Box>
                         </Box>

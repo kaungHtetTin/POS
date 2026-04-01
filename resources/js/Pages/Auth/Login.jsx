@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
 import AuthSplitLayout from '@/Layouts/AuthSplitLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Box, Typography, TextField, Button, Checkbox as MuiCheckbox, FormControlLabel, Alert, Stack, useTheme } from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Box, Typography, TextField, Button, Checkbox as MuiCheckbox, FormControlLabel, Alert, Stack } from '@mui/material';
 
-export default function Login({ status, canResetPassword }) {
-    const theme = useTheme();
+export default function Login({ status }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -35,21 +34,7 @@ export default function Login({ status, canResetPassword }) {
         <AuthSplitLayout
             title="Log in to your account"
             subtitle="Enter your email and password to continue"
-            topBarContent={
-                <Typography variant="body2" color="text.secondary">
-                    No account?{' '}
-                    <Link 
-                        href={route('register')} 
-                        style={{ 
-                            color: theme.palette.primary.main, 
-                            fontWeight: 600,
-                            textDecoration: 'none'
-                        }}
-                    >
-                        Sign up
-                    </Link>
-                </Typography>
-            }
+            topBarContent={<Typography variant="body2" color="text.secondary" />}
         >
             <Head title="Log in" />
 
@@ -107,19 +92,6 @@ export default function Login({ status, canResetPassword }) {
                     </Box>
 
                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                        {canResetPassword && (
-                            <Link
-                                href={route('password.request')}
-                                style={{ 
-                                    fontSize: '0.875rem',
-                                    color: theme.palette.text.secondary,
-                                    textDecoration: 'none'
-                                }}
-                            >
-                                Forgot your password?
-                            </Link>
-                        )}
-
                         <Button
                             type="submit"
                             variant="contained"

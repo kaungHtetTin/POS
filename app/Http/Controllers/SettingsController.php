@@ -172,6 +172,29 @@ class SettingsController extends Controller
         return redirect()->back()->with('success', 'Notification settings updated successfully.');
     }
 
+    public function updateGeneral(Request $request)
+    {
+        $validated = $request->validate([
+            'expiry_alert_days' => 'required|integer|min:1|max:365',
+            'low_stock_sound' => 'required|boolean',
+            'pharmacy_name' => 'required|string|max:255',
+            'logo' => 'nullable|image|max:2048',
+            'theme_primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ]);
+
+        Setting::set('inventory.expiry_alert_days', (string) $validated['expiry_alert_days']);
+        Setting::set('inventory.low_stock_sound', $validated['low_stock_sound'] ? '1' : '0');
+        Setting::set('invoice.pharmacy_name', $validated['pharmacy_name']);
+        Setting::set('app.theme_primary_color', strtoupper($validated['theme_primary_color']));
+
+        if ($request->hasFile('logo')) {
+            $path = $request->file('logo')->store('settings', 'public');
+            Setting::set('invoice.logo_path', $path);
+        }
+
+        return redirect()->back()->with('success', 'General settings updated successfully.');
+    }
+
     public function updateLocalization(Request $request)
     {
         $validated = $request->validate([
