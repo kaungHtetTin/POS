@@ -456,7 +456,7 @@ class PosController extends Controller
                 $available = (int) $batches->sum('quantity');
 
                 if ($available < $baseToDeduct) {
-                    throw new \RuntimeException('Insufficient stock for selected product.');
+                    throw new \Exception("Insufficient stock for {$product->name}. Requested: {$baseToDeduct}, Available: {$available}");
                 }
 
                 $remaining = $baseToDeduct;

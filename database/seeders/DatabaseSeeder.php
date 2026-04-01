@@ -14,18 +14,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
+        // $this->call([
+        //     RoleSeeder::class,
+        //     PermissionSeeder::class,
+        //     BranchSeeder::class,
+        //     RootUserSeeder::class,
+        //     UserSeeder::class,
+        //     SupplierSeeder::class,
+        //     UnitSeeder::class,
+        //     ProductSeeder::class,
+        //     ProductUnitSeeder::class,
+        //     PurchaseSeeder::class,
+        //     SaleSeeder::class,
+        // ]);
+
         $this->call([
             RoleSeeder::class,
             PermissionSeeder::class,
             BranchSeeder::class,
             RootUserSeeder::class,
-            UserSeeder::class,
-            SupplierSeeder::class,
             UnitSeeder::class,
-            ProductSeeder::class,
-            ProductUnitSeeder::class,
-            PurchaseSeeder::class,
-            SaleSeeder::class,
         ]);
     }
 }

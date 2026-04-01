@@ -48,7 +48,7 @@ Route::get('/language/{lang}', [LanguageController::class, 'switch'])->name('lan
 
 Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], function () {
     
-    Route::get('/dashboard', [DashboardController::class, 'index'])
+    Route::get('/', [DashboardController::class, 'index'])
         ->middleware(['auth', 'verified'])
         ->name('dashboard');
 

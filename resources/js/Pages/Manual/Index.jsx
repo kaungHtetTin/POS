@@ -663,11 +663,21 @@ export default function Manual({ auth, appName }) {
                         <ListItem><ListItemIcon><CircleIcon sx={{ fontSize: 8 }} /></ListItemIcon><ListItemText primary="Clear Cache" secondary="Run 'php artisan optimize:clear' after configuration changes." /></ListItem>
                     </List>
 
+                    <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>
+                        <AlertTitle>Session Locked</AlertTitle>
+                        <Typography variant="caption">A cashier cannot open a new session if they have an 'Open' session in another branch. Close the previous session first.</Typography>
+                    </Alert>
+
+                    <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>
+                        <AlertTitle>Data Sync Warning</AlertTitle>
+                        <Typography variant="caption">Ensure you have a stable internet connection for sales. If a sale fails with "Insufficient Stock" but physical stock exists, it may be due to unexpired stock in other batches not being updated yet.</Typography>
+                    </Alert>
+
                     <Alert severity="info" variant="outlined" sx={{ mt: 2 }}>
                         <AlertTitle>Emergency Contact</AlertTitle>
                         <Typography variant="caption">
                             For critical system failures (System Offline), contact the Technical Support Team at:<br />
-                            <strong>support@pharmacypos.com</strong> | +1 (800) 555-0199
+                            <strong>kaunghtettin17204@gmail.com</strong> | 09682537158
                         </Typography>
                     </Alert>
                 </Box>

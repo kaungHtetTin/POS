@@ -40,16 +40,16 @@ class InventoryController extends Controller
 
         // If a specific branch is selected, get stock for that branch
         if ($branchId) {
-            $query->with(['inventories' => function($q) use ($branchId) {
+            $query->withSum(['inventories' => function($q) use ($branchId) {
                 $q->where('branch_id', $branchId);
-            }]);
+            }], 'quantity');
         } else {
             // Global stock (sum across all branches)
-            $query->with(['inventories']);
+            $query->withSum('inventories', 'quantity');
         }
 
         $products = $query->latest()->get()->map(function($product) {
-            $stock = $product->inventories->sum('quantity');
+            $stock = (int) ($product->inventories_sum_quantity ?? 0);
             return [
                 'id' => $product->id,
                 'name' => $product->name,
