@@ -26,6 +26,7 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\ManualController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -149,6 +150,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::post('/active-branch', [ActiveBranchController::class, 'update'])->name('active-branch.update');
 
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
+        Route::get('/manual', [ManualController::class, 'index'])->name('manual.index');
         Route::patch('/settings/pos-behavior', [SettingsController::class, 'updatePosBehavior'])->name('settings.pos-behavior.update')->middleware('permission:manage_branches');
         Route::post('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general.update')->middleware('permission:manage_branches');
         Route::patch('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update')->middleware('permission:manage_branches');

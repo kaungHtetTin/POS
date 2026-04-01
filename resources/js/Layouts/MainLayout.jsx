@@ -56,6 +56,7 @@ import {
     Label as ExpenseCategoryIcon,
     Language as LanguageIcon,
     History as ActivityLogIcon,
+    MenuBook as ManualIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 200; // More compact sidebar
@@ -185,6 +186,7 @@ export default function MainLayout({ children, header }) {
         permissions: { text: 'Permission', icon: <PermissionsIcon fontSize="small" />, href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_users' },
         activityLogs: { text: 'Activity Logs', icon: <ActivityLogIcon fontSize="small" />, href: route('activity-logs.index'), routePattern: 'activity-logs.*', permission: 'manage_users' },
         settings: { text: 'Settings', icon: <SettingsIcon fontSize="small" />, href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_branches' },
+        manual: { text: 'SOP Manual', icon: <ManualIcon fontSize="small" />, href: route('manual.index'), routePattern: 'manual.index', permission: null },
     };
 
     const menuGroups = [
@@ -194,7 +196,7 @@ export default function MainLayout({ children, header }) {
         { label: 'Stock', keys: ['adjustments', 'transfers'] },
         { label: 'Sales', keys: ['customers', 'returns', 'sales'] },
         { label: 'Finance', keys: ['expenses', 'expenseCategories', 'reports', 'cashSessionReport'] },
-        { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'activityLogs', 'settings'] },
+        { label: 'Administration', keys: ['staff', 'roles', 'branches', 'permissions', 'activityLogs', 'settings', 'manual'] },
     ];
 
     const canSee = (item) => !item.permission || auth.user?.permissions?.includes(item.permission);
