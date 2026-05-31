@@ -49,28 +49,24 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
             title: "Total Products", 
             value: stats.total_products || 0, 
             icon: <ProductIcon color="primary" fontSize="small" />, 
-            color: '#e3f2fd',
             link: route('products.index')
         },
         { 
             title: "Total Suppliers", 
             value: stats.total_suppliers || 0, 
             icon: <SupplierIcon color="info" fontSize="small" />, 
-            color: '#e0f2f1',
             link: route('suppliers.index')
         },
         { 
             title: "Pending Returns", 
             value: stats.pending_returns || 0, 
             icon: <ReturnIcon color="error" fontSize="small" />, 
-            color: '#ffebee',
             link: route('returns.index')
         },
         { 
             title: "Pending Payments", 
             value: stats.pending_purchases || 0, 
             icon: <POSIcon color="warning" fontSize="small" />, 
-            color: '#fff3e0',
             link: route('purchases.index')
         },
     ];
@@ -82,7 +78,7 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
             <Box sx={{ flexGrow: 1 }}>
                 {/* Branch Filter */}
                 {branches && branches.length > 1 && (
-                    <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Filter by Branch:</Typography>
                         <TextField
                             select
@@ -102,17 +98,19 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                 )}
 
                 {/* Statistics Cards */}
-                <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
                     {statCards.map((stat, index) => (
                         <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card sx={{ height: '100%' }}>
-                                <CardContent sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
+                            <Card sx={{ height: '100%', borderLeft: '3px solid', borderLeftColor: 'primary.main' }}>
+                                <CardContent sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}>
                                     <Box sx={{ 
-                                        p: 1.5, 
-                                        borderRadius: 2, 
-                                        bgcolor: stat.color, 
-                                        mr: 2,
-                                        display: 'flex'
+                                        p: 1,
+                                        borderRadius: 0.75,
+                                        bgcolor: 'action.hover',
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        mr: 1.5,
+                                        display: 'flex',
                                     }}>
                                         {stat.icon}
                                     </Box>
@@ -248,21 +246,12 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                 </Grid>
 
                 {/* Quick Actions */}
-                <Paper sx={{ mt: 3, p: 2 }}>
+                <Paper sx={{ mt: 2, p: 2 }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
                         QUICK ACTIONS
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                            <Stack direction="row" spacing={2}>
-                        <Button 
-                            variant="outlined" 
-                            startIcon={<POSIcon />} 
-                            component={Link} 
-                            href="#"
-                            size="small"
-                        >
-                            New Sale
-                        </Button>
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                         <Button 
                             variant="outlined" 
                             startIcon={<StockIcon />} 

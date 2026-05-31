@@ -231,7 +231,7 @@ export default function Manual({ auth, appName }) {
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><strong>Secondary Unit</strong></TableCell>
-                                    <TableCell>A group of base units (Conversion > 1)</TableCell>
+                                    <TableCell>A group of base units (Conversion {'>'} 1)</TableCell>
                                     <TableCell>1 Box (30 Tablets)</TableCell>
                                 </TableRow>
                             </TableBody>

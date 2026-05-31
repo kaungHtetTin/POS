@@ -784,8 +784,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         {displayError}
                     </Alert>
                 )}
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'flex-start' }}>
+                    <Paper sx={{ p: 2, flex: 1.15, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                             <ScanIcon color="primary" fontSize="small" />
                             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -1075,7 +1075,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         )}
                     </Paper>
 
-                    <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <Paper sx={{ p: 2, flex: 1, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                             <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -1276,6 +1276,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
                         <Divider sx={{ my: 2 }} />
 
+                        <Box sx={{ p: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
                         <Stack spacing={1}>
                             <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="body2" color="text.secondary">
@@ -1309,15 +1310,16 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     sx={{ width: 120 }}
                                 />
                             </Stack>
-                            <Stack direction="row" justifyContent="space-between">
-                                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                                     {__('Grand Total')}
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main', lineHeight: 1 }}>
                                     {currencySymbol}{totals.grandTotal.toFixed(2)}
                                 </Typography>
                             </Stack>
                         </Stack>
+                        </Box>
 
                         <Divider sx={{ my: 2 }} />
 
@@ -1327,7 +1329,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                                         {__('Customer (optional)')}
                                     </Typography>
-                                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start">
                                         <Autocomplete
                                             size="small"
                                             fullWidth
@@ -1370,7 +1372,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     </Stack>
                                 </Box>
 
-                                <Stack direction="row" spacing={1}>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                                     <TextField
                                         select
                                         size="small"
@@ -1406,7 +1408,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 </Stack>
 
                                 {isCashPayment && (
-                                    <Stack direction="row" spacing={1}>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                                         <TextField
                                             size="small"
                                             fullWidth
@@ -1450,6 +1452,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     startIcon={<CheckoutIcon />}
                                     disabled={processing || cart.length === 0 || !hasActiveSession || (isPaidCashSale && cashShortageValue > 0)}
                                     fullWidth
+                                    sx={{ minHeight: 42, fontWeight: 800, letterSpacing: '0.02em' }}
                                 >
                                     {__('Complete Sale')}
                                 </Button>

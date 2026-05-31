@@ -420,8 +420,9 @@ export default function MainLayout({ children, header }) {
                                             selected={isActive}
                                             sx={{
                                                 py: 0.5,
-                                                borderRadius: 1,
+                                                borderRadius: 0.75,
                                                 mx: 0.5,
+                                                borderLeft: '3px solid transparent',
                                                 '&.Mui-selected': {
                                                     bgcolor: 'action.selected',
                                                     borderLeft: '3px solid',
@@ -439,7 +440,7 @@ export default function MainLayout({ children, header }) {
                                                             sx={{
                                                                 width: 22,
                                                                 height: 22,
-                                                                borderRadius: 1.5,
+                                                                borderRadius: 0.75,
                                                                 display: 'inline-flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
@@ -478,7 +479,7 @@ export default function MainLayout({ children, header }) {
                                                         sx={{
                                                             width: 22,
                                                             height: 22,
-                                                            borderRadius: 1.5,
+                                                            borderRadius: 0.75,
                                                             display: 'inline-flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
@@ -531,7 +532,7 @@ export default function MainLayout({ children, header }) {
                 sx={{
                     width: { sm: `calc(100% - ${drawerWidth}px)` },
                     ml: { sm: `${drawerWidth}px` },
-                    bgcolor: 'background.paper',
+                    bgcolor: 'transparent',
                     color: 'text.primary',
                     boxShadow: 'none',
                     borderBottom: '1px solid',
@@ -565,7 +566,7 @@ export default function MainLayout({ children, header }) {
                             color="inherit"
                             size="small"
                             sx={{
-                                borderRadius: 2,
+                                borderRadius: 0.75,
                                 border: '1px solid',
                                 borderColor: 'divider',
                                 bgcolor: 'background.paper',
@@ -584,7 +585,7 @@ export default function MainLayout({ children, header }) {
                                 color="inherit"
                                 size="small"
                                 sx={{
-                                    borderRadius: 2,
+                                    borderRadius: 0.75,
                                     border: '1px solid',
                                     borderColor: 'divider',
                                     bgcolor: 'background.paper',
@@ -621,7 +622,7 @@ export default function MainLayout({ children, header }) {
                             </MenuItem>
                         </Menu>
 
-                        <Tooltip title={__('Open settings')}>
+                        <Tooltip title={__('User menu')}>
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5 }}>
                                 <Avatar 
                                     alt={auth.user?.name || 'User'} 
@@ -645,12 +646,66 @@ export default function MainLayout({ children, header }) {
                             }}
                             open={Boolean(anchorElUser)}
                             onClose={handleCloseUserMenu}
+                            slotProps={{
+                                paper: {
+                                    sx: {
+                                        width: 260,
+                                        mt: 0.5,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                    },
+                                },
+                            }}
                         >
+                            <Box sx={{ px: 1.5, py: 1.25, display: 'flex', gap: 1.25, alignItems: 'center' }}>
+                                <Avatar
+                                    alt={auth.user?.name || 'User'}
+                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
+                                    sx={{ width: 38, height: 38, bgcolor: 'primary.main', fontWeight: 700 }}
+                                >
+                                    {auth.user?.name?.charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
+                                        {auth.user?.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                        {auth.user?.email}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                        {auth.user?.roles?.map((roleName) => (
+                                            <Chip key={roleName} label={__(roleName)} size="small" sx={{ height: 17, fontSize: '0.6rem' }} />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            </Box>
+                            <Divider />
+                            <MenuItem component="a" href={route('dashboard')} onClick={handleCloseUserMenu}>
+                                <ListItemIcon><DashboardIcon fontSize="small" /></ListItemIcon>
+                                <Typography variant="body2">{__('Dashboard')}</Typography>
+                            </MenuItem>
+                            {auth.user?.permissions?.includes('process_sale') && (
+                                <MenuItem component="a" href={route('pos.index')} onClick={handleCloseUserMenu}>
+                                    <ListItemIcon><POSIcon fontSize="small" /></ListItemIcon>
+                                    <Typography variant="body2">{__('POS')}</Typography>
+                                </MenuItem>
+                            )}
                             <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
-                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }}>
+                            {auth.user?.permissions?.includes('manage_branches') && (
+                                <MenuItem component="a" href={route('settings.index')} onClick={handleCloseUserMenu}>
+                                    <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                                    <Typography variant="body2">{__('Settings')}</Typography>
+                                </MenuItem>
+                            )}
+                            <MenuItem component="a" href={route('manual.index')} onClick={handleCloseUserMenu}>
+                                <ListItemIcon><ManualIcon fontSize="small" /></ListItemIcon>
+                                <Typography variant="body2">{__('SOP Manual')}</Typography>
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }} sx={{ color: 'error.main' }}>
                                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
                                 <Typography variant="body2">{__('Logout')}</Typography>
                             </MenuItem>
@@ -672,7 +727,7 @@ export default function MainLayout({ children, header }) {
                     }}
                     sx={{
                         display: { xs: 'block', sm: 'none' },
-                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRightColor: 'divider' },
                     }}
                 >
                     {drawer}
@@ -681,7 +736,7 @@ export default function MainLayout({ children, header }) {
                     variant="permanent"
                     sx={{
                         display: { xs: 'none', sm: 'block' },
-                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRightColor: 'divider' },
                     }}
                     open
                 >
@@ -690,9 +745,9 @@ export default function MainLayout({ children, header }) {
             </Box>
             <Box
                 component="main"
-                sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', bgcolor: 'background.default' }}
+                sx={{ flexGrow: 1, p: { xs: 1.5, md: 2 }, width: { sm: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', bgcolor: 'transparent' }}
             >
-                <Toolbar />
+                <Toolbar sx={{ minHeight: '48px !important' }} />
                 {children}
             </Box>
 

@@ -60,6 +60,15 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
         MuiCssBaseline: {
             styleOverrides: {
                 body: {
+                    backgroundColor: mode === 'light' ? '#eef6f4' : '#071522',
+                    backgroundImage: mode === 'light'
+                        ? `radial-gradient(circle at 12% 8%, ${alpha(primaryColor, 0.16)} 0, transparent 28%),
+                           radial-gradient(circle at 88% 18%, ${alpha('#1976d2', 0.10)} 0, transparent 24%),
+                           linear-gradient(145deg, #f8fbfa 0%, #edf5f3 52%, #f4f8fb 100%)`
+                        : `radial-gradient(circle at 12% 8%, ${alpha(primaryColor, 0.24)} 0, transparent 30%),
+                           radial-gradient(circle at 88% 18%, ${alpha('#1976d2', 0.18)} 0, transparent 26%),
+                           linear-gradient(145deg, #071522 0%, #0a1929 55%, #0b1d2d 100%)`,
+                    backgroundAttachment: 'fixed',
                     scrollbarColor: mode === 'light' ? '#bdbdbd #f5f5f5' : '#455a64 #101f33',
                     '&::-webkit-scrollbar, & *::-webkit-scrollbar': {
                         width: '8px',
@@ -84,11 +93,14 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
         MuiButton: {
             defaultProps: {
                 size: 'small',
+                disableElevation: true,
             },
             styleOverrides: {
                 root: {
-                    borderRadius: 4,
+                    borderRadius: 3,
+                    minHeight: 32,
                     padding: '4px 12px',
+                    fontWeight: 600,
                 },
             },
         },
@@ -99,8 +111,15 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
             styleOverrides: {
                 root: {
                     border: '1px solid',
-                    borderColor: mode === 'light' ? '#e0e0e0' : '#1e293b',
-                    borderRadius: 4,
+                    borderColor: mode === 'light' ? alpha('#ffffff', 0.72) : alpha('#ffffff', 0.12),
+                    borderRadius: 3,
+                    backgroundColor: mode === 'light' ? alpha('#ffffff', 0.68) : alpha('#101f33', 0.72),
+                    backgroundImage: 'none',
+                    backdropFilter: 'blur(16px) saturate(125%)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(125%)',
+                    boxShadow: mode === 'light'
+                        ? '0 10px 28px rgba(40, 84, 78, 0.08)'
+                        : '0 12px 30px rgba(0, 0, 0, 0.20)',
                 },
             },
         },
@@ -111,7 +130,12 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
             styleOverrides: {
                 root: {
                     border: '1px solid',
-                    borderColor: mode === 'light' ? '#e0e0e0' : '#1e293b',
+                    borderColor: mode === 'light' ? alpha('#ffffff', 0.68) : alpha('#ffffff', 0.12),
+                    borderRadius: 3,
+                    backgroundColor: mode === 'light' ? alpha('#ffffff', 0.66) : alpha('#101f33', 0.70),
+                    backgroundImage: 'none',
+                    backdropFilter: 'blur(16px) saturate(125%)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(125%)',
                 },
             },
         },
@@ -143,7 +167,9 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
         MuiOutlinedInput: {
             styleOverrides: {
                 root: {
+                    borderRadius: 3,
                     fontSize: '0.875rem',
+                    backgroundColor: mode === 'light' ? '#ffffff' : '#101f33',
                     '& .MuiOutlinedInput-notchedOutline': {
                         borderColor: mode === 'light' ? '#e0e0e0' : '#1e293b',
                         '& legend': {
@@ -198,10 +224,61 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
             },
             styleOverrides: {
                 paper: {
-                    borderRadius: 4,
+                    borderRadius: 3,
                     border: '1px solid',
-                    borderColor: mode === 'light' ? '#e0e0e0' : '#1e293b',
+                    borderColor: mode === 'light' ? '#d8e1df' : '#24364a',
+                    backgroundColor: mode === 'light' ? '#ffffff' : '#101f33',
+                    backgroundImage: 'none',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
                     boxShadow: mode === 'light' ? '0 4px 20px rgba(0,0,0,0.1)' : '0 4px 20px rgba(0,0,0,0.5)',
+                    '& .MuiPaper-root': {
+                        backgroundColor: mode === 'light' ? '#ffffff' : '#101f33',
+                        backgroundImage: 'none',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
+                        boxShadow: 'none',
+                    },
+                },
+            },
+        },
+        MuiAppBar: {
+            styleOverrides: {
+                root: {
+                    backgroundColor: mode === 'light' ? alpha('#ffffff', 0.72) : alpha('#101f33', 0.76),
+                    backgroundImage: 'none',
+                    backdropFilter: 'blur(18px) saturate(135%)',
+                    WebkitBackdropFilter: 'blur(18px) saturate(135%)',
+                },
+            },
+        },
+        MuiDrawer: {
+            styleOverrides: {
+                paper: {
+                    backgroundColor: mode === 'light' ? alpha('#ffffff', 0.70) : alpha('#101f33', 0.76),
+                    backgroundImage: 'none',
+                    backdropFilter: 'blur(18px) saturate(135%)',
+                    WebkitBackdropFilter: 'blur(18px) saturate(135%)',
+                },
+            },
+        },
+        MuiMenu: {
+            styleOverrides: {
+                paper: {
+                    backgroundColor: mode === 'light' ? '#ffffff' : '#101f33',
+                    backgroundImage: 'none',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                },
+            },
+        },
+        MuiAutocomplete: {
+            styleOverrides: {
+                paper: {
+                    backgroundColor: mode === 'light' ? '#ffffff' : '#101f33',
+                    backgroundImage: 'none',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
                 },
             },
         },
@@ -210,16 +287,29 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
                 root: {
                     fontSize: '1.1rem',
                     fontWeight: 600,
-                    padding: '12px 16px',
+                    padding: '10px 14px !important',
                     borderBottom: '1px solid',
                     borderColor: mode === 'light' ? '#f0f0f0' : '#1e293b',
+                },
+            },
+        },
+        MuiDialogContent: {
+            styleOverrides: {
+                root: {
+                    padding: '12px 14px !important',
+                    '&.MuiDialogContent-dividers': {
+                        padding: '12px 14px !important',
+                    },
+                    '& .MuiStack-root': {
+                        gap: '10px',
+                    },
                 },
             },
         },
         MuiDialogActions: {
             styleOverrides: {
                 root: {
-                    padding: '8px 16px',
+                    padding: '8px 14px !important',
                     borderTop: '1px solid',
                     borderColor: mode === 'light' ? '#f0f0f0' : '#1e293b',
                 },
@@ -228,7 +318,7 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
         MuiAlert: {
             styleOverrides: {
                 root: {
-                    borderRadius: 4,
+                    borderRadius: 3,
                     fontSize: '0.875rem',
                 },
             },
@@ -254,6 +344,14 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
                     padding: '6px 12px',
                     borderColor: mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)',
                 },
+                head: {
+                    backgroundColor: mode === 'light' ? '#f7faf9' : '#14263a',
+                    color: mode === 'light' ? '#40514f' : '#d7e2e1',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                },
             },
         },
         MuiIconButton: {
@@ -262,19 +360,44 @@ export const getTheme = (mode, primaryColor = '#00796b') => createTheme({
             },
             styleOverrides: {
                 root: {
-                    borderRadius: 10,
-                    border: '1px solid',
-                    borderColor: mode === 'light' ? alpha(primaryColor, 0.22) : alpha(primaryColor, 0.38),
-                    backgroundColor: mode === 'light' ? alpha(primaryColor, 0.07) : alpha(primaryColor, 0.18),
-                    transition: 'all 180ms ease',
+                    borderRadius: 3,
+                    transition: 'background-color 160ms ease, color 160ms ease, border-color 160ms ease',
                     '&:hover': {
-                        transform: 'translateY(-1px)',
-                        backgroundColor: mode === 'light' ? alpha(primaryColor, 0.14) : alpha(primaryColor, 0.28),
-                        borderColor: mode === 'light' ? alpha(primaryColor, 0.34) : alpha(primaryColor, 0.56),
-                        boxShadow: mode === 'light'
-                            ? `0 6px 16px ${alpha(primaryColor, 0.24)}`
-                            : '0 6px 16px rgba(0, 0, 0, 0.45)',
+                        backgroundColor: mode === 'light' ? alpha(primaryColor, 0.08) : alpha(primaryColor, 0.18),
                     },
+                },
+            },
+        },
+        MuiChip: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 3,
+                    fontWeight: 600,
+                },
+            },
+        },
+        MuiToggleButton: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 3,
+                    padding: '4px 8px',
+                },
+            },
+        },
+        MuiTabs: {
+            styleOverrides: {
+                root: {
+                    minHeight: 38,
+                },
+            },
+        },
+        MuiTab: {
+            styleOverrides: {
+                root: {
+                    minHeight: 38,
+                    padding: '8px 12px',
+                    textTransform: 'none',
+                    fontWeight: 600,
                 },
             },
         },

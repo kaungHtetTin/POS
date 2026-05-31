@@ -6,7 +6,9 @@ import {
     AppBar,
     Box,
     Button,
+    Chip,
     CssBaseline,
+    Divider,
     IconButton,
     Menu,
     MenuItem,
@@ -31,6 +33,8 @@ import {
     Person as PersonIcon,
     ShoppingCart as PosIcon,
     Language as LanguageIcon,
+    Settings as SettingsIcon,
+    MenuBook as ManualIcon,
 } from '@mui/icons-material';
 
 export default function PosLayout({ children, header = 'POS' }) {
@@ -135,12 +139,12 @@ export default function PosLayout({ children, header = 'POS' }) {
     ];
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'transparent' }}>
             <CssBaseline />
             <AppBar
                 position="fixed"
                 sx={{
-                    bgcolor: 'background.paper',
+                    bgcolor: 'transparent',
                     color: 'text.primary',
                     boxShadow: 'none',
                     borderBottom: '1px solid',
@@ -164,12 +168,12 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 sx={{
                                     textTransform: 'none',
                                     fontWeight: item.active ? 700 : 500,
-                                    borderRadius: 2,
+                                    borderRadius: 0.75,
                                     '& .MuiButton-startIcon': {
                                         width: 18,
                                         height: 18,
                                         mr: 0.75,
-                                        borderRadius: 1.25,
+                                        borderRadius: 0.75,
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -225,7 +229,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                             color="inherit"
                             size="small"
                             sx={{
-                                borderRadius: 2,
+                                borderRadius: 0.75,
                                 border: '1px solid',
                                 borderColor: 'divider',
                                 bgcolor: 'background.paper',
@@ -244,7 +248,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 color="inherit"
                                 size="small"
                                 sx={{
-                                    borderRadius: 2,
+                                    borderRadius: 0.75,
                                     border: '1px solid',
                                     borderColor: 'divider',
                                     bgcolor: 'background.paper',
@@ -305,12 +309,66 @@ export default function PosLayout({ children, header = 'POS' }) {
                             }}
                             open={Boolean(anchorElUser)}
                             onClose={handleCloseUserMenu}
+                            slotProps={{
+                                paper: {
+                                    sx: {
+                                        width: 260,
+                                        mt: 0.5,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                    },
+                                },
+                            }}
                         >
+                            <Box sx={{ px: 1.5, py: 1.25, display: 'flex', gap: 1.25, alignItems: 'center' }}>
+                                <Avatar
+                                    alt={auth.user?.name || 'User'}
+                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
+                                    sx={{ width: 38, height: 38, bgcolor: 'primary.main', fontWeight: 700 }}
+                                >
+                                    {auth.user?.name?.charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
+                                        {auth.user?.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                        {auth.user?.email}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                        {auth.user?.roles?.map((roleName) => (
+                                            <Chip key={roleName} label={__(roleName)} size="small" sx={{ height: 17, fontSize: '0.6rem' }} />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            </Box>
+                            <Divider />
+                            <MenuItem component="a" href={route('dashboard')} onClick={handleCloseUserMenu}>
+                                <ListItemIcon><DashboardIcon fontSize="small" /></ListItemIcon>
+                                <Typography variant="body2">{__('Dashboard')}</Typography>
+                            </MenuItem>
+                            {permissions.includes('view_financial_reports') && (
+                                <MenuItem component="a" href={route('sales.index')} onClick={handleCloseUserMenu}>
+                                    <ListItemIcon><SalesIcon fontSize="small" /></ListItemIcon>
+                                    <Typography variant="body2">{__('Sales')}</Typography>
+                                </MenuItem>
+                            )}
                             <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
-                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }}>
+                            {permissions.includes('manage_branches') && (
+                                <MenuItem component="a" href={route('settings.index')} onClick={handleCloseUserMenu}>
+                                    <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                                    <Typography variant="body2">{__('Settings')}</Typography>
+                                </MenuItem>
+                            )}
+                            <MenuItem component="a" href={route('manual.index')} onClick={handleCloseUserMenu}>
+                                <ListItemIcon><ManualIcon fontSize="small" /></ListItemIcon>
+                                <Typography variant="body2">{__('SOP Manual')}</Typography>
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }} sx={{ color: 'error.main' }}>
                                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
                                 <Typography variant="body2">{__('Logout')}</Typography>
                             </MenuItem>
