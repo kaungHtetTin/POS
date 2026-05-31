@@ -1,0 +1,1 @@
+import{a as h}from"./app-3515efbb.js";import{a as m}from"./Box-3d9fdaf0.js";const a=m(h("path",{d:"M3 11h8V3H3zm2-6h4v4H5zM3 21h8v-8H3zm2-6h4v4H5zm8-12v8h8V3zm6 6h-4V5h4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z"}));export{a as L};

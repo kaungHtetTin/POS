@@ -73,6 +73,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
         receipt_header: invoiceSettings.receipt_header ?? '',
         receipt_footer: invoiceSettings.receipt_footer ?? '',
         invoice_prefix: invoiceSettings.invoice_prefix ?? 'S',
+        enable_tax: invoiceSettings.enable_tax ?? true,
     });
 
     const labelForm = useForm({
@@ -327,6 +328,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
             receipt_header: invoiceSettings.receipt_header ?? '',
             receipt_footer: invoiceSettings.receipt_footer ?? '',
             invoice_prefix: invoiceSettings.invoice_prefix ?? 'S',
+            enable_tax: invoiceSettings.enable_tax ?? true,
         });
     }, [invoiceSettings]);
 
@@ -881,6 +883,20 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                     )}
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={invoiceForm.data.enable_tax}
+                                                onChange={(e) => invoiceForm.setData('enable_tax', e.target.checked)}
+                                            />
+                                        }
+                                        label={__('Enable Tax Feature')}
+                                    />
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                        {__('When disabled, tax selection will be hidden on products and sales.')}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
                                     <TextField
                                         select
                                         fullWidth
@@ -894,7 +910,7 @@ export default function Settings({ auth, pos_behavior: posBehavior = {}, notific
                                         <MenuItem value="">{__('None')}</MenuItem>
                                         {taxes.map((tax) => (
                                             <MenuItem key={tax.id} value={tax.id}>
-                                                {tax.name} ({tax.rate}%)
+                                                {tax.name} ({tax.rate}%) 
                                             </MenuItem>
                                         ))}
                                     </TextField>

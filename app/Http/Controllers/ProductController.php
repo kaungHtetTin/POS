@@ -40,7 +40,7 @@ class ProductController extends Controller
         $defaultTaxId = \App\Models\Setting::get('invoice.default_tax_id', '');
 
         return Inertia::render('Products/Index', [
-            'products' => $query->latest()->get(),
+            'products' => $query->latest()->paginate(15)->withQueryString(),
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
             'units' => Unit::all(),
@@ -83,6 +83,14 @@ class ProductController extends Controller
                 $taxIds = collect([$validated['tax_id']]);
             }
 
+            // Default to "Tax Free" (0% tax) if nothing selected
+            if ($taxIds->isEmpty()) {
+                $taxFree = \App\Models\Tax::where('name', 'Tax Free')->first();
+                if ($taxFree) {
+                    $taxIds = collect([$taxFree->id]);
+                }
+            }
+
             $validated['tax_id'] = $taxIds->first();
 
             if ($request->hasFile('image')) {
@@ -99,6 +107,18 @@ class ProductController extends Controller
         });
 
         return redirect()->back()->with('success', 'Medicine created successfully.');
+    }
+
+    public function edit($locale, $product)
+    {
+        $productModel = Product::with(['category', 'taxes', 'product_units.unit'])->findOrFail($product);
+
+        return Inertia::render('Products/Edit', [
+            'product' => $productModel,
+            'categories' => Category::all(),
+            'taxes' => Tax::where('status', true)->get(),
+            'units' => Unit::all(),
+        ]);
     }
 
     public function update(Request $request, Product $product)
@@ -133,6 +153,14 @@ class ProductController extends Controller
 
             if ($taxIds->isEmpty() && !empty($validated['tax_id'])) {
                 $taxIds = collect([$validated['tax_id']]);
+            }
+
+            // Default to "Tax Free" (0% tax) if nothing selected
+            if ($taxIds->isEmpty()) {
+                $taxFree = \App\Models\Tax::where('name', 'Tax Free')->first();
+                if ($taxFree) {
+                    $taxIds = collect([$taxFree->id]);
+                }
             }
 
             $validated['tax_id'] = $taxIds->first();

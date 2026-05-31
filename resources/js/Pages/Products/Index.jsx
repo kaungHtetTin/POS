@@ -32,6 +32,7 @@ import {
     ListItemText,
     FormControlLabel,
     Switch,
+    FormHelperText,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -50,8 +51,6 @@ import {
 
 export default function ProductIndex({ auth, products, categories, taxes, units, filters, default_tax_id: defaultTaxId }) {
     const [open, setOpen] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
 
     // Printing State
     const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -94,7 +93,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     }, [open, products]);
 
     useEffect(() => {
-        if (!open || editMode) {
+        if (!open) {
             return;
         }
 
@@ -103,10 +102,10 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         }, 120);
 
         return () => clearTimeout(timer);
-    }, [open, editMode]);
+    }, [open]);
 
     const processScan = (barcode) => {
-        const existingProduct = products.find(p => p.barcode === barcode);
+        const existingProduct = products.data.find(p => p.barcode === barcode);
         if (existingProduct) {
             handleOpen(existingProduct);
         } else {
@@ -147,7 +146,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     };
 
     const handleOpenPrintDialog = () => {
-        const items = products
+        const items = products.data
             .filter(p => selectedForPrint.includes(p.id))
             .map(p => ({
                 id: p.id,
@@ -197,47 +196,14 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         ],
     });
 
-    const handleOpen = (product = null) => {
-        if (product) {
-            setEditMode(true);
-            setEditingProduct(product);
-            const taxIds = (product.taxes || []).map((t) => t.id);
-            const mergedTaxIds = taxIds.length > 0
-                ? taxIds
-                : (product.tax_id ? [product.tax_id] : []);
-            setData({
-                category_id: product.category_id,
-                tax_id: mergedTaxIds[0] || '',
-                tax_ids: mergedTaxIds,
-                name: product.name,
-                generic_name: product.generic_name || '',
-                brand_name: product.brand_name || '',
-                manufacturer: product.manufacturer || '',
-                strength: product.strength || '',
-                barcode: product.barcode || '',
-                description: product.description || '',
-                min_stock_level: product.min_stock_level,
-                tax_method: product.tax_method,
-                status: product.status,
-                image: null,
-                product_units: product.product_units.map(pu => ({
-                    unit_id: pu.unit_id,
-                    conversion_factor: pu.conversion_factor,
-                    selling_price: pu.selling_price,
-                    is_base_unit: Boolean(pu.is_base_unit)
-                }))
-            });
-        } else {
-            setEditMode(false);
-            setEditingProduct(null);
-            reset();
-            if (defaultTaxId) {
-                setData(prev => ({
-                    ...prev,
-                    tax_id: defaultTaxId,
-                    tax_ids: [defaultTaxId],
-                }));
-            }
+    const handleOpen = () => {
+        reset();
+        if (defaultTaxId) {
+            setData(prev => ({
+                ...prev,
+                tax_id: defaultTaxId,
+                tax_ids: [defaultTaxId],
+            }));
         }
         setOpen(true);
     };
@@ -270,8 +236,6 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     const handleClose = () => {
         setOpen(false);
         reset();
-        setEditMode(false);
-        setEditingProduct(null);
     };
 
     const generateBarcode = () => {
@@ -283,21 +247,9 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
 
     const submit = (e) => {
         e.preventDefault();
-        if (editMode) {
-            post(route('products.update', editingProduct.id), {
-                forceFormData: true,
-                onSuccess: () => handleClose(),
-                data: {
-                    ...data,
-                    _method: 'POST' // Using POST with _method isn't strictly needed for POST routes, 
-                                   // but good to keep in mind for multipart updates
-                }
-            });
-        } else {
-            post(route('products.store'), {
-                onSuccess: () => handleClose(),
-            });
-        }
+        post(route('products.store'), {
+            onSuccess: () => handleClose(),
+        });
     };
 
     const handleDelete = (product) => {
@@ -419,11 +371,11 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                     <TableCell padding="checkbox">
                                         <Checkbox
                                             size="small"
-                                            indeterminate={selectedForPrint.length > 0 && selectedForPrint.length < products.length}
-                                            checked={products.length > 0 && selectedForPrint.length === products.length}
+                                            indeterminate={selectedForPrint.length > 0 && selectedForPrint.length < products.data.length}
+                                            checked={products.data.length > 0 && selectedForPrint.length === products.data.length}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    setSelectedForPrint(products.map(p => p.id));
+                                                    setSelectedForPrint(products.data.map(p => p.id));
                                                 } else {
                                                     setSelectedForPrint([]);
                                                 }
@@ -440,7 +392,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {products.map((product) => (
+                                {products.data.map((product) => (
                                     <TableRow key={product.id} hover>
                                         <TableCell padding="checkbox">
                                             <Checkbox
@@ -508,7 +460,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             />
                                         </TableCell>
                                         <TableCell align="right">
-                                            <IconButton size="small" color="primary" onClick={() => handleOpen(product)}>
+                                            <IconButton size="small" color="primary" onClick={() => router.visit(route('products.edit', product.id))}>
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                             <IconButton size="small" color="error" onClick={() => handleDelete(product)}>
@@ -517,7 +469,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {products.length === 0 && (
+                                {products.data.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -536,7 +488,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {editMode ? 'Edit Medicine' : 'Add New Medicine'}
+                        Add New Medicine
                         <IconButton size="small" onClick={handleClose}>
                             <CloseIcon />
                         </IconButton>
@@ -547,7 +499,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             <Grid item xs={12} sm={3}>
                                 <Stack alignItems="center" spacing={1.5}>
                                     <Avatar
-                                        src={data.image ? URL.createObjectURL(data.image) : (editingProduct?.image_path ? `/storage/${editingProduct.image_path}` : null)}
+                                        src={data.image ? URL.createObjectURL(data.image) : null}
                                         variant="rounded"
                                         sx={{ width: 120, height: 120, border: '1px solid', borderColor: 'divider' }}
                                     >
@@ -560,7 +512,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         fullWidth
                                         startIcon={<PhotoCameraIcon />}
                                     >
-                                        {editMode ? 'Change Photo' : 'Upload Photo'}
+                                        Upload Photo
                                         <input
                                             type="file"
                                             hidden
@@ -655,7 +607,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         label="Barcode / SKU"
                                         fullWidth
                                         size="small"
-                                        autoFocus={!editMode}
+                                        autoFocus
                                         inputRef={barcodeInputRef}
                                         value={data.barcode}
                                         onChange={e => setData('barcode', e.target.value)}
@@ -707,6 +659,9 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             </MenuItem>
                                         ))}
                                     </Select>
+                                    {(errors.tax_id || errors.tax_ids) && (
+                                        <FormHelperText>{errors.tax_ids || errors.tax_id}</FormHelperText>
+                                    )}
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -900,7 +855,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             size="small" 
                             disabled={processing}
                         >
-                            {editMode ? 'Update Medicine' : 'Add Medicine'}
+                            Add Medicine
                         </Button>
                     </DialogActions>
                 </form>

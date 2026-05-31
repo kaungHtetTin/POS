@@ -27,6 +27,7 @@ use App\Http\Controllers\SalesController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ManualController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -89,6 +90,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::delete('/taxes/{tax}', [TaxController::class, 'destroy'])->name('taxes.destroy')->middleware('permission:manage_inventory');
 
         Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:manage_inventory');
+        Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:manage_inventory');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:manage_inventory');
         Route::post('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:manage_inventory');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:manage_inventory');
@@ -160,7 +162,15 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index')->middleware('permission:manage_users');
 
         Route::get('/products/labels/print', [ProductController::class, 'printLabels'])->name('products.labels.print')->middleware('permission:manage_inventory');
+
+        // Locale-aware authentication routes (login/logout with /en or /my prefix)
+        Route::middleware('guest')->group(function () {
+            Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+            Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+        });
+
+        Route::middleware('auth')->group(function () {
+            Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+        });
     });
 });
-
-require __DIR__.'/auth.php';

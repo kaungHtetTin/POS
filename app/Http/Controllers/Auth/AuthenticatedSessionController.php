@@ -34,7 +34,20 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         ActivityLogger::log($request, 'auth.login', 'User logged in.');
 
-        return redirect()->intended(RouteServiceProvider::HOME);
+        // Determine the target locale: prefer session, then previous URL, then app default
+        $locale = $request->session()->get('locale')
+            ?? app()->getLocale()
+            ?? config('app.locale', 'en');
+
+        $intended = redirect()->intended()->getTargetUrl();
+
+        // If intended URL has no locale prefix, inject the current locale
+        if (!preg_match('#^/' . $locale . '/#', parse_url($intended, PHP_URL_PATH) ?? '')) {
+            // Fallback to locale-aware dashboard
+            return redirect("/{$locale}/dashboard");
+        }
+
+        return redirect($intended);
     }
 
     /**
@@ -42,6 +55,8 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $locale = app()->getLocale() ?: config('app.locale', 'en');
+
         ActivityLogger::log($request, 'auth.logout', 'User logged out.');
         Auth::guard('web')->logout();
 
@@ -49,6 +64,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // Redirect to locale-aware home page
+        return redirect("/{$locale}");
     }
 }

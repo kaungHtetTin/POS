@@ -45,6 +45,7 @@ class SettingsController extends Controller
             'receipt_header' => Setting::get('invoice.receipt_header', ''),
             'receipt_footer' => Setting::get('invoice.receipt_footer', ''),
             'invoice_prefix' => Setting::get('invoice.prefix', 'S'),
+            'enable_tax' => Setting::get('tax.enabled', '1') === '1',
         ];
 
         $labels = [
@@ -117,6 +118,7 @@ class SettingsController extends Controller
             'receipt_header' => 'nullable|string|max:1000',
             'receipt_footer' => 'nullable|string|max:1000',
             'invoice_prefix' => 'nullable|string|max:10',
+            'enable_tax' => 'required|boolean',
         ]);
 
         Setting::set('invoice.pharmacy_name', $validated['pharmacy_name']);
@@ -130,6 +132,7 @@ class SettingsController extends Controller
         Setting::set('invoice.receipt_header', $validated['receipt_header'] ?? '');
         Setting::set('invoice.receipt_footer', $validated['receipt_footer'] ?? '');
         Setting::set('invoice.prefix', $validated['invoice_prefix'] ?? 'S');
+        Setting::set('tax.enabled', $validated['enable_tax'] ? '1' : '0');
 
         return redirect()->back()->with('success', 'Invoice and receipt settings updated successfully.');
     }
