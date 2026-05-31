@@ -10,7 +10,6 @@ import {
     CardActionArea,
     CardContent,
     Chip,
-    Collapse,
     Dialog,
     DialogActions,
     DialogContent,
@@ -42,8 +41,6 @@ import {
     ShoppingCartCheckout as CheckoutIcon,
     ViewList as ListViewIcon,
     ViewModule as GridViewIcon,
-    ExpandLess as ExpandLessIcon,
-    ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -91,7 +88,11 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     const [closingCountedInput, setClosingCountedInput] = useState('');
     const [closingNotesInput, setClosingNotesInput] = useState('');
     const [sessionSubmitting, setSessionSubmitting] = useState(false);
-    const [cashierSectionExpanded, setCashierSectionExpanded] = useState(true);
+    const [shiftDialogOpen, setShiftDialogOpen] = useState(!activeSession?.id);
+    const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+    const [customerSectionExpanded, setCustomerSectionExpanded] = useState(false);
+    const [discountExpanded, setDiscountExpanded] = useState(false);
+    const [paymentOptionsExpanded, setPaymentOptionsExpanded] = useState(false);
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
@@ -742,6 +743,10 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                 setData('amount_received', 0);
                 setData('payment_method', paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'));
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
+                setPaymentDialogOpen(false);
+                setCustomerSectionExpanded(false);
+                setDiscountExpanded(false);
+                setPaymentOptionsExpanded(false);
                 if (behavior.barcode_focus) {
                     setTimeout(() => searchInputRef.current?.focus(), 100);
                 }
@@ -756,6 +761,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             opening_amount: openingAmount,
         }, {
             preserveScroll: true,
+            onSuccess: () => setShiftDialogOpen(false),
             onFinish: () => setSessionSubmitting(false),
             onError: () => setSessionSubmitting(false),
         });
@@ -769,9 +775,21 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             notes: closingNotesInput,
         }, {
             preserveScroll: true,
+            onSuccess: () => setShiftDialogOpen(false),
             onFinish: () => setSessionSubmitting(false),
             onError: () => setSessionSubmitting(false),
         });
+    };
+
+    const openPaymentDialog = () => {
+        if (!hasActiveSession) {
+            setShiftDialogOpen(true);
+            return;
+        }
+
+        if (cart.length > 0) {
+            setPaymentDialogOpen(true);
+        }
     };
 
     return (
@@ -1079,113 +1097,23 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                             <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                                    {__('Cashier Session')}
+                                    {__('Current Sale')}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                    {hasActiveSession ? __('Session is active') : __('No active session')}
+                                    {cart.length} {cart.length === 1 ? __('item') : __('items')}
                                 </Typography>
                             </Box>
                             <Button
                                 size="small"
-                                variant="text"
-                                endIcon={cashierSectionExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                                onClick={() => setCashierSectionExpanded((prev) => !prev)}
+                                variant="outlined"
+                                color={hasActiveSession ? 'success' : 'warning'}
+                                onClick={() => setShiftDialogOpen(true)}
                             >
-                                {cashierSectionExpanded ? __('Collapse') : __('Expand')}
+                                {hasActiveSession ? __('Shift Active') : __('Start Shift')}
                             </Button>
                         </Stack>
 
-                        <Collapse in={cashierSectionExpanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ pt: 1.25 }}>
-                                {pageErrors.session && (
-                                    <Alert severity="error" sx={{ mb: 1.25 }}>
-                                        {pageErrors.session}
-                                    </Alert>
-                                )}
-
-                                {!hasActiveSession ? (
-                                    <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
-                                        <TextField
-                                            size="small"
-                                            fullWidth
-                                            type="number"
-                                            label={__('Opening Cash')}
-                                            value={openingAmountInput}
-                                            onChange={(e) => setOpeningAmountInput(e.target.value)}
-                                            inputProps={{ min: 0, step: '0.01' }}
-                                            InputProps={{
-                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
-                                            }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            onClick={startCashSession}
-                                            disabled={sessionSubmitting}
-                                        >
-                                            {__('Start')}
-                                        </Button>
-                                    </Stack>
-                                ) : (
-                                    <Stack spacing={0.75} sx={{ mb: 1.5 }}>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {__('Opened at')}: {activeSession?.opened_at ? new Date(activeSession.opened_at).toLocaleString() : '-'}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {__('Opening')}: {currencySymbol}{Number(activeSession?.opening_amount || 0).toFixed(2)}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {__('Cash Received')}: {currencySymbol}{Number(activeSession?.cash_received_total || 0).toFixed(2)}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {__('Change Given')}: {currencySymbol}{Number(activeSession?.change_given_total || 0).toFixed(2)}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {__('Net Cash Sales')}: {currencySymbol}{Number(activeSession?.net_cash_sales || 0).toFixed(2)}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                            {__('Expected Drawer')}: {currencySymbol}{activeSessionExpected.toFixed(2)}
-                                        </Typography>
-                                        <Stack direction="row" spacing={1} sx={{ pt: 0.75 }}>
-                                            <TextField
-                                                size="small"
-                                                fullWidth
-                                                type="number"
-                                                label={__('Counted Cash')}
-                                                value={closingCountedInput}
-                                                onChange={(e) => setClosingCountedInput(e.target.value)}
-                                                inputProps={{ min: 0, step: '0.01' }}
-                                                InputProps={{
-                                                    startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
-                                                }}
-                                            />
-                                            <Button
-                                                variant="outlined"
-                                                color="warning"
-                                                size="small"
-                                                onClick={closeCashSession}
-                                                disabled={sessionSubmitting}
-                                            >
-                                                {__('End')}
-                                            </Button>
-                                        </Stack>
-                                        <TextField
-                                            size="small"
-                                            label={__('Closing Notes (optional)')}
-                                            value={closingNotesInput}
-                                            onChange={(e) => setClosingNotesInput(e.target.value)}
-                                        />
-                                        {activeSessionDifference !== null && (
-                                            <Typography variant="caption" color={activeSessionDifference === 0 ? 'success.main' : (activeSessionDifference > 0 ? 'warning.main' : 'error.main')}>
-                                                {__('Difference')}: {currencySymbol}{activeSessionDifference.toFixed(2)}
-                                            </Typography>
-                                        )}
-                                    </Stack>
-                                )}
-                            </Box>
-                        </Collapse>
-
-                        <Divider sx={{ mb: 1.5, mt: cashierSectionExpanded ? 0 : 1.25 }} />
+                        <Divider sx={{ my: 1.5 }} />
 
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                             {__('Cart')}
@@ -1298,17 +1226,35 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 <Typography variant="body2" color="text.secondary">
                                     {__('Discount')}
                                 </Typography>
-                                <TextField
-                                    size="small"
-                                    type="number"
-                                    value={data.discount}
-                                    onChange={(e) => setData('discount', e.target.value)}
-                                    InputProps={{
-                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
-                                    }}
-                                    inputProps={{ min: 0, step: '0.01' }}
-                                    sx={{ width: 120 }}
-                                />
+                                {discountExpanded || Number(data.discount || 0) > 0 ? (
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <TextField
+                                            size="small"
+                                            type="number"
+                                            value={data.discount}
+                                            onChange={(e) => setData('discount', e.target.value)}
+                                            InputProps={{
+                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                            }}
+                                            inputProps={{ min: 0, step: '0.01' }}
+                                            sx={{ width: 120 }}
+                                        />
+                                        <Button
+                                            size="small"
+                                            color="inherit"
+                                            onClick={() => {
+                                                setData('discount', 0);
+                                                setDiscountExpanded(false);
+                                            }}
+                                        >
+                                            {__('Remove')}
+                                        </Button>
+                                    </Stack>
+                                ) : (
+                                    <Button size="small" onClick={() => setDiscountExpanded(true)}>
+                                        {__('Add discount')}
+                                    </Button>
+                                )}
                             </Stack>
                             <Stack direction="row" justifyContent="space-between" alignItems="baseline">
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
@@ -1323,72 +1269,271 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
                         <Divider sx={{ my: 2 }} />
 
-                        <Box component="form" onSubmit={submit}>
+                        <Box>
                             <Stack spacing={1.5}>
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                        {__('Customer (optional)')}
-                                    </Typography>
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start">
-                                        <Autocomplete
-                                            size="small"
-                                            fullWidth
-                                            options={customerOptions}
-                                            value={selectedCustomer}
-                                            onChange={(e, value) => setSelectedCustomer(value)}
-                                            inputValue={customerSearchInput}
-                                            onInputChange={(e, value) => setCustomerSearchInput(value || '')}
-                                            getOptionLabel={(option) => (option?.name ?? '') || ''}
-                                            renderOption={(props, option) => (
-                                                <li {...props} key={option.id}>
-                                                    <Stack>
-                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {[option.phone, option.email].filter(Boolean).join(' · ') || __('No contact')}
-                                                        </Typography>
-                                                    </Stack>
-                                                </li>
-                                            )}
-                                            loading={customerLoading}
-                                            isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                                            renderInput={(params) => (
-                                                <TextField
-                                                    {...params}
-                                                    placeholder={__('Search by name, phone, or email...')}
-                                                    size="small"
-                                                />
-                                            )}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outlined"
-                                            size="small"
-                                            startIcon={<PersonAddIcon />}
-                                            onClick={openNewCustomer}
-                                            sx={{ minWidth: 140 }}
-                                        >
-                                            {__('New customer')}
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                {__('Customer')}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                {selectedCustomer?.name || __('Walk-in customer')}
+                                            </Typography>
+                                        </Box>
+                                        <Button size="small" onClick={() => setCustomerSectionExpanded((prev) => !prev)}>
+                                            {customerSectionExpanded ? __('Done') : __('Change')}
                                         </Button>
                                     </Stack>
+                                    {customerSectionExpanded && (
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start" sx={{ mt: 1 }}>
+                                            <Autocomplete
+                                                size="small"
+                                                fullWidth
+                                                options={customerOptions}
+                                                value={selectedCustomer}
+                                                onChange={(e, value) => setSelectedCustomer(value)}
+                                                inputValue={customerSearchInput}
+                                                onInputChange={(e, value) => setCustomerSearchInput(value || '')}
+                                                getOptionLabel={(option) => (option?.name ?? '') || ''}
+                                                renderOption={(props, option) => (
+                                                    <li {...props} key={option.id}>
+                                                        <Stack>
+                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {[option.phone, option.email].filter(Boolean).join(' / ') || __('No contact')}
+                                                            </Typography>
+                                                        </Stack>
+                                                    </li>
+                                                )}
+                                                loading={customerLoading}
+                                                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                                                renderInput={(params) => (
+                                                    <TextField
+                                                        {...params}
+                                                        placeholder={__('Search by name, phone, or email...')}
+                                                        size="small"
+                                                    />
+                                                )}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outlined"
+                                                size="small"
+                                                startIcon={<PersonAddIcon />}
+                                                onClick={openNewCustomer}
+                                                sx={{ minWidth: 140 }}
+                                            >
+                                                {__('New customer')}
+                                            </Button>
+                                        </Stack>
+                                    )}
                                 </Box>
 
+                                {!hasActiveSession && (
+                                    <Alert severity="warning">
+                                        {__('Start your shift before completing sales.')}
+                                    </Alert>
+                                )}
+
+                                {errors.items && (
+                                    <Alert severity="error">{errors.items}</Alert>
+                                )}
+
+                                <Button
+                                    variant="contained"
+                                    startIcon={<CheckoutIcon />}
+                                    disabled={processing || (hasActiveSession && cart.length === 0)}
+                                    fullWidth
+                                    onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
+                                    sx={{ minHeight: 46, fontWeight: 800, letterSpacing: '0.02em' }}
+                                >
+                                    {hasActiveSession
+                                        ? `${__('Pay')} ${currencySymbol}${totals.grandTotal.toFixed(2)}`
+                                        : __('Start Shift')}
+                                </Button>
+                            </Stack>
+                        </Box>
+                    </Paper>
+                </Box>
+            </Box>
+
+            <Dialog open={shiftDialogOpen} onClose={() => !sessionSubmitting && setShiftDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {__('Cashier Session')}
+                    <IconButton size="small" onClick={() => setShiftDialogOpen(false)} disabled={sessionSubmitting}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={1.5}>
+                        {pageErrors.session && (
+                            <Alert severity="error">
+                                {pageErrors.session}
+                            </Alert>
+                        )}
+
+                        {!hasActiveSession ? (
+                            <>
+                                <Typography variant="body2" color="text.secondary">
+                                    {__('Start your shift by entering the cash currently in the drawer.')}
+                                </Typography>
+                                <TextField
+                                    size="small"
+                                    fullWidth
+                                    type="number"
+                                    label={__('Opening Cash')}
+                                    value={openingAmountInput}
+                                    onChange={(e) => setOpeningAmountInput(e.target.value)}
+                                    inputProps={{ min: 0, step: '0.01' }}
+                                    InputProps={{
+                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                    }}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <Chip size="small" color="success" label={__('Shift Active')} sx={{ alignSelf: 'flex-start' }} />
+                                <Stack spacing={0.75}>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Opened at')}: {activeSession?.opened_at ? new Date(activeSession.opened_at).toLocaleString() : '-'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Opening')}: {currencySymbol}{Number(activeSession?.opening_amount || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Cash Received')}: {currencySymbol}{Number(activeSession?.cash_received_total || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Change Given')}: {currencySymbol}{Number(activeSession?.change_given_total || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Net Cash Sales')}: {currencySymbol}{Number(activeSession?.net_cash_sales || 0).toFixed(2)}
+                                    </Typography>
+                                </Stack>
+                                <Divider />
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                    {__('Expected Drawer')}: {currencySymbol}{activeSessionExpected.toFixed(2)}
+                                </Typography>
+                                <TextField
+                                    size="small"
+                                    fullWidth
+                                    type="number"
+                                    label={__('Counted Cash')}
+                                    value={closingCountedInput}
+                                    onChange={(e) => setClosingCountedInput(e.target.value)}
+                                    inputProps={{ min: 0, step: '0.01' }}
+                                    InputProps={{
+                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                    }}
+                                />
+                                <TextField
+                                    size="small"
+                                    label={__('Closing Notes (optional)')}
+                                    value={closingNotesInput}
+                                    onChange={(e) => setClosingNotesInput(e.target.value)}
+                                />
+                                {activeSessionDifference !== null && (
+                                    <Typography variant="caption" color={activeSessionDifference === 0 ? 'success.main' : (activeSessionDifference > 0 ? 'warning.main' : 'error.main')}>
+                                        {__('Difference')}: {currencySymbol}{activeSessionDifference.toFixed(2)}
+                                    </Typography>
+                                )}
+                            </>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShiftDialogOpen(false)} disabled={sessionSubmitting}>
+                        {__('Cancel')}
+                    </Button>
+                    {!hasActiveSession ? (
+                        <Button variant="contained" onClick={startCashSession} disabled={sessionSubmitting}>
+                            {__('Start Shift')}
+                        </Button>
+                    ) : (
+                        <Button variant="contained" color="warning" onClick={closeCashSession} disabled={sessionSubmitting}>
+                            {__('End Shift')}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={paymentDialogOpen} onClose={() => !processing && setPaymentDialogOpen(false)} maxWidth="sm" fullWidth>
+                <Box component="form" onSubmit={submit}>
+                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {__('Payment')}
+                        <IconButton size="small" onClick={() => setPaymentDialogOpen(false)} disabled={processing}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={1.5}>
+                            <Box sx={{ p: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                        {__('Amount to pay')}
+                                    </Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                                        {currencySymbol}{totals.grandTotal.toFixed(2)}
+                                    </Typography>
+                                </Stack>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    {__('Payment Method')}
+                                </Typography>
+                                <ToggleButtonGroup
+                                    size="small"
+                                    exclusive
+                                    fullWidth
+                                    value={data.payment_method}
+                                    onChange={(e, next) => {
+                                        if (next) setData('payment_method', next);
+                                    }}
+                                >
+                                    {(paymentMethods || []).map((method) => (
+                                        <ToggleButton key={method} value={method} sx={{ flex: 1, textTransform: 'none' }}>
+                                            {__(method)}
+                                        </ToggleButton>
+                                    ))}
+                                </ToggleButtonGroup>
+                            </Box>
+
+                            {isCashPayment && (
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                                     <TextField
-                                        select
                                         size="small"
                                         fullWidth
-                                        label={__('Payment Method')}
-                                        value={data.payment_method}
-                                        onChange={(e) => setData('payment_method', e.target.value)}
-                                        error={!!errors.payment_method}
-                                        helperText={errors.payment_method}
-                                    >
-                                        {(paymentMethods || []).map((m) => (
-                                            <MenuItem key={m} value={m}>
-                                                {m}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
+                                        type="number"
+                                        label={__('Amount Received')}
+                                        value={data.amount_received}
+                                        onChange={(e) => setData('amount_received', e.target.value)}
+                                        error={!!errors.amount_received || (isPaidCashSale && cashShortageValue > 0)}
+                                        helperText={
+                                            errors.amount_received
+                                            || (isPaidCashSale && cashShortageValue > 0 ? `${__('Need')} ${currencySymbol}${cashShortageValue.toFixed(2)} ${__('more')}` : '')
+                                        }
+                                        InputProps={{
+                                            startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                        }}
+                                        inputProps={{ min: 0, step: '0.01' }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        label={__('Change')}
+                                        value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Stack>
+                            )}
+
+                            <Box>
+                                <Button size="small" onClick={() => setPaymentOptionsExpanded((prev) => !prev)}>
+                                    {paymentOptionsExpanded ? __('Hide options') : __('More options')}
+                                </Button>
+                                {paymentOptionsExpanded && (
                                     <TextField
                                         select
                                         size="small"
@@ -1398,69 +1543,37 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                         onChange={(e) => setData('payment_status', e.target.value)}
                                         error={!!errors.payment_status}
                                         helperText={errors.payment_status}
+                                        sx={{ mt: 1 }}
                                     >
-                                        {(paymentStatuses || []).map((s) => (
-                                            <MenuItem key={s} value={s}>
-                                                {s}
+                                        {(paymentStatuses || []).map((status) => (
+                                            <MenuItem key={status} value={status}>
+                                                {__(status)}
                                             </MenuItem>
                                         ))}
                                     </TextField>
-                                </Stack>
-
-                                {isCashPayment && (
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                        <TextField
-                                            size="small"
-                                            fullWidth
-                                            type="number"
-                                            label={__('Amount Received')}
-                                            value={data.amount_received}
-                                            onChange={(e) => setData('amount_received', e.target.value)}
-                                            error={!!errors.amount_received || (isPaidCashSale && cashShortageValue > 0)}
-                                            helperText={
-                                                errors.amount_received
-                                                || (isPaidCashSale && cashShortageValue > 0 ? `${__('Need')} ${currencySymbol}${cashShortageValue.toFixed(2)} ${__('more')}` : '')
-                                            }
-                                            InputProps={{
-                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
-                                            }}
-                                            inputProps={{ min: 0, step: '0.01' }}
-                                        />
-                                        <TextField
-                                            size="small"
-                                            fullWidth
-                                            label={__('Change')}
-                                            value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
-                                            InputProps={{ readOnly: true }}
-                                        />
-                                    </Stack>
                                 )}
+                            </Box>
 
-                                {!hasActiveSession && (
-                                    <Alert severity="warning">
-                                        {__('Open cashier session before completing sale.')}
-                                    </Alert>
-                                )}
-
-                                {errors.items && (
-                                    <Alert severity="error">{errors.items}</Alert>
-                                )}
-
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    startIcon={<CheckoutIcon />}
-                                    disabled={processing || cart.length === 0 || !hasActiveSession || (isPaidCashSale && cashShortageValue > 0)}
-                                    fullWidth
-                                    sx={{ minHeight: 42, fontWeight: 800, letterSpacing: '0.02em' }}
-                                >
-                                    {__('Complete Sale')}
-                                </Button>
-                            </Stack>
-                        </Box>
-                    </Paper>
+                            {errors.items && (
+                                <Alert severity="error">{errors.items}</Alert>
+                            )}
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button type="button" onClick={() => setPaymentDialogOpen(false)} disabled={processing}>
+                            {__('Cancel')}
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            startIcon={<CheckoutIcon />}
+                            disabled={processing || cart.length === 0 || !hasActiveSession || (isPaidCashSale && cashShortageValue > 0)}
+                        >
+                            {__('Complete Sale')}
+                        </Button>
+                    </DialogActions>
                 </Box>
-            </Box>
+            </Dialog>
 
             <Dialog open={newCustomerOpen} onClose={closeNewCustomer} maxWidth="sm" fullWidth>
                 <form onSubmit={submitNewCustomer}>

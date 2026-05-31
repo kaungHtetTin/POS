@@ -304,5 +304,21 @@
     "EAN-13 (Retail)": "EAN-13 (လက်လီ)",
     "QR Code": "QR ကုဒ်",
     "Save Label Settings": "လေဘယ် ဆက်တင်များ သိမ်းမည်",
-    "Out of stock": "ကုန်လက်ကျန်မရှိ"
+    "Out of stock": "ကုန်လက်ကျန်မရှိ",
+    "Current Sale": "လက်ရှိအရောင်း",
+    "item": "ပစ္စည်း",
+    "items": "ပစ္စည်းများ",
+    "Shift Active": "အလုပ်ချိန် ဖွင့်ထားသည်",
+    "Start Shift": "အလုပ်ချိန် စတင်မည်",
+    "End Shift": "အလုပ်ချိန် ပြီးဆုံးမည်",
+    "Walk-in customer": "အထွေထွေ ဖောက်သည်",
+    "Done": "ပြီးပါပြီ",
+    "Add discount": "လျှော့စျေး ထည့်မည်",
+    "Remove": "ဖယ်ရှားမည်",
+    "Pay": "ငွေပေးချေမည်",
+    "Start your shift before completing sales.": "အရောင်းမပြီးစီးမီ အလုပ်ချိန်ကို စတင်ပါ။",
+    "Start your shift by entering the cash currently in the drawer.": "ငွေသေတ္တာအတွင်းရှိ လက်ရှိငွေပမာဏကို ထည့်သွင်းပြီး အလုပ်ချိန် စတင်ပါ။",
+    "Amount to pay": "ပေးချေရမည့် ငွေပမာဏ",
+    "Hide options": "ရွေးချယ်စရာများ ဖျောက်မည်",
+    "More options": "နောက်ထပ် ရွေးချယ်စရာများ"
 }
