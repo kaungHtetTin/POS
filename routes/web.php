@@ -47,11 +47,24 @@ Route::get('/', function () {
 
 Route::get('/language/{lang}', [LanguageController::class, 'switch'])->name('language.switch');
 
+// Login / Logout routes WITHOUT locale prefix (auth pages don't need locale)
+Route::middleware('guest')->group(function () {
+    Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
+    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+});
+
 Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], function () {
     
     Route::get('/', [DashboardController::class, 'index'])
         ->middleware(['auth', 'verified'])
         ->name('dashboard');
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware(['auth', 'verified']);
 
     Route::middleware('auth')->group(function () {
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -162,15 +175,5 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index')->middleware('permission:manage_users');
 
         Route::get('/products/labels/print', [ProductController::class, 'printLabels'])->name('products.labels.print')->middleware('permission:manage_inventory');
-
-        // Locale-aware authentication routes (login/logout with /en or /my prefix)
-        Route::middleware('guest')->group(function () {
-            Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-            Route::post('/login', [AuthenticatedSessionController::class, 'store']);
-        });
-
-        Route::middleware('auth')->group(function () {
-            Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-        });
     });
 });
