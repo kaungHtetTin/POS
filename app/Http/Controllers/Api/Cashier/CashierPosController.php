@@ -18,6 +18,13 @@ class CashierPosController extends Controller
      * Search products for POS (barcode, name, generic name).
      * Requires: process_sale permission
      */
+    /**
+     * Search or list products for POS.
+     * - If "query" parameter is provided → search by name/barcode/generic
+     * - If "query" is empty → return all active products (useful for initial load on handheld POS)
+     *
+     * Requires: process_sale permission
+     */
     public function searchProducts(Request $request)
     {
         if (!$request->user()->hasPermission('process_sale')) {
@@ -30,17 +37,18 @@ class CashierPosController extends Controller
         }
 
         $query = trim((string) $request->query('query', ''));
-        if ($query === '') {
-            return response()->json([]);
-        }
 
-        $products = Product::query()
-            ->where('status', 'Active')
-            ->where(function ($q) use ($query) {
+        $productsQuery = Product::query()->where('status', 'Active');
+
+        if ($query !== '') {
+            $productsQuery->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
                     ->orWhere('barcode', 'like', "%{$query}%")
                     ->orWhere('generic_name', 'like', "%{$query}%");
-            })
+            });
+        }
+
+        $products = $productsQuery
             ->leftJoin('inventories', function ($join) use ($branchId) {
                 $join->on('inventories.product_id', '=', 'products.id')
                     ->where('inventories.branch_id', '=', $branchId);
@@ -62,7 +70,7 @@ class CashierPosController extends Controller
                 },
             ])
             ->orderBy('products.name')
-            ->limit(25)
+            ->limit($query === '' ? 200 : 50) // Return more when loading all products
             ->get()
             ->map(function ($product) {
                 $taxRate = $product->taxes->sum('rate');
