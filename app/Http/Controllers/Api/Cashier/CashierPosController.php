@@ -280,7 +280,7 @@ class CashierPosController extends Controller
             'branch_id' => $branchId,
             'user_id' => $request->user()->id,
             'opened_at' => now(),
-            'opening_balance' => $validated['opening_balance'],
+            'opening_amount' => $validated['opening_balance'], // map API field to DB column
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -330,10 +330,10 @@ class CashierPosController extends Controller
         return [
             'id' => $session->id,
             'opened_at' => $session->opened_at,
-            'opening_balance' => $session->opening_balance,
+            'opening_balance' => $session->opening_amount, // map DB column back to API field
             'total_sales' => $totalSales,
             'total_cash' => $totalCash,
-            'expected_closing' => $session->opening_balance + $totalCash,
+            'expected_closing' => $session->opening_amount + $totalCash,
         ];
     }
 

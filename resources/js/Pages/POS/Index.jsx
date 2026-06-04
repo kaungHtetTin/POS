@@ -54,6 +54,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     const currencySymbol = settings.app?.currency_symbol || '$';
     const appBase = ziggy?.base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
     const behavior = {
         default_view: posDefaults?.default_view || 'table',
         default_payment_method: posDefaults?.default_payment_method || paymentMethods?.[0] || 'Cash',
@@ -993,7 +994,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     const preferred = units.find((u) => u.is_base_unit) || units[0];
                                     const price = Number(preferred?.selling_price || 0);
                                     const unitLabel = preferred?.short_name || preferred?.name || '';
-                                    const imageUrl = p.image_path ? `/storage/${p.image_path}` : null;
+                                    const imageUrl = p.image_path ? storageUrl(p.image_path) : null;
 
                                     return (
                                         <Card
