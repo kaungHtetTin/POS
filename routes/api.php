@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Cashier\CashierPosController;
 use App\Http\Controllers\Api\Staff\StaffPurchaseController;
 
@@ -14,63 +15,68 @@ use App\Http\Controllers\Api\Staff\StaffPurchaseController;
 | routes are loaded by the RouteServiceProvider within a group which
 | is assigned the "api" middleware group. Enjoy building your API!
 |
-| All API routes require Sanctum token authentication via the
-| "Authorization: Bearer <token>" header.
+| Authentication:
+| - Login: POST /api/login (public)
+| - All other routes require Sanctum token: Authorization: Bearer <token>
 |
 */
 
-// Public route (for token verification)
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user()->only('id', 'name', 'email', 'branch_id', 'active_branch_id');
-});
+/*
+|--------------------------------------------------------------------------
+| PUBLIC ROUTES (No authentication required)
+|--------------------------------------------------------------------------
+*/
+Route::post('/login', [AuthController::class, 'login']);
 
 /*
 |--------------------------------------------------------------------------
-| CASHIER API (POS Module)
-| Permission required: process_sale
+| PROTECTED ROUTES (Require Sanctum token)
 |--------------------------------------------------------------------------
-| Base URL: /api/cashier
-| Auth: Bearer Token (Sanctum)
 */
-Route::middleware('auth:sanctum')->prefix('cashier')->group(function () {
-    // Products
-    Route::get('/products', [CashierPosController::class, 'searchProducts']);
+Route::middleware('auth:sanctum')->group(function () {
 
-    // Customers
-    Route::get('/customers', [CashierPosController::class, 'customers']);
+    // Get current user
+    Route::get('/user', function (Request $request) {
+        return $request->user()->only('id', 'name', 'email', 'branch_id', 'active_branch_id');
+    });
 
-    // Sales
-    Route::post('/sales', [CashierPosController::class, 'checkout']);
+    // Logout (revoke current token)
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Cash Sessions
-    Route::get('/sessions/active', [CashierPosController::class, 'activeSession']);
-    Route::post('/sessions/open', [CashierPosController::class, 'openSession']);
-    Route::post('/sessions/{session}/close', [CashierPosController::class, 'closeSession']);
+    /*
+    |--------------------------------------------------------------------------
+    | CASHIER API (POS Module)
+    | Permission required: process_sale
+    |--------------------------------------------------------------------------
+    | Base URL: /api/cashier
+    */
+    Route::prefix('cashier')->group(function () {
+        Route::get('/products', [CashierPosController::class, 'searchProducts']);
+        Route::get('/customers', [CashierPosController::class, 'customers']);
+        Route::post('/sales', [CashierPosController::class, 'checkout']);
 
-    // Receipt Settings (for handheld POS printing)
-    Route::get('/receipt-settings', [CashierPosController::class, 'getReceiptSettings']);
-});
+        Route::get('/sessions/active', [CashierPosController::class, 'activeSession']);
+        Route::post('/sessions/open', [CashierPosController::class, 'openSession']);
+        Route::post('/sessions/{session}/close', [CashierPosController::class, 'closeSession']);
 
-/*
-|--------------------------------------------------------------------------
-| STAFF API (Purchase Module)
-| Permission required: manage_inventory
-|--------------------------------------------------------------------------
-| Base URL: /api/staff
-| Auth: Bearer Token (Sanctum)
-*/
-Route::middleware('auth:sanctum')->prefix('staff')->group(function () {
-    // Suppliers
-    Route::get('/suppliers', [StaffPurchaseController::class, 'suppliers']);
+        Route::get('/receipt-settings', [CashierPosController::class, 'getReceiptSettings']);
+    });
 
-    // Products (with units)
-    Route::get('/products', [StaffPurchaseController::class, 'products']);
+    /*
+    |--------------------------------------------------------------------------
+    | STAFF API (Purchase Module)
+    | Permission required: manage_inventory
+    |--------------------------------------------------------------------------
+    | Base URL: /api/staff
+    */
+    Route::prefix('staff')->group(function () {
+        Route::get('/suppliers', [StaffPurchaseController::class, 'suppliers']);
+        Route::get('/products', [StaffPurchaseController::class, 'products']);
+        Route::get('/branches', [StaffPurchaseController::class, 'branches']);
 
-    // Branches
-    Route::get('/branches', [StaffPurchaseController::class, 'branches']);
+        Route::get('/purchases', [StaffPurchaseController::class, 'index']);
+        Route::post('/purchases', [StaffPurchaseController::class, 'store']);
+        Route::get('/purchases/{purchase}', [StaffPurchaseController::class, 'show']);
+    });
 
-    // Purchases
-    Route::get('/purchases', [StaffPurchaseController::class, 'index']);
-    Route::post('/purchases', [StaffPurchaseController::class, 'store']);
-    Route::get('/purchases/{purchase}', [StaffPurchaseController::class, 'show']);
 });
