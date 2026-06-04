@@ -104,6 +104,10 @@ class CashierPosController extends Controller
      * List or search customers.
      * Requires: process_sale permission
      */
+    /**
+     * List / Search customers.
+     * Requires: process_sale permission
+     */
     public function customers(Request $request)
     {
         if (!$request->user()->hasPermission('process_sale')) {
@@ -111,6 +115,7 @@ class CashierPosController extends Controller
         }
 
         $query = Customer::query();
+
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -120,10 +125,108 @@ class CashierPosController extends Controller
 
         $customers = $query->select('id', 'name', 'phone', 'address', 'credit_limit', 'balance')
             ->orderBy('name')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         return response()->json($customers);
+    }
+
+    /**
+     * Get a single customer by ID.
+     * Requires: process_sale permission
+     */
+    public function showCustomer(Request $request, Customer $customer)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json($customer);
+    }
+
+    /**
+     * Create a new customer.
+     * Requires: process_sale permission
+     */
+    public function storeCustomer(Request $request)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'credit_limit' => 'nullable|numeric|min:0',
+        ]);
+
+        $customer = Customer::create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'address' => $validated['address'] ?? null,
+            'credit_limit' => $validated['credit_limit'] ?? 0,
+            'balance' => 0,
+        ]);
+
+        return response()->json([
+            'message' => 'Customer created successfully.',
+            'customer' => $customer,
+        ], 201);
+    }
+
+    /**
+     * Update an existing customer.
+     * Requires: process_sale permission
+     */
+    public function updateCustomer(Request $request, Customer $customer)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'credit_limit' => 'nullable|numeric|min:0',
+        ]);
+
+        $customer->update([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'address' => $validated['address'] ?? null,
+            'credit_limit' => $validated['credit_limit'] ?? $customer->credit_limit,
+        ]);
+
+        return response()->json([
+            'message' => 'Customer updated successfully.',
+            'customer' => $customer,
+        ]);
+    }
+
+    /**
+     * Delete a customer.
+     * Requires: process_sale permission
+     */
+    public function destroyCustomer(Request $request, Customer $customer)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Optional: Prevent deletion if customer has sales
+        if ($customer->sales()->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete customer because they have existing sales.',
+            ], 422);
+        }
+
+        $customer->delete();
+
+        return response()->json([
+            'message' => 'Customer deleted successfully.',
+        ]);
     }
 
     /**
