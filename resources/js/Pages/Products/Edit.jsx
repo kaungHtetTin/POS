@@ -1,6 +1,6 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -28,6 +28,11 @@ import {
 } from '@mui/icons-material';
 
 export default function ProductEdit({ auth, product, categories, taxes, units }) {
+    const { ziggy = {} } = usePage().props;
+    const appBase = ziggy?.base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
+
     const { data, setData, post, errors, processing } = useForm({
         category_id: product.category_id,
         tax_id: (product.taxes?.[0]?.id) || product.tax_id || '',
@@ -108,7 +113,7 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
                             <Grid item xs={12} sm={3}>
                                 <Stack alignItems="center" spacing={1.5}>
                                     <Avatar
-                                        src={data.image ? URL.createObjectURL(data.image) : (product.image_path ? `/storage/${product.image_path}` : null)}
+                                        src={data.image ? URL.createObjectURL(data.image) : (product.image_path ? storageUrl(product.image_path) : null)}
                                         variant="rounded"
                                         sx={{ width: 120, height: 120, border: '1px solid', borderColor: 'divider' }}
                                     />

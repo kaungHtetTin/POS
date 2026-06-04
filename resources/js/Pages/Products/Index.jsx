@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -50,6 +50,11 @@ import {
 } from '@mui/icons-material';
 
 export default function ProductIndex({ auth, products, categories, taxes, units, filters, default_tax_id: defaultTaxId }) {
+    const { ziggy = {} } = usePage().props;
+    const appBase = ziggy?.base || '';
+    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
+    const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
+
     const [open, setOpen] = useState(false);
 
     // Printing State
@@ -248,6 +253,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     const submit = (e) => {
         e.preventDefault();
         post(route('products.store'), {
+            forceFormData: true,
             onSuccess: () => handleClose(),
         });
     };
@@ -404,7 +410,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         <TableCell>
                                             <Stack direction="row" spacing={1.5} alignItems="center">
                                                 <Avatar 
-                                                    src={product.image_path ? `/storage/${product.image_path}` : null}
+                                                    src={product.image_path ? storageUrl(product.image_path) : null}
                                                     variant="rounded"
                                                     sx={{ width: 40, height: 40, bgcolor: 'primary.light' }}
                                                 >

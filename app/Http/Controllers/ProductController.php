@@ -121,8 +121,10 @@ class ProductController extends Controller
         ]);
     }
 
-    public function update(Request $request, Product $product)
+    public function update(Request $request, $locale, $product)
     {
+        $product = Product::findOrFail($product);
+
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'tax_id' => 'nullable|exists:taxes,id',
@@ -186,8 +188,10 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Medicine updated successfully.');
     }
 
-    public function destroy(Product $product)
+    public function destroy($locale, $product)
     {
+        $product = Product::findOrFail($product);
+
         // Check if product has batches or sales before deleting (soft delete is used)
         if ($product->batches()->exists()) {
             return redirect()->back()->with('error', 'Product cannot be deleted because it has inventory batches.');

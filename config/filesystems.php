@@ -35,9 +35,17 @@ return [
             'root' => storage_path('app'),
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Public Disk (Shared Hosting Compatible)
+        |--------------------------------------------------------------------------
+        | On shared hosting (like Hostinger), symbolic links are often disabled.
+        | We configure the "public" disk to write directly inside the public folder.
+        | This removes the need for `php artisan storage:link`.
+        */
         'public' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
+            'root' => public_path('storage'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
         ],
@@ -66,8 +74,16 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Symbolic Links (Disabled for Shared Hosting)
+    |--------------------------------------------------------------------------
+    | We do not rely on symbolic links because many shared hosts (Hostinger, etc.)
+    | disable the `symlink()` function. The public disk now writes directly
+    | into the public folder.
+    */
     'links' => [
-        public_path('storage') => storage_path('app/public'),
+        // public_path('storage') => storage_path('app/public'),
     ],
 
 ];
