@@ -114,6 +114,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy')->middleware('permission:manage_inventory');
 
         Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index')->middleware('permission:manage_inventory');
+        Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show')->middleware('permission:manage_inventory');
         Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store')->middleware('permission:manage_inventory');
         Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update')->middleware('permission:manage_inventory');
         Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy')->middleware('permission:manage_inventory');

@@ -44,7 +44,7 @@ class StaffPurchaseController extends Controller
         $products = Product::select('id', 'name', 'generic_name', 'barcode')
             ->with([
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -65,6 +65,7 @@ class StaffPurchaseController extends Controller
                             'unit_short_name' => $pu->unit->short_name ?? '',
                             'conversion_factor' => $pu->conversion_factor,
                             'selling_price' => $pu->selling_price,
+                            'wholesale_price' => $pu->wholesale_price ?? $pu->selling_price,
                             'is_base_unit' => $pu->is_base_unit,
                         ];
                     }),
@@ -112,17 +113,62 @@ class StaffPurchaseController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'required|date|after:today',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01',
             'items.*.selling_price' => 'required|numeric|min:0.01',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0.01',
         ]);
 
         $userId = $request->user()->id;
 
         $purchase = DB::transaction(function () use ($validated, $userId) {
             $items = collect($validated['items']);
-            $totalAmount = $items->sum(function ($item) {
-                return $item['quantity'] * $item['unit_price'];
+            $productUnitRows = DB::table('product_units')
+                ->select('product_id', 'unit_id', 'conversion_factor')
+                ->whereIn('product_id', $items->pluck('product_id')->unique()->values())
+                ->whereIn('unit_id', $items->pluck('unit_id')->unique()->values())
+                ->get();
+
+            $preparedItems = $items->map(function ($item) use ($productUnitRows) {
+                $productUnit = $productUnitRows->first(function ($row) use ($item) {
+                    return $row->product_id === $item['product_id'] && $row->unit_id === $item['unit_id'];
+                });
+
+                if (!$productUnit || (int) $productUnit->conversion_factor < 1) {
+                    abort(422, 'Selected unit does not belong to the selected product.');
+                }
+
+                $conversionFactor = (int) $productUnit->conversion_factor;
+                $paidQuantity = (int) $item['quantity'];
+                $focQuantity = (int) ($item['foc_quantity'] ?? 0);
+                $receivedQuantity = $paidQuantity + $focQuantity;
+                $baseQuantity = $receivedQuantity * $conversionFactor;
+                $lineTotal = $paidQuantity * (float) $item['unit_price'];
+
+                return array_merge($item, [
+                    'batch_number' => trim((string) ($item['batch_number'] ?? '')) ?: 'BATCH-' . now()->format('YmdHis'),
+                    'foc_quantity' => $focQuantity,
+                    'base_quantity' => $baseQuantity,
+                    'foc_base_quantity' => $focQuantity * $conversionFactor,
+                    'base_unit_price' => $baseQuantity > 0 ? $lineTotal / $baseQuantity : 0,
+                    'base_selling_price' => (float) $item['selling_price'] / $conversionFactor,
+                    'wholesale_price' => (float) ($item['wholesale_price'] ?? $item['selling_price']),
+                    'line_total' => $lineTotal,
+                ]);
             });
+
+            $totalAmount = (float) $preparedItems->sum('line_total');
+            $paidAmount = (float) ($validated['paid_amount'] ?? 0);
+
+            if ($validated['payment_status'] === 'Paid') {
+                $paidAmount = $totalAmount;
+            }
+
+            if ($validated['payment_status'] === 'Due') {
+                $paidAmount = 0;
+            }
+
+            $dueAmount = max($totalAmount - $paidAmount, 0);
 
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
@@ -131,34 +177,37 @@ class StaffPurchaseController extends Controller
                 'invoice_number' => $validated['invoice_number'],
                 'purchase_date' => $validated['purchase_date'],
                 'total_amount' => $totalAmount,
-                'paid_amount' => $validated['paid_amount'] ?? 0,
+                'paid_amount' => $paidAmount,
+                'due_amount' => $dueAmount,
                 'payment_status' => $validated['payment_status'],
                 'notes' => $validated['notes'] ?? null,
             ]);
 
-            foreach ($items as $item) {
+            foreach ($preparedItems as $item) {
                 PurchaseItem::create([
                     'purchase_id' => $purchase->id,
                     'product_id' => $item['product_id'],
                     'unit_id' => $item['unit_id'],
-                    'batch_number' => $item['batch_number'] ?? null,
+                    'batch_number' => $item['batch_number'],
                     'expiry_date' => $item['expiry_date'],
                     'quantity' => $item['quantity'],
+                    'foc_quantity' => $item['foc_quantity'],
+                    'base_quantity' => $item['base_quantity'],
+                    'foc_base_quantity' => $item['foc_base_quantity'],
                     'unit_price' => $item['unit_price'],
-                    'selling_price' => $item['selling_price'],
-                    'total' => $item['quantity'] * $item['unit_price'],
+                    'total_price' => $item['line_total'],
+                    'created_at' => now(),
                 ]);
 
                 // Create inventory batch
                 \App\Models\InventoryBatch::create([
                     'branch_id' => $validated['branch_id'],
                     'product_id' => $item['product_id'],
-                    'unit_id' => $item['unit_id'],
-                    'batch_number' => $item['batch_number'] ?? 'BATCH-' . now()->format('YmdHis'),
+                    'batch_number' => $item['batch_number'],
                     'expiry_date' => $item['expiry_date'],
-                    'quantity' => $item['quantity'],
-                    'purchase_price' => $item['unit_price'],
-                    'selling_price' => $item['selling_price'],
+                    'quantity' => $item['base_quantity'],
+                    'purchase_price' => $item['base_unit_price'],
+                    'selling_price' => $item['base_selling_price'],
                 ]);
 
                 // Update or create inventory aggregate
@@ -166,9 +215,19 @@ class StaffPurchaseController extends Controller
                     'branch_id' => $validated['branch_id'],
                     'product_id' => $item['product_id'],
                 ]);
-                $inventory->quantity = ($inventory->quantity ?? 0) + $item['quantity'];
+                $inventory->quantity = ($inventory->quantity ?? 0) + $item['base_quantity'];
                 $inventory->save();
+
+                DB::table('product_units')
+                    ->where('product_id', $item['product_id'])
+                    ->where('unit_id', $item['unit_id'])
+                    ->update([
+                        'selling_price' => $item['selling_price'],
+                        'wholesale_price' => $item['wholesale_price'],
+                    ]);
             }
+
+            Supplier::whereKey($validated['supplier_id'])->increment('balance', $dueAmount);
 
             return $purchase;
         });

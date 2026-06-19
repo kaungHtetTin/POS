@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\CashSession;
 use App\Models\Customer;
 use App\Models\Inventory;
+use App\Models\InventoryBatch;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CashierPosController extends Controller
 {
@@ -61,12 +63,13 @@ class CashierPosController extends Controller
                 'products.barcode',
                 'products.image_path',
                 'products.tax_method',
+                'products.discount_percentage',
                 'inventories.quantity as stock_quantity',
             ])
             ->with([
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -83,6 +86,7 @@ class CashierPosController extends Controller
                     'image_url' => $product->image_path ? url('storage/' . $product->image_path) : null,
                     'stock_quantity' => $product->stock_quantity ?? 0,
                     'tax_method' => $product->tax_method,
+                    'discount_percentage' => (float) ($product->discount_percentage ?? 0),
                     'tax_rate' => $taxRate,
                     'units' => $product->product_units->map(function ($pu) {
                         return [
@@ -92,6 +96,7 @@ class CashierPosController extends Controller
                             'unit_short_name' => $pu->unit->short_name ?? '',
                             'conversion_factor' => $pu->conversion_factor,
                             'selling_price' => $pu->selling_price,
+                            'wholesale_price' => $pu->wholesale_price ?? $pu->selling_price,
                             'is_base_unit' => $pu->is_base_unit,
                         ];
                     }),
@@ -245,12 +250,14 @@ class CashierPosController extends Controller
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
             'payment_status' => 'required|in:Paid,Partial,Due',
             'amount_received' => 'required|numeric|min:0',
-            'discount' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.product_unit_id' => 'required|exists:product_units,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.foc_quantity' => 'nullable|numeric|min:0',
+            'items.*.foc_product_unit_id' => 'nullable|exists:product_units,id',
             'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.price_type' => 'nullable|in:retail,wholesale',
             'items.*.tax_rate' => 'nullable|numeric|min:0',
         ]);
 
@@ -270,21 +277,96 @@ class CashierPosController extends Controller
         }
 
         $result = DB::transaction(function () use ($validated, $branchId, $userId, $activeSession) {
-            $items = collect($validated['items']);
-            $subTotal = 0;
-            $totalTax = 0;
+            $items = collect($validated['items'])->map(function ($item) {
+                $item['quantity'] = (float) $item['quantity'];
+                $item['foc_quantity'] = (float) ($item['foc_quantity'] ?? 0);
+                $item['foc_product_unit_id'] = $item['foc_product_unit_id'] ?? $item['product_unit_id'];
+                $item['price_type'] = $item['price_type'] ?? 'retail';
+                return $item;
+            });
+            $productUnitIds = $items
+                ->pluck('product_unit_id')
+                ->merge($items->pluck('foc_product_unit_id'))
+                ->filter()
+                ->unique()
+                ->values();
+            $productIds = $items->pluck('product_id')->unique()->values();
+            $products = Product::whereIn('id', $productIds)
+                ->with(['taxes:id,rate', 'product_units' => function ($q) use ($productUnitIds) {
+                    $q->whereIn('id', $productUnitIds)
+                        ->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit');
+                }])
+                ->get()
+                ->keyBy('id');
 
-            foreach ($items as $item) {
-                $lineTotal = $item['quantity'] * $item['unit_price'];
-                $taxRate = $item['tax_rate'] ?? 0;
-                $taxAmount = $lineTotal * ($taxRate / 100);
-                $subTotal += $lineTotal;
+            $lineComputations = [];
+            $subTotal = 0.0;
+            $totalTax = 0.0;
+            $productDiscountTotal = 0.0;
+
+            foreach ($items as $index => $item) {
+                $product = $products->get($item['product_id']);
+                $productUnit = $product?->product_units->firstWhere('id', $item['product_unit_id']);
+                $focProductUnit = $product?->product_units->firstWhere('id', $item['foc_product_unit_id']);
+
+                if (!$product || !$productUnit) {
+                    throw ValidationException::withMessages([
+                        "items.$index.product_unit_id" => 'Invalid product unit.',
+                    ]);
+                }
+
+                if (!$focProductUnit) {
+                    throw ValidationException::withMessages([
+                        "items.$index.foc_product_unit_id" => 'Invalid FOC product unit.',
+                    ]);
+                }
+
+                $conversionFactor = max((int) $productUnit->conversion_factor, 1);
+                $focConversionFactor = max((int) $focProductUnit->conversion_factor, 1);
+                $baseQuantity = (int) round($item['quantity'] * $conversionFactor);
+                $focBaseQuantity = (int) round($item['foc_quantity'] * $focConversionFactor);
+                $originalUnitPrice = $item['price_type'] === 'wholesale'
+                    ? (float) ($productUnit->wholesale_price ?? $productUnit->selling_price)
+                    : (float) $productUnit->selling_price;
+                $discountPercentage = min(max((float) ($product->discount_percentage ?? 0), 0), 100);
+                $lineGross = $item['quantity'] * $originalUnitPrice;
+                $lineDiscount = $lineGross * ($discountPercentage / 100);
+                $unitPrice = $item['quantity'] > 0 ? max(($lineGross - $lineDiscount) / $item['quantity'], 0) : 0;
+                $lineNet = $item['quantity'] * $unitPrice;
+                $taxRate = (float) $product->taxes->sum('rate');
+                $taxAmount = $product->tax_method === 'Inclusive' && $taxRate > 0
+                    ? $lineNet - ($lineNet / (1 + ($taxRate / 100)))
+                    : $lineNet * ($taxRate / 100);
+
+                $subTotal += $product->tax_method === 'Inclusive' && $taxRate > 0
+                    ? $lineNet - $taxAmount
+                    : $lineNet;
                 $totalTax += $taxAmount;
+                $productDiscountTotal += $lineDiscount;
+
+                $lineComputations[] = [
+                    'product_id' => $product->id,
+                    'unit_id' => $productUnit->unit_id,
+                    'foc_unit_id' => $focProductUnit->unit_id,
+                    'base_quantity' => $baseQuantity,
+                    'foc_base_quantity' => $focBaseQuantity,
+                    'total_base_quantity' => $baseQuantity + $focBaseQuantity,
+                    'quantity' => $item['quantity'],
+                    'foc_quantity' => $item['foc_quantity'],
+                    'conversion_factor' => $conversionFactor,
+                    'foc_conversion_factor' => $focConversionFactor,
+                    'unit_price' => $unitPrice,
+                    'original_unit_price' => $originalUnitPrice,
+                    'price_type' => $item['price_type'],
+                    'discount_percentage' => $discountPercentage,
+                    'discount_amount' => $lineDiscount,
+                ];
             }
 
-            $discount = $validated['discount'] ?? 0;
-            $grandTotal = max($subTotal + $totalTax - $discount, 0);
-            $amountReceived = $validated['amount_received'];
+            $manualDiscount = 0.0;
+            $saleDiscount = $productDiscountTotal;
+            $grandTotal = max($subTotal + $totalTax, 0);
+            $amountReceived = (float) $validated['amount_received'];
             $changeDue = max($amountReceived - $grandTotal, 0);
 
             $sale = Sale::create([
@@ -294,7 +376,7 @@ class CashierPosController extends Controller
                 'cash_session_id' => $activeSession->id,
                 'invoice_number' => 'S' . date('YmdHis') . rand(10, 99),
                 'total_amount' => $subTotal,
-                'discount' => $discount,
+                'discount' => $saleDiscount,
                 'tax' => $totalTax,
                 'grand_total' => $grandTotal,
                 'amount_received' => $amountReceived,
@@ -304,30 +386,76 @@ class CashierPosController extends Controller
                 'sale_date' => now(),
             ]);
 
-            foreach ($items as $item) {
-                SaleItem::create([
-                    'sale_id' => $sale->id,
-                    'branch_id' => $branchId,
-                    'product_id' => $item['product_id'],
-                    'product_unit_id' => $item['product_unit_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'tax_rate' => $item['tax_rate'] ?? 0,
-                    'tax_amount' => ($item['quantity'] * $item['unit_price']) * (($item['tax_rate'] ?? 0) / 100),
-                    'total' => $item['quantity'] * $item['unit_price'],
-                ]);
+            foreach ($lineComputations as $line) {
+                $paidBaseRemaining = (int) $line['base_quantity'];
+                $focBaseRemaining = (int) $line['foc_base_quantity'];
+                $remaining = (int) $line['total_base_quantity'];
+                $batches = InventoryBatch::where('branch_id', $branchId)
+                    ->where('product_id', $line['product_id'])
+                    ->where('quantity', '>', 0)
+                    ->whereDate('expiry_date', '>=', now()->toDateString())
+                    ->orderBy('expiry_date')
+                    ->lockForUpdate()
+                    ->get();
 
-                // Reduce inventory for this branch + product
+                if ((int) $batches->sum('quantity') < $remaining) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Insufficient stock for one or more items.',
+                    ]);
+                }
+
+                foreach ($batches as $batch) {
+                    if ($remaining <= 0) {
+                        break;
+                    }
+
+                    $deduct = min($remaining, (int) $batch->quantity);
+                    $batch->update(['quantity' => (int) $batch->quantity - $deduct]);
+
+                    $paidBaseDeduct = min($deduct, $paidBaseRemaining);
+                    $paidBaseRemaining -= $paidBaseDeduct;
+
+                    $focBaseDeduct = $deduct - $paidBaseDeduct;
+                    if ($focBaseDeduct > $focBaseRemaining) {
+                        $focBaseDeduct = $focBaseRemaining;
+                    }
+                    $focBaseRemaining -= $focBaseDeduct;
+
+                    $quantityInUnit = $paidBaseDeduct / (int) $line['conversion_factor'];
+                    $focQuantityInUnit = $focBaseDeduct / (int) $line['foc_conversion_factor'];
+
+                    SaleItem::create([
+                        'sale_id' => $sale->id,
+                        'product_id' => $line['product_id'],
+                        'batch_id' => $batch->id,
+                        'unit_id' => $line['unit_id'],
+                        'quantity' => $quantityInUnit,
+                        'foc_quantity' => $focQuantityInUnit,
+                        'foc_unit_id' => $line['foc_unit_id'],
+                        'base_quantity' => $paidBaseDeduct,
+                        'foc_base_quantity' => $focBaseDeduct,
+                        'unit_price' => $line['unit_price'],
+                        'price_type' => $line['price_type'],
+                        'original_unit_price' => $line['original_unit_price'],
+                        'discount_percentage' => $line['discount_percentage'],
+                        'discount_amount' => $line['discount_amount'] * ($quantityInUnit / (float) $line['quantity']),
+                        'total_price' => $quantityInUnit * (float) $line['unit_price'],
+                        'created_at' => now(),
+                    ]);
+
+                    $remaining -= $deduct;
+                }
+
                 $inventory = Inventory::firstOrNew([
                     'branch_id' => $branchId,
-                    'product_id' => $item['product_id'],
+                    'product_id' => $line['product_id'],
                 ]);
 
-                $inventory->quantity = max(($inventory->quantity ?? 0) - $item['quantity'], 0);
+                $inventory->quantity = max(($inventory->quantity ?? 0) - (int) $line['total_base_quantity'], 0);
                 $inventory->save();
             }
 
-            return $sale->load(['items.product:id,name', 'items.productUnit.unit:id,name,short_name', 'customer:id,name,phone']);
+            return $sale->load(['items.product:id,name', 'items.unit:id,name,short_name', 'items.focUnit:id,name,short_name', 'customer:id,name,phone']);
         });
 
         return response()->json([

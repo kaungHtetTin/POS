@@ -21,7 +21,9 @@ class PurchaseItem extends Model
         'batch_number',
         'expiry_date',
         'quantity',
+        'foc_quantity',
         'base_quantity',
+        'foc_base_quantity',
         'unit_price',
         'total_price',
         'created_at',
@@ -30,7 +32,9 @@ class PurchaseItem extends Model
     protected $casts = [
         'expiry_date' => 'date',
         'quantity' => 'integer',
+        'foc_quantity' => 'integer',
         'base_quantity' => 'integer',
+        'foc_base_quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
     ];

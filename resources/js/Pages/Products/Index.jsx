@@ -192,11 +192,12 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         barcode: '',
         description: '',
         min_stock_level: 10,
+        discount_percentage: 0,
         tax_method: 'Exclusive',
         status: 'Active',
         image: null,
         product_units: [
-            { unit_id: '', conversion_factor: 1, selling_price: 0, is_base_unit: true }
+            { unit_id: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: true }
         ],
     });
 
@@ -213,7 +214,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     };
 
     const handleAddUnit = () => {
-        const newUnits = [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, is_base_unit: false }];
+        const newUnits = [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: false }];
         setData('product_units', newUnits);
     };
 
@@ -392,6 +393,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                     <TableCell sx={{ fontWeight: 'bold' }}>Generic/Brand</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Manufacturer</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Tax</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Discount</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
                                 </TableRow>
@@ -456,6 +458,15 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             )}
                                         </TableCell>
                                         <TableCell align="center">
+                                            <Chip
+                                                label={`${Number(product.discount_percentage || 0).toFixed(2)}%`}
+                                                size="small"
+                                                color={Number(product.discount_percentage || 0) > 0 ? 'success' : 'default'}
+                                                variant="outlined"
+                                                sx={{ fontSize: '10px', height: '20px' }}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
                                             <Chip 
                                                 label={product.status} 
                                                 size="small" 
@@ -476,7 +487,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                 ))}
                                 {products.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No medicines found. Click "Add New Medicine" to get started.
                                             </Typography>
@@ -666,6 +677,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             xs: '1fr',
                                             sm: 'repeat(2, minmax(0, 1fr))',
                                             md: 'repeat(4, minmax(0, 1fr))',
+                                            lg: 'repeat(5, minmax(0, 1fr))',
                                         },
                                         gap: 2,
                                     }}
@@ -726,6 +738,17 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         error={!!errors.min_stock_level}
                                         helperText={errors.min_stock_level}
                                     />
+                                    <TextField
+                                        label="Product Discount %"
+                                        fullWidth
+                                        size="small"
+                                        type="number"
+                                        value={data.discount_percentage}
+                                        onChange={e => setData('discount_percentage', e.target.value)}
+                                        error={!!errors.discount_percentage}
+                                        helperText={errors.discount_percentage}
+                                        inputProps={{ min: 0, max: 100, step: '0.01' }}
+                                    />
                                     <FormControl fullWidth size="small" required>
                                         <InputLabel>Status</InputLabel>
                                         <Select
@@ -780,13 +803,14 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         </Box>
 
                         <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
-                            <Table size="small" sx={{ minWidth: 650 }}>
+                            <Table size="small" sx={{ minWidth: 820 }}>
                                 <TableHead sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Unit Type</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Conversion Factor</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Selling Price</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '25%' }} align="right">Actions</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '22%' }}>Unit Type</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '22%' }}>Conversion Factor</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Retail Price</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Wholesale Price</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '20%' }} align="right">Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -842,6 +866,18 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                                     type="number"
                                                     value={unit.selling_price}
                                                     onChange={(e) => handleUnitChange(index, 'selling_price', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <Typography variant="caption" sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.5 }}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    type="number"
+                                                    value={unit.wholesale_price}
+                                                    onChange={(e) => handleUnitChange(index, 'wholesale_price', e.target.value)}
                                                     InputProps={{
                                                         startAdornment: <Typography variant="caption" sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                                                     }}

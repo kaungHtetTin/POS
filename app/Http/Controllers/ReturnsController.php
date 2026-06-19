@@ -185,7 +185,10 @@ class ReturnsController extends Controller
                     'batch_number' => $item->batch_number,
                     'expiry_date' => $item->expiry_date?->format('Y-m-d'),
                     'quantity' => (int) $item->quantity,
+                    'foc_quantity' => (int) ($item->foc_quantity ?? 0),
+                    'received_quantity' => (int) $item->quantity + (int) ($item->foc_quantity ?? 0),
                     'base_quantity' => (int) $item->base_quantity,
+                    'foc_base_quantity' => (int) ($item->foc_base_quantity ?? 0),
                     'unit_price' => (float) $item->unit_price,
                 ];
             })->values(),
@@ -277,14 +280,26 @@ class ReturnsController extends Controller
             ->firstOrFail();
 
         $referenceItems = PurchaseItem::where('purchase_id', $purchase->id)->get()->keyBy('id');
+        $productUnitRows = DB::table('product_units')
+            ->select('product_id', 'unit_id', 'conversion_factor')
+            ->whereIn('product_id', $referenceItems->pluck('product_id')->unique()->values())
+            ->whereIn('unit_id', $referenceItems->pluck('unit_id')->unique()->values())
+            ->get();
 
-        $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems, $purchase) {
+        $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems, $productUnitRows, $purchase) {
             $ref = $referenceItems->get($item['reference_item_id']);
             if (!$ref) {
                 abort(422);
             }
 
-            $conversionFactor = (int) round(((int) $ref->base_quantity) / ((int) $ref->quantity ?: 1));
+            $productUnit = $productUnitRows->first(function ($row) use ($ref) {
+                return $row->product_id === $ref->product_id && $row->unit_id === $ref->unit_id;
+            });
+
+            $conversionFactor = $productUnit
+                ? (int) $productUnit->conversion_factor
+                : (int) round(((int) $ref->base_quantity) / ((int) $ref->quantity ?: 1));
+
             if ($conversionFactor < 1) {
                 abort(422);
             }
@@ -406,4 +421,3 @@ class ReturnsController extends Controller
         return redirect()->back()->with('success', 'Return status updated.');
     }
 }
-

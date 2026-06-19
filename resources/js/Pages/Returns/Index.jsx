@@ -146,7 +146,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                 initial[it.id] = {
                     quantity: 0,
                     refund_price: it.unit_price ?? 0,
-                    max: it.quantity ?? 0,
+                    max: data.type === 'Supplier' ? (it.received_quantity ?? it.quantity ?? 0) : (it.quantity ?? 0),
                 };
             });
             setLineEdits(initial);
@@ -447,6 +447,11 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                                             {it.batch_number && (
                                                                 <Typography variant="caption" color="text.secondary">
                                                                     Batch: {it.batch_number} {it.expiry_date ? `| Exp: ${it.expiry_date}` : ''}
+                                                                </Typography>
+                                                            )}
+                                                            {data.type === 'Supplier' && Number(it.foc_quantity || 0) > 0 && (
+                                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                                    Paid: {it.quantity} | FOC: {it.foc_quantity}
                                                                 </Typography>
                                                             )}
                                                         </TableCell>

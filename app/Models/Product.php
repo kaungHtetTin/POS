@@ -24,6 +24,7 @@ class Product extends Model
         'image_path',
         'description',
         'min_stock_level',
+        'discount_percentage',
         'expiry_alert_days',
         'tax_method',
         'status',
@@ -32,6 +33,7 @@ class Product extends Model
     protected $casts = [
         'min_stock_level' => 'integer',
         'expiry_alert_days' => 'integer',
+        'discount_percentage' => 'decimal:2',
     ];
 
     public function category()
@@ -52,7 +54,7 @@ class Product extends Model
     public function units()
     {
         return $this->belongsToMany(Unit::class, 'product_units')
-                    ->withPivot(['id', 'conversion_factor', 'selling_price', 'is_base_unit'])
+                    ->withPivot(['id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit'])
                     ->withTimestamps();
     }
 

@@ -22,6 +22,7 @@ class PosController extends Controller
         
         if (!$branchId) {
             return Inertia::render('POS/Index', [
+                'pageTitle' => 'POS Interface',
                 'error' => 'No branch assigned. Please contact the administrator to assign you to a branch.',
                 'activeSession' => null,
             ]);
@@ -31,6 +32,7 @@ class PosController extends Controller
         $activeSession = $this->getActiveSession($branchId, $userId);
 
         return Inertia::render('POS/Index', [
+            'pageTitle' => 'POS Interface',
             'paymentMethods' => ['Cash', 'Card', 'Mobile', 'Wallet'],
             'paymentStatuses' => ['Paid', 'Partial', 'Due'],
             'posDefaults' => [
@@ -80,13 +82,14 @@ class PosController extends Controller
                 'products.image_path',
                 'products.tax_id',
                 'products.tax_method',
+                'products.discount_percentage',
                 'inventories.quantity as stock_quantity',
             ])
             ->with([
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -109,6 +112,7 @@ class PosController extends Controller
                     'barcode' => $product->barcode,
                     'image_path' => $product->image_path,
                     'tax_method' => $product->tax_method,
+                    'discount_percentage' => (float) ($product->discount_percentage ?? 0),
                     'taxes' => $taxes->map(function ($tax) {
                         return [
                             'id' => $tax->id,
@@ -126,6 +130,7 @@ class PosController extends Controller
                             'short_name' => $pu->unit?->short_name,
                             'conversion_factor' => (int) $pu->conversion_factor,
                             'selling_price' => (float) $pu->selling_price,
+                            'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                             'is_base_unit' => (bool) $pu->is_base_unit,
                         ];
                     })->values(),
@@ -168,13 +173,14 @@ class PosController extends Controller
                 'products.image_path',
                 'products.tax_id',
                 'products.tax_method',
+                'products.discount_percentage',
                 'inventories.quantity as stock_quantity',
             ])
             ->with([
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -198,6 +204,7 @@ class PosController extends Controller
                 'barcode' => $product->barcode,
                 'image_path' => $product->image_path,
                 'tax_method' => $product->tax_method,
+                'discount_percentage' => (float) ($product->discount_percentage ?? 0),
                 'taxes' => $taxes->map(function ($tax) {
                     return [
                         'id' => $tax->id,
@@ -215,6 +222,7 @@ class PosController extends Controller
                         'short_name' => $pu->unit?->short_name,
                         'conversion_factor' => (int) $pu->conversion_factor,
                         'selling_price' => (float) $pu->selling_price,
+                        'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                         'is_base_unit' => (bool) $pu->is_base_unit,
                     ];
                 })->values(),
@@ -263,13 +271,14 @@ class PosController extends Controller
                 'products.image_path',
                 'products.tax_id',
                 'products.tax_method',
+                'products.discount_percentage',
                 'inventories.quantity as stock_quantity',
             ])
             ->with([
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -294,6 +303,7 @@ class PosController extends Controller
             'barcode' => $product->barcode,
             'image_path' => $product->image_path,
             'tax_method' => $product->tax_method,
+            'discount_percentage' => (float) ($product->discount_percentage ?? 0),
             'taxes' => $taxes->map(function ($tax) {
                 return [
                     'id' => $tax->id,
@@ -311,6 +321,7 @@ class PosController extends Controller
                     'short_name' => $pu->unit?->short_name,
                     'conversion_factor' => (int) $pu->conversion_factor,
                     'selling_price' => (float) $pu->selling_price,
+                    'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                     'is_base_unit' => (bool) $pu->is_base_unit,
                 ];
             })->values(),
@@ -321,14 +332,17 @@ class PosController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
-            'discount' => 'nullable|numeric|min:0|max:999999999999.99',
             'amount_received' => 'nullable|numeric|min:0|max:999999999999.99',
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
             'payment_status' => 'required|in:Paid,Partial,Due',
+            'sale_channel' => 'nullable|in:retail,wholesale',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.unit_id' => 'required|exists:units,id',
             'items.*.quantity' => 'required|numeric|min:0.01|max:999999.99',
+            'items.*.foc_quantity' => 'nullable|numeric|min:0|max:999999.99',
+            'items.*.foc_unit_id' => 'nullable|exists:units,id',
+            'items.*.price_type' => 'nullable|in:retail,wholesale',
         ]);
 
         $branchId = $request->user()->currentBranchId();
@@ -340,7 +354,7 @@ class PosController extends Controller
         }
 
         $userId = $request->user()->id;
-        $discount = (float) ($validated['discount'] ?? 0);
+        $manualDiscount = 0.0;
         $activeSession = $this->getActiveSession($branchId, $userId);
 
         if (!$activeSession) {
@@ -349,20 +363,26 @@ class PosController extends Controller
             ]);
         }
 
-        $items = collect($validated['items'])->map(function ($item) {
+        $saleChannel = ($validated['sale_channel'] ?? 'retail') === 'wholesale' ? 'wholesale' : 'retail';
+
+        $items = collect($validated['items'])->map(function ($item) use ($saleChannel) {
             $item['quantity'] = (float) $item['quantity'];
+            $item['foc_quantity'] = (float) ($item['foc_quantity'] ?? 0);
+            $item['foc_unit_id'] = $item['foc_unit_id'] ?? $item['unit_id'];
+            $item['price_type'] = $saleChannel;
             return $item;
         });
 
         $productIds = $items->pluck('product_id')->unique()->values();
         $products = Product::whereIn('id', $productIds)
-            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,is_base_unit'])
+            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,wholesale_price,is_base_unit'])
             ->get()
             ->keyBy('id');
 
         $lineComputations = [];
         $totalAmount = 0.0;
         $taxAmount = 0.0;
+        $productDiscountTotal = 0.0;
 
         foreach ($items as $index => $item) {
             $product = $products->get($item['product_id']);
@@ -388,6 +408,22 @@ class PosController extends Controller
                 ]);
             }
 
+            $focProductUnit = $product->product_units->firstWhere('unit_id', $item['foc_unit_id']);
+
+            if (!$focProductUnit) {
+                return redirect()->back()->withErrors([
+                    "items.$index.foc_unit_id" => 'Selected FOC unit does not belong to the selected product.',
+                ]);
+            }
+
+            $focConversionFactor = (int) $focProductUnit->conversion_factor;
+
+            if ($focConversionFactor < 1) {
+                return redirect()->back()->withErrors([
+                    "items.$index.foc_unit_id" => 'Invalid conversion factor for selected FOC unit.',
+                ]);
+            }
+
             $rawBaseQuantity = $item['quantity'] * $conversionFactor;
             $baseQuantity = (int) round($rawBaseQuantity);
 
@@ -397,7 +433,24 @@ class PosController extends Controller
                 ]);
             }
 
-            $unitPrice = (float) $productUnit->selling_price;
+            $rawFocBaseQuantity = $item['foc_quantity'] * $focConversionFactor;
+            $focBaseQuantity = (int) round($rawFocBaseQuantity);
+
+            if (abs($rawFocBaseQuantity - $focBaseQuantity) > 0.0001) {
+                return redirect()->back()->withErrors([
+                    "items.$index.foc_quantity" => 'FOC quantity is not compatible with selected FOC unit conversion.',
+                ]);
+            }
+
+            $priceType = $item['price_type'] ?? 'retail';
+            $originalUnitPrice = $priceType === 'wholesale'
+                ? (float) ($productUnit->wholesale_price ?? $productUnit->selling_price)
+                : (float) $productUnit->selling_price;
+            $discountPercentage = min(max((float) ($product->discount_percentage ?? 0), 0), 100);
+            $lineGross = $item['quantity'] * $originalUnitPrice;
+            $lineDiscount = $lineGross * ($discountPercentage / 100);
+            $unitPrice = $item['quantity'] > 0 ? max(($lineGross - $lineDiscount) / $item['quantity'], 0) : 0;
+            $productDiscountTotal += $lineDiscount;
             $taxes = $product->taxes && $product->taxes->count() > 0
                 ? $product->taxes
                 : ($product->tax ? collect([$product->tax]) : collect());
@@ -425,14 +478,24 @@ class PosController extends Controller
             $lineComputations[] = [
                 'product_id' => $product->id,
                 'unit_id' => $productUnit->unit_id,
+                'foc_unit_id' => $focProductUnit->unit_id,
                 'conversion_factor' => $conversionFactor,
+                'foc_conversion_factor' => $focConversionFactor,
                 'unit_price' => $unitPrice,
+                'original_unit_price' => $originalUnitPrice,
+                'price_type' => $priceType,
+                'discount_percentage' => $discountPercentage,
+                'discount_amount' => $lineDiscount,
                 'quantity' => $item['quantity'],
+                'foc_quantity' => $item['foc_quantity'],
                 'base_quantity' => $baseQuantity,
+                'foc_base_quantity' => $focBaseQuantity,
+                'total_base_quantity' => $baseQuantity + $focBaseQuantity,
             ];
         }
 
-        $grandTotal = max(($totalAmount + $taxAmount) - $discount, 0);
+        $saleDiscount = $productDiscountTotal;
+        $grandTotal = max($totalAmount + $taxAmount, 0);
         $amountReceived = 0.0;
         $changeDue = 0.0;
         if ($validated['payment_method'] === 'Cash') {
@@ -446,7 +509,7 @@ class PosController extends Controller
         }
 
         $createdSale = null;
-        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $discount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
+        DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $saleDiscount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $userId,
@@ -454,7 +517,7 @@ class PosController extends Controller
                 'cash_session_id' => $activeSession->id,
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'total_amount' => $totalAmount,
-                'discount' => $discount,
+                'discount' => $saleDiscount,
                 'tax' => $taxAmount,
                 'grand_total' => $grandTotal,
                 'amount_received' => $amountReceived,
@@ -468,7 +531,9 @@ class PosController extends Controller
             $createdSale = $sale;
 
             foreach ($lineComputations as $line) {
-                $baseToDeduct = (int) $line['base_quantity'];
+                $paidBaseRemaining = (int) $line['base_quantity'];
+                $focBaseRemaining = (int) $line['foc_base_quantity'];
+                $baseToDeduct = (int) $line['total_base_quantity'];
 
                 $batches = InventoryBatch::where('branch_id', $branchId)
                     ->where('product_id', $line['product_id'])
@@ -481,7 +546,7 @@ class PosController extends Controller
                 $available = (int) $batches->sum('quantity');
 
                 if ($available < $baseToDeduct) {
-                    throw new \Exception("Insufficient stock for {$product->name}. Requested: {$baseToDeduct}, Available: {$available}");
+                    throw new \Exception("Insufficient stock. Requested: {$baseToDeduct}, Available: {$available}");
                 }
 
                 $remaining = $baseToDeduct;
@@ -497,7 +562,17 @@ class PosController extends Controller
                         'quantity' => (int) $batch->quantity - $deduct,
                     ]);
 
-                    $quantityInUnit = $deduct / (int) $line['conversion_factor'];
+                    $paidBaseDeduct = min($deduct, $paidBaseRemaining);
+                    $paidBaseRemaining -= $paidBaseDeduct;
+
+                    $focBaseDeduct = $deduct - $paidBaseDeduct;
+                    if ($focBaseDeduct > $focBaseRemaining) {
+                        $focBaseDeduct = $focBaseRemaining;
+                    }
+                    $focBaseRemaining -= $focBaseDeduct;
+
+                    $quantityInUnit = $paidBaseDeduct / (int) $line['conversion_factor'];
+                    $focQuantityInUnit = $focBaseDeduct / (int) $line['foc_conversion_factor'];
                     $totalPrice = $quantityInUnit * (float) $line['unit_price'];
 
                     $sale->items()->create([
@@ -505,8 +580,15 @@ class PosController extends Controller
                         'batch_id' => $batch->id,
                         'unit_id' => $line['unit_id'],
                         'quantity' => $quantityInUnit,
-                        'base_quantity' => $deduct,
+                        'foc_quantity' => $focQuantityInUnit,
+                        'foc_unit_id' => $line['foc_unit_id'],
+                        'base_quantity' => $paidBaseDeduct,
+                        'foc_base_quantity' => $focBaseDeduct,
                         'unit_price' => $line['unit_price'],
+                        'price_type' => $line['price_type'],
+                        'original_unit_price' => $line['original_unit_price'],
+                        'discount_percentage' => $line['discount_percentage'],
+                        'discount_amount' => $line['quantity'] > 0 ? $line['discount_amount'] * ($quantityInUnit / (float) $line['quantity']) : 0,
                         'total_price' => $totalPrice,
                         'created_at' => now(),
                     ]);
@@ -535,7 +617,11 @@ class PosController extends Controller
             return [
                 'name' => $product?->name ?? 'Item',
                 'quantity' => (float) $line['quantity'],
+                'foc_quantity' => (float) $line['foc_quantity'],
                 'unit_price' => (float) $line['unit_price'],
+                'price_type' => $line['price_type'],
+                'discount_percentage' => (float) $line['discount_percentage'],
+                'discount_amount' => (float) $line['discount_amount'],
                 'total_price' => (float) $line['quantity'] * (float) $line['unit_price'],
             ];
         })->values();
@@ -548,7 +634,9 @@ class PosController extends Controller
             'payment_status' => $validated['payment_status'],
             'subtotal' => (float) $totalAmount,
             'tax' => (float) $taxAmount,
-            'discount' => (float) $discount,
+            'discount' => (float) $saleDiscount,
+            'manual_discount' => (float) $manualDiscount,
+            'product_discount' => (float) $productDiscountTotal,
             'grand_total' => (float) $grandTotal,
             'amount_received' => (float) $amountReceived,
             'change_due' => (float) $changeDue,

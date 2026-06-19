@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Alert,
     Box,
@@ -33,6 +33,7 @@ import {
     Inventory as InventoryIcon,
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
+    Visibility as VisibilityIcon,
     WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 
@@ -42,8 +43,10 @@ const emptyItem = {
     batch_number: '',
     expiry_date: '',
     quantity: 1,
+    foc_quantity: 0,
     unit_price: 0,
     selling_price: 0,
+    wholesale_price: 0,
 };
 
 export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters }) {
@@ -158,10 +161,17 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                     batch_number: item?.batch_number || '',
                     expiry_date: item.expiry_date?.split('T')[0] || '',
                     quantity: Number(item?.quantity || 1),
+                    foc_quantity: Number(item?.foc_quantity || 0),
                     unit_price: Number(item?.unit_price || 0),
                     // Try to find the matching selling_price from product units
                     selling_price: Number(
                         products.find(p => p.id === productId)?.product_units?.find(u => u.unit_id === selectedUnitId)?.selling_price
+                        || item?.unit_price
+                        || 0
+                    ),
+                    wholesale_price: Number(
+                        products.find(p => p.id === productId)?.product_units?.find(u => u.unit_id === selectedUnitId)?.wholesale_price
+                        || products.find(p => p.id === productId)?.product_units?.find(u => u.unit_id === selectedUnitId)?.selling_price
                         || item?.unit_price
                         || 0
                     ),
@@ -226,6 +236,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 product_id: value,
                 unit_id: preferredUnit?.unit_id || '',
                 selling_price: preferredUnit ? Number(preferredUnit.selling_price || 0) : 0,
+                wholesale_price: preferredUnit ? Number(preferredUnit.wholesale_price || preferredUnit.selling_price || 0) : 0,
             };
 
             setData('items', updatedItems);
@@ -240,6 +251,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 ...currentItem,
                 unit_id: value,
                 selling_price: selectedUnit ? Number(selectedUnit.selling_price || 0) : currentItem.selling_price,
+                wholesale_price: selectedUnit ? Number(selectedUnit.wholesale_price || selectedUnit.selling_price || 0) : currentItem.wholesale_price,
             };
 
             setData('items', updatedItems);
@@ -329,7 +341,17 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                         <TableCell>
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <PurchaseIcon fontSize="small" color="primary" />
-                                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                <Typography
+                                                    component={Link}
+                                                    href={route('purchases.show', { purchase: purchase.id })}
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontWeight: 500,
+                                                        color: 'primary.main',
+                                                        textDecoration: 'none',
+                                                        '&:hover': { textDecoration: 'underline' },
+                                                    }}
+                                                >
                                                     {purchase.invoice_number}
                                                 </Typography>
                                             </Stack>
@@ -353,6 +375,15 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                         </TableCell>
                                         <TableCell align="center">
                                             <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                <IconButton
+                                                    component={Link}
+                                                    href={route('purchases.show', { purchase: purchase.id })}
+                                                    size="small"
+                                                    color="info"
+                                                    title="View Invoice"
+                                                >
+                                                    <VisibilityIcon fontSize="inherit" />
+                                                </IconButton>
                                                 <IconButton
                                                     size="small"
                                                     color="primary"
@@ -532,7 +563,10 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                     const unitsForProduct = getUnitsForProduct(item.product_id);
                                     const selectedUnit = unitsForProduct.find((unit) => unit.unit_id === item.unit_id);
                                     const conversionFactor = Number(selectedUnit?.conversion_factor || 1);
-                                    const baseQuantity = Number(item.quantity || 0) * conversionFactor;
+                                    const paidQuantity = Number(item.quantity || 0);
+                                    const focQuantity = Number(item.foc_quantity || 0);
+                                    const receivedQuantity = paidQuantity + focQuantity;
+                                    const baseQuantity = receivedQuantity * conversionFactor;
                                     const lineTotal = (Number(item.quantity || 0) * Number(item.unit_price || 0)).toFixed(2);
 
                                     return (
@@ -549,7 +583,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                             <Box
                                                 sx={{
                                                     display: 'grid',
-                                                    gridTemplateColumns: { xs: '1fr', md: '2fr 1.2fr 0.8fr 1fr 1fr' },
+                                                    gridTemplateColumns: { xs: '1fr', md: '2fr 1fr 0.7fr 0.7fr 0.9fr 0.9fr 0.9fr' },
                                                     gap: 1.2,
                                                     mb: 1.2,
                                                 }}
@@ -596,6 +630,14 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 />
                                                 <TextField
                                                     size="small"
+                                                    label="FOC Qty"
+                                                    type="number"
+                                                    value={item.foc_quantity}
+                                                    onChange={(event) => updateItem(index, 'foc_quantity', event.target.value)}
+                                                    inputProps={{ min: 0 }}
+                                                />
+                                                <TextField
+                                                    size="small"
                                                     label="Unit Cost"
                                                     type="number"
                                                     value={item.unit_price}
@@ -609,6 +651,15 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     type="number"
                                                     value={item.selling_price}
                                                     onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
+                                                    inputProps={{ min: 0.01, step: '0.01' }}
+                                                    required
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    label="Wholesale Price"
+                                                    type="number"
+                                                    value={item.wholesale_price}
+                                                    onChange={(event) => updateItem(index, 'wholesale_price', event.target.value)}
                                                     inputProps={{ min: 0.01, step: '0.01' }}
                                                     required
                                                 />
@@ -650,7 +701,9 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 >
                                                     <Typography variant="caption" color="text.secondary">Line Total</Typography>
                                                     <Typography variant="body2" sx={{ fontWeight: 700 }}>${lineTotal}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">Base Qty: {baseQuantity}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Received: {receivedQuantity} | Base Qty: {baseQuantity}
+                                                    </Typography>
                                                 </Paper>
                                             </Box>
 
@@ -659,6 +712,12 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                             )}
                                             {errors[`items.${index}.unit_id`] && (
                                                 <Typography variant="caption" color="error">{errors[`items.${index}.unit_id`]}</Typography>
+                                            )}
+                                            {errors[`items.${index}.foc_quantity`] && (
+                                                <Typography variant="caption" color="error">{errors[`items.${index}.foc_quantity`]}</Typography>
+                                            )}
+                                            {errors[`items.${index}.wholesale_price`] && (
+                                                <Typography variant="caption" color="error">{errors[`items.${index}.wholesale_price`]}</Typography>
                                             )}
                                         </Paper>
                                     );

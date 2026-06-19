@@ -64,6 +64,7 @@ class ProductController extends Controller
             'barcode' => 'nullable|string|max:255|unique:products,barcode',
             'description' => 'nullable|string',
             'min_stock_level' => 'nullable|integer|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:2048',
@@ -71,10 +72,13 @@ class ProductController extends Controller
             'product_units.*.unit_id' => 'required|exists:units,id',
             'product_units.*.conversion_factor' => 'required|numeric|min:1',
             'product_units.*.selling_price' => 'required|numeric|min:0',
+            'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated) {
+            $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
+
             $taxIds = collect($validated['tax_ids'] ?? [])
                 ->filter()
                 ->values();
@@ -102,6 +106,7 @@ class ProductController extends Controller
             $product->taxes()->sync($taxIds->all());
 
             foreach ($validated['product_units'] as $unitData) {
+                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
                 $product->product_units()->create($unitData);
             }
         });
@@ -138,6 +143,7 @@ class ProductController extends Controller
             'barcode' => 'nullable|string|max:255|unique:products,barcode,' . $product->id,
             'description' => 'nullable|string',
             'min_stock_level' => 'nullable|integer|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:2048',
@@ -145,10 +151,13 @@ class ProductController extends Controller
             'product_units.*.unit_id' => 'required|exists:units,id',
             'product_units.*.conversion_factor' => 'required|numeric|min:1',
             'product_units.*.selling_price' => 'required|numeric|min:0',
+            'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated, $product) {
+            $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
+
             $taxIds = collect($validated['tax_ids'] ?? [])
                 ->filter()
                 ->values();
@@ -181,6 +190,7 @@ class ProductController extends Controller
             // Update product units
             $product->product_units()->delete();
             foreach ($validated['product_units'] as $unitData) {
+                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
                 $product->product_units()->create($unitData);
             }
         });
@@ -248,7 +258,11 @@ class ProductController extends Controller
             if (!$product) continue;
 
             $baseUnit = $product->product_units->where('is_base_unit', true)->first();
-            $price = $baseUnit ? $baseUnit->selling_price : 0;
+            $price = $baseUnit ? (float) $baseUnit->selling_price : 0;
+            $discountPercentage = (float) ($product->discount_percentage ?? 0);
+            if ($discountPercentage > 0) {
+                $price = max($price - ($price * ($discountPercentage / 100)), 0);
+            }
 
             // Get the earliest expiry date from active batches
             $earliestBatch = $product->batches->first();

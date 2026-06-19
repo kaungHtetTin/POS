@@ -15,7 +15,15 @@ class ProductUnit extends Model
         'unit_id',
         'conversion_factor',
         'selling_price',
+        'wholesale_price',
         'is_base_unit',
+    ];
+
+    protected $casts = [
+        'conversion_factor' => 'integer',
+        'selling_price' => 'decimal:2',
+        'wholesale_price' => 'decimal:2',
+        'is_base_unit' => 'boolean',
     ];
 
     public function product()

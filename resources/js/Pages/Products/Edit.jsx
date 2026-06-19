@@ -47,6 +47,7 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
         barcode: product.barcode || '',
         description: product.description || '',
         min_stock_level: product.min_stock_level,
+        discount_percentage: product.discount_percentage || 0,
         tax_method: product.tax_method,
         status: product.status,
         image: null,
@@ -54,12 +55,13 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
             unit_id: pu.unit_id,
             conversion_factor: pu.conversion_factor,
             selling_price: pu.selling_price,
+            wholesale_price: pu.wholesale_price ?? pu.selling_price,
             is_base_unit: Boolean(pu.is_base_unit)
         })),
     });
 
     const handleAddUnit = () => {
-        setData('product_units', [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, is_base_unit: false }]);
+        setData('product_units', [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: false }]);
     };
 
     const handleRemoveUnit = (index) => {
@@ -241,6 +243,7 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
                                             xs: '1fr',
                                             sm: 'repeat(2, minmax(0, 1fr))',
                                             md: 'repeat(4, minmax(0, 1fr))',
+                                            lg: 'repeat(5, minmax(0, 1fr))',
                                         },
                                         gap: 2,
                                     }}
@@ -286,6 +289,17 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
                                         error={!!errors.min_stock_level}
                                         helperText={errors.min_stock_level}
                                     />
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Product Discount %"
+                                        type="number"
+                                        value={data.discount_percentage}
+                                        onChange={e => setData('discount_percentage', e.target.value)}
+                                        error={!!errors.discount_percentage}
+                                        helperText={errors.discount_percentage}
+                                        inputProps={{ min: 0, max: 100, step: '0.01' }}
+                                    />
                                     <FormControl fullWidth size="small" required>
                                         <InputLabel>Status</InputLabel>
                                         <Select value={data.status} label="Status" onChange={e => setData('status', e.target.value)}>
@@ -320,7 +334,7 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
                                                     display: 'grid',
                                                     gridTemplateColumns: {
                                                         xs: '1fr',
-                                                        sm: 'minmax(180px, 1.5fr) repeat(2, minmax(120px, 1fr)) minmax(120px, auto) minmax(90px, auto)',
+                                                        sm: 'minmax(170px, 1.5fr) repeat(3, minmax(120px, 1fr)) minmax(110px, auto) minmax(90px, auto)',
                                                     },
                                                     gap: 2,
                                                     alignItems: 'center',
@@ -333,7 +347,8 @@ export default function ProductEdit({ auth, product, categories, taxes, units })
                                                     </Select>
                                                 </FormControl>
                                                 <TextField fullWidth size="small" label="Conversion" type="number" value={unit.conversion_factor} onChange={e => handleUnitChange(index, 'conversion_factor', e.target.value)} />
-                                                <TextField fullWidth size="small" label="Selling Price" type="number" value={unit.selling_price} onChange={e => handleUnitChange(index, 'selling_price', e.target.value)} />
+                                                <TextField fullWidth size="small" label="Retail Price" type="number" value={unit.selling_price} onChange={e => handleUnitChange(index, 'selling_price', e.target.value)} />
+                                                <TextField fullWidth size="small" label="Wholesale Price" type="number" value={unit.wholesale_price} onChange={e => handleUnitChange(index, 'wholesale_price', e.target.value)} />
                                                 <Button variant={unit.is_base_unit ? 'contained' : 'outlined'} size="small" onClick={() => handleSetBaseUnit(index)}>
                                                     {unit.is_base_unit ? 'Base' : 'Set Base'}
                                                 </Button>

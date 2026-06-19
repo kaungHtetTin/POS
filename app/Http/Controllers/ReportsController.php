@@ -131,7 +131,7 @@ class ReportsController extends Controller
         $cogs = (clone $salesBase)
             ->join('sale_items', 'sales.id', '=', 'sale_items.sale_id')
             ->join('inventory_batches', 'sale_items.batch_id', '=', 'inventory_batches.id')
-            ->selectRaw('COALESCE(SUM(sale_items.base_quantity * inventory_batches.purchase_price), 0) as cogs')
+            ->selectRaw('COALESCE(SUM((sale_items.base_quantity + COALESCE(sale_items.foc_base_quantity, 0)) * inventory_batches.purchase_price), 0) as cogs')
             ->value('cogs');
 
         $returnsBase = ReturnEntry::query()
@@ -206,7 +206,7 @@ class ReportsController extends Controller
                 'monthly' => "DATE_FORMAT(sales.sale_date, '%Y-%m-01') as period",
                 default => "DATE(sales.sale_date) as period",
             })
-            ->selectRaw('COALESCE(SUM(sale_items.base_quantity * inventory_batches.purchase_price), 0) as cogs')
+            ->selectRaw('COALESCE(SUM((sale_items.base_quantity + COALESCE(sale_items.foc_base_quantity, 0)) * inventory_batches.purchase_price), 0) as cogs')
             ->groupBy($dateExpr)
             ->orderBy($dateExpr)
             ->get();

@@ -129,7 +129,7 @@ export default function PosLayout({ children, header = 'POS' }) {
     const currentBranchId = auth.user?.current_branch_id || '';
 
     const navItems = [
-        { text: 'POS', href: route('pos.index'), icon: <PosIcon fontSize="small" />, active: isActiveRoute('pos.*', route('pos.index')) },
+        { text: 'POS', href: route('pos.index'), icon: <PosIcon fontSize="small" />, active: isActiveRoute('pos.index', route('pos.index')) },
         { text: 'Dashboard', href: route('dashboard'), icon: <DashboardIcon fontSize="small" />, active: isActiveRoute('dashboard', route('dashboard')) },
         { text: 'Sales', href: route('sales.index'), icon: <SalesIcon fontSize="small" />, active: isActiveRoute('sales.*', route('sales.index')) },
         ...(canManageInventory ? [

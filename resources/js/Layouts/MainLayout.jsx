@@ -159,7 +159,7 @@ export default function MainLayout({ children, header }) {
 
     const menuItems = {
         dashboard: { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, href: route('dashboard'), routePattern: 'dashboard', permission: null },
-        pos: { text: 'POS', icon: <POSIcon fontSize="small" />, href: route('pos.index'), routePattern: 'pos.*', permission: 'process_sale' },
+        pos: { text: 'POS', icon: <POSIcon fontSize="small" />, href: route('pos.index'), routePattern: 'pos.index', permission: 'process_sale' },
 
         inventory: { text: 'Inventory', icon: <InventoryIcon fontSize="small" />, href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
         medicines: { text: 'Medicines', icon: <ProductIcon fontSize="small" />, href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },

@@ -45,7 +45,15 @@ import {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDefaults, activeSession = null, error = null }) {
+export default function PosIndex({
+    auth,
+    paymentMethods,
+    paymentStatuses,
+    posDefaults,
+    activeSession = null,
+    error = null,
+    pageTitle = 'POS Interface',
+}) {
     const page = usePage();
     const { settings = {}, translations = {}, ziggy = {}, flash = {} } = page.props;
     const pageErrors = page.props?.errors || {};
@@ -92,8 +100,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     const [shiftDialogOpen, setShiftDialogOpen] = useState(!activeSession?.id);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [customerSectionExpanded, setCustomerSectionExpanded] = useState(false);
-    const [discountExpanded, setDiscountExpanded] = useState(false);
     const [paymentOptionsExpanded, setPaymentOptionsExpanded] = useState(false);
+    const [salePriceType, setSalePriceType] = useState('retail');
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
@@ -102,10 +110,10 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
     const { data, setData, post, processing, errors } = useForm({
         customer_id: null,
-        discount: 0,
         amount_received: 0,
         payment_method: paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'),
         payment_status: paymentStatuses?.[0] || 'Paid',
+        sale_channel: 'retail',
         items: [],
     });
 
@@ -126,14 +134,44 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    const resolveUnitPrice = (unit, priceType = 'retail') => {
+        if (!unit) return 0;
+        return Number(priceType === 'wholesale' ? (unit.wholesale_price ?? unit.selling_price) : unit.selling_price) || 0;
+    };
+    const resolveLineDiscount = (line) => {
+        const qty = Number(line.quantity || 0);
+        const unitPrice = Number(line.unit_price || 0);
+        const discountPercentage = Math.min(Math.max(Number(line.discount_percentage || 0), 0), 100);
+        return qty * unitPrice * (discountPercentage / 100);
+    };
+    const resolveDiscountedLineTotal = (line) => Math.max(
+        (Number(line.quantity || 0) * Number(line.unit_price || 0)) - resolveLineDiscount(line),
+        0
+    );
+    const resolveUnitConversion = (line, unitId) => {
+        const unit = (line.units || []).find((u) => u.unit_id === unitId);
+        return Number(unit?.conversion_factor || 1) || 1;
+    };
+    const resolveRequestedBaseQuantity = (line) => {
+        const paidBase = Number(line.quantity || 0) * resolveUnitConversion(line, line.unit_id);
+        const focBase = Number(line.foc_quantity || 0) * resolveUnitConversion(line, line.foc_unit_id || line.unit_id);
+        return paidBase + focBase;
+    };
 
     useEffect(() => {
         setData('items', cart.map((line) => ({
             product_id: line.product_id,
             unit_id: line.unit_id,
             quantity: line.quantity,
+            foc_quantity: line.foc_quantity || 0,
+            foc_unit_id: line.foc_unit_id || line.unit_id,
+            price_type: salePriceType,
         })));
-    }, [cart, setData]);
+    }, [cart, salePriceType, setData]);
+
+    useEffect(() => {
+        setData('sale_channel', salePriceType);
+    }, [salePriceType, setData]);
 
     useEffect(() => {
         setData('customer_id', selectedCustomer?.id ?? null);
@@ -369,7 +407,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
         setCart((prev) => {
             const existingIndex = prev.findIndex(
-                (l) => l.product_id === product.id && l.unit_id === preferredUnit.unit_id
+                (l) => l.product_id === product.id && l.unit_id === preferredUnit.unit_id && (l.price_type || 'retail') === salePriceType
             );
 
             if (existingIndex >= 0) {
@@ -392,13 +430,17 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                     image_path: product.image_path || null,
                     tax_method: product.tax_method,
                     tax_rate: Number(product.total_tax_rate || 0),
+                    discount_percentage: Number(product.discount_percentage || 0),
                     stock_quantity: product.stock_quantity || 0,
                     units,
                     unit_id: preferredUnit.unit_id,
                     unit_name: preferredUnit.short_name || preferredUnit.name,
                     conversion_factor: preferredUnit.conversion_factor || 1,
-                    unit_price: preferredUnit.selling_price || 0,
+                    price_type: salePriceType,
+                    unit_price: resolveUnitPrice(preferredUnit, salePriceType),
                     quantity: 1,
+                    foc_quantity: 0,
+                    foc_unit_id: preferredUnit.unit_id,
                 },
             ];
         });
@@ -411,16 +453,41 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
                 const updated = { ...line, ...patch };
 
-                if (patch.unit_id) {
+                if (patch.unit_id || patch.price_type) {
                     const unit = (updated.units || []).find((u) => u.unit_id === patch.unit_id);
-                    if (unit) {
-                        updated.unit_name = unit.short_name || unit.name;
-                        updated.conversion_factor = unit.conversion_factor || 1;
-                        updated.unit_price = unit.selling_price || 0;
+                    const selectedUnit = unit || (updated.units || []).find((u) => u.unit_id === updated.unit_id);
+                    if (selectedUnit) {
+                        updated.unit_name = selectedUnit.short_name || selectedUnit.name;
+                        updated.conversion_factor = selectedUnit.conversion_factor || 1;
+                        updated.unit_price = resolveUnitPrice(selectedUnit, updated.price_type || 'retail');
                     }
                 }
 
                 return updated;
+            })
+        );
+    };
+
+    const changeSalePriceType = (next) => {
+        if (!next || next === salePriceType) return;
+
+        setSalePriceType(next);
+        setCart((prev) =>
+            prev.map((line) => {
+                const selectedUnit = (line.units || []).find((u) => u.unit_id === line.unit_id);
+
+                if (!selectedUnit) {
+                    return {
+                        ...line,
+                        price_type: next,
+                    };
+                }
+
+                return {
+                    ...line,
+                    price_type: next,
+                    unit_price: resolveUnitPrice(selectedUnit, next),
+                };
             })
         );
     };
@@ -430,12 +497,13 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
     const totals = useMemo(() => {
         let totalAmount = 0;
         let tax = 0;
+        let productDiscount = 0;
 
         for (const line of cart) {
-            const qty = Number(line.quantity || 0);
-            const unitPrice = Number(line.unit_price || 0);
             const rate = Number(line.tax_rate || 0);
-            const lineTotal = qty * unitPrice;
+            const lineDiscount = resolveLineDiscount(line);
+            const lineTotal = resolveDiscountedLineTotal(line);
+            productDiscount += lineDiscount;
 
             if (line.tax_method === 'Inclusive' && rate > 0) {
                 const preTax = lineTotal / (1 + rate / 100);
@@ -447,16 +515,24 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             }
         }
 
-        const discount = Math.max(Number(data.discount || 0), 0);
-        const grandTotal = Math.max(totalAmount + tax - discount, 0);
+        const discount = productDiscount;
+        const grandTotal = Math.max(totalAmount + tax, 0);
 
         return {
             totalAmount,
             tax,
+            productDiscount,
             discount,
             grandTotal,
         };
-    }, [cart, data.discount]);
+    }, [cart]);
+
+    const hasStockIssue = useMemo(() => {
+        return cart.some((line) => {
+            const stockBase = Number(line.stock_quantity || 0);
+            return stockBase >= 0 && resolveRequestedBaseQuantity(line) > stockBase;
+        });
+    }, [cart]);
 
     const isCashPayment = data.payment_method === 'Cash';
     const amountReceivedValue = Math.max(Number(data.amount_received || 0), 0);
@@ -480,11 +556,12 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
 
         const itemRows = items.map((item) => {
             const qty = Number(item.quantity || 0);
+            const focQty = Number(item.foc_quantity || 0);
             const total = Number(item.total_price || 0);
             return `
                 <tr>
                     <td class="name">${escapeHtml(item.name)}</td>
-                    <td class="qty">${qty}</td>
+                    <td class="qty">${qty}${focQty > 0 ? `<br><span class="meta">FOC ${focQty}</span>` : ''}</td>
                     <td class="amount">${currencySymbol}${total.toFixed(2)}</td>
                 </tr>
             `;
@@ -549,7 +626,8 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                     <div class="totals">
                         <div class="row"><span>Subtotal</span><span>${currencySymbol}${Number(receipt.subtotal || 0).toFixed(2)}</span></div>
                         <div class="row"><span>Tax</span><span>${currencySymbol}${Number(receipt.tax || 0).toFixed(2)}</span></div>
-                        <div class="row"><span>Discount</span><span>${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}</span></div>
+                        ${Number(receipt.product_discount || 0) > 0 ? `<div class="row"><span>Product Discount</span><span>${currencySymbol}${Number(receipt.product_discount || 0).toFixed(2)}</span></div>` : ''}
+                        <div class="row"><span>Total Discount</span><span>${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}</span></div>
                         <div class="row grand"><span>Grand Total</span><span>${currencySymbol}${Number(receipt.grand_total || 0).toFixed(2)}</span></div>
                         ${Number(receipt.amount_received || 0) > 0 ? `<div class="row"><span>Cash Received</span><span>${currencySymbol}${Number(receipt.amount_received || 0).toFixed(2)}</span></div>` : ''}
                         ${Number(receipt.amount_received || 0) > 0 ? `<div class="row"><span>Change</span><span>${currencySymbol}${Number(receipt.change_due || 0).toFixed(2)}</span></div>` : ''}
@@ -654,15 +732,22 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
         items.forEach((item) => {
             const itemName = String(item.name || 'Item');
             const qty = Number(item.quantity || 0);
+            const focQty = Number(item.foc_quantity || 0);
             const total = Number(item.total_price || 0);
             rows.push(itemName.slice(0, lineWidth));
             rows.push(`${padRight(`Qty ${qty}`, lineWidth - 12)}${padLeft(`${currencySymbol}${total.toFixed(2)}`, 12)}`);
+            if (focQty > 0) {
+                rows.push(`FOC ${focQty}`);
+            }
         });
 
         rows.push(divider);
         rows.push(`${padRight('Subtotal', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.subtotal || 0).toFixed(2)}`, 12)}`);
         rows.push(`${padRight('Tax', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.tax || 0).toFixed(2)}`, 12)}`);
-        rows.push(`${padRight('Discount', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}`, 12)}`);
+        if (Number(receipt.product_discount || 0) > 0) {
+            rows.push(`${padRight('Product Disc', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.product_discount || 0).toFixed(2)}`, 12)}`);
+        }
+        rows.push(`${padRight('Total Disc', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.discount || 0).toFixed(2)}`, 12)}`);
         rows.push(`${padRight('Grand Total', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.grand_total || 0).toFixed(2)}`, 12)}`);
         if (Number(receipt.amount_received || 0) > 0) {
             rows.push(`${padRight('Cash Received', lineWidth - 12)}${padLeft(`${currencySymbol}${Number(receipt.amount_received || 0).toFixed(2)}`, 12)}`);
@@ -740,13 +825,12 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                 setSelectedCustomer(null);
                 setCustomerSearchInput('');
                 setData('customer_id', null);
-                setData('discount', 0);
                 setData('amount_received', 0);
                 setData('payment_method', paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'));
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
+                setData('sale_channel', salePriceType);
                 setPaymentDialogOpen(false);
                 setCustomerSectionExpanded(false);
-                setDiscountExpanded(false);
                 setPaymentOptionsExpanded(false);
                 if (behavior.barcode_focus) {
                     setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -788,14 +872,19 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
             return;
         }
 
+        if (hasStockIssue) {
+            setScanError(__('Cart quantity exceeds available stock.'));
+            return;
+        }
+
         if (cart.length > 0) {
             setPaymentDialogOpen(true);
         }
     };
 
     return (
-        <PosLayout header={__('POS Interface')}>
-            <Head title="POS" />
+        <PosLayout header={__(pageTitle)}>
+            <Head title={pageTitle} />
 
             <Box sx={{ p: 2 }}>
                 {displayError && (
@@ -804,7 +893,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                     </Alert>
                 )}
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'flex-start' }}>
-                    <Paper sx={{ p: 2, flex: 1.15, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
+                    <Paper sx={{ p: 2, flex: { xs: '1 1 auto', md: '0 1 42%' }, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                             <ScanIcon color="primary" fontSize="small" />
                             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -834,6 +923,25 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 {scanError}
                             </Alert>
                         )}
+
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                                {__('Price mode')}
+                            </Typography>
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={salePriceType}
+                                onChange={(event, next) => changeSalePriceType(next)}
+                            >
+                                <ToggleButton value="retail" sx={{ textTransform: 'none' }}>
+                                    {__('Retail')}
+                                </ToggleButton>
+                                <ToggleButton value="wholesale" sx={{ textTransform: 'none' }}>
+                                    {__('Wholesale')}
+                                </ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
                         {resultsView === 'table' ? (
                             <Stack direction="row" spacing={1}>
@@ -992,7 +1100,9 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     const outOfStock = isOutOfStock(p);
                                     const units = p.units || [];
                                     const preferred = units.find((u) => u.is_base_unit) || units[0];
-                                    const price = Number(preferred?.selling_price || 0);
+                                    const price = resolveUnitPrice(preferred, salePriceType);
+                                    const discountPercentage = Number(p.discount_percentage || 0);
+                                    const discountedPrice = Math.max(price - (price * (discountPercentage / 100)), 0);
                                     const unitLabel = preferred?.short_name || preferred?.name || '';
                                     const imageUrl = p.image_path ? storageUrl(p.image_path) : null;
 
@@ -1039,9 +1149,14 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                             {unitLabel ? `${__('Unit')}: ${unitLabel}` : __('Unit')}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                            {currencySymbol}{price.toFixed(2)}
+                                                            {currencySymbol}{discountedPrice.toFixed(2)}
                                                         </Typography>
                                                     </Stack>
+                                                    {discountPercentage > 0 && (
+                                                        <Typography variant="caption" color="success.main" sx={{ fontWeight: 700 }}>
+                                                            {discountPercentage}% {__('off')}
+                                                        </Typography>
+                                                    )}
                                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
                                                         <Typography variant="caption" color="text.secondary">
                                                             {__('Stock')}
@@ -1094,7 +1209,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                         )}
                     </Paper>
 
-                    <Paper sx={{ p: 2, flex: 1, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
+                    <Paper sx={{ p: { xs: 1.25, md: 1.5 }, flex: { xs: '1 1 auto', md: '1 1 58%' }, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                             <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -1120,37 +1235,85 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             {__('Cart')}
                         </Typography>
 
-                        <TableContainer sx={{ minHeight: 260 }}>
-                            <Table size="small" stickyHeader>
+                        <TableContainer sx={{ minHeight: 220, overflowX: 'hidden' }}>
+                            <Table
+                                size="small"
+                                stickyHeader
+                                sx={{
+                                    tableLayout: 'fixed',
+                                    minWidth: 0,
+                                    '& .MuiTableCell-root': {
+                                        px: 0.75,
+                                        py: 0.7,
+                                        verticalAlign: 'middle',
+                                    },
+                                    '& .MuiTableCell-head': {
+                                        py: 0.65,
+                                        fontSize: 12,
+                                        letterSpacing: '0.04em',
+                                    },
+                                    '& .MuiInputBase-root': {
+                                        height: 34,
+                                        fontSize: 13,
+                                    },
+                                    '& .MuiInputBase-input': {
+                                        px: 0.75,
+                                        py: 0.5,
+                                    },
+                                    '& .MuiSelect-select': {
+                                        py: '6px',
+                                        pr: '24px !important',
+                                    },
+                                    '& .MuiFormHelperText-root': {
+                                        m: 0,
+                                        mt: 0.25,
+                                        fontSize: 10,
+                                        lineHeight: 1.1,
+                                    },
+                                }}
+                            >
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                        <TableCell sx={{ fontWeight: 700 }}>{__('Item')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{__('Unit')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                                        <TableCell sx={{ fontWeight: 700, width: '23%' }}>{__('Item')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '13%' }}>{__('Unit')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '12%' }}>{__('Price')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '10%' }} align="right">
                                             {__('Qty')}
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                                        <TableCell sx={{ fontWeight: 700, width: '22%' }}>
+                                            {__('FOC')}
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '14%' }} align="right">
                                             {__('Total')}
                                         </TableCell>
-                                        <TableCell />
+                                        <TableCell sx={{ width: '6%' }} />
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {cart.map((line) => {
                                         const qty = Number(line.quantity || 0);
                                         const unitPrice = Number(line.unit_price || 0);
-                                        const lineTotal = qty * unitPrice;
+                                        const lineDiscount = resolveLineDiscount(line);
+                                        const lineTotal = resolveDiscountedLineTotal(line);
                                         const maxQty = Math.floor((Number(line.stock_quantity || 0) || 0) / (Number(line.conversion_factor || 1) || 1));
+                                        const requestedBase = resolveRequestedBaseQuantity(line);
+                                        const stockBase = Number(line.stock_quantity || 0);
+                                        const exceedsStock = stockBase >= 0 && requestedBase > stockBase;
 
                                         return (
                                             <TableRow key={line.id} hover>
                                                 <TableCell>
-                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    <Typography variant="body2" title={line.name} sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
                                                         {line.name}
                                                     </Typography>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }} noWrap>
                                                         {line.barcode || '-'}
                                                     </Typography>
+                                                    {Number(line.discount_percentage || 0) > 0 && (
+                                                        <Typography variant="caption" color="success.main" sx={{ display: 'block', fontWeight: 700, lineHeight: 1.1 }} noWrap>
+                                                            {Number(line.discount_percentage || 0)}% {__('off')} ({currencySymbol}{lineDiscount.toFixed(2)})
+                                                        </Typography>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <TextField
@@ -1158,7 +1321,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                         size="small"
                                                         value={line.unit_id}
                                                         onChange={(e) => updateCartLine(line.id, { unit_id: e.target.value })}
-                                                        sx={{ minWidth: 120 }}
+                                                        sx={{ width: '100%', minWidth: 0 }}
                                                     >
                                                         {(line.units || []).map((u) => (
                                                             <MenuItem key={u.unit_id} value={u.unit_id}>
@@ -1167,6 +1330,16 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                         ))}
                                                     </TextField>
                                                 </TableCell>
+                                                <TableCell>
+                                                    {salePriceType === 'wholesale' && (
+                                                        <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 800, lineHeight: 1 }}>
+                                                            {__('Wholesale')}
+                                                        </Typography>
+                                                    )}
+                                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                                                        {currencySymbol}{unitPrice.toFixed(2)}
+                                                    </Typography>
+                                                </TableCell>
                                                 <TableCell align="right">
                                                     <TextField
                                                         size="small"
@@ -1174,16 +1347,48 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                                         value={line.quantity}
                                                         onChange={(e) => updateCartLine(line.id, { quantity: e.target.value })}
                                                         inputProps={{ min: 0.01, step: '0.01' }}
-                                                        sx={{ width: 90 }}
-                                                        error={maxQty >= 0 && qty > maxQty}
-                                                        helperText={maxQty >= 0 && qty > maxQty ? `${__('Max')} ${maxQty}` : ''}
+                                                        sx={{ width: '100%' }}
+                                                        error={exceedsStock}
+                                                        helperText={exceedsStock ? `${__('Max')} ${maxQty}` : ''}
                                                     />
                                                 </TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 700 }}>
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            value={line.foc_quantity || 0}
+                                                            onChange={(e) => updateCartLine(line.id, { foc_quantity: e.target.value })}
+                                                            inputProps={{ min: 0, step: '0.01' }}
+                                                            sx={{ width: 62 }}
+                                                            error={exceedsStock}
+                                                        />
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            value={line.foc_unit_id || line.unit_id}
+                                                            onChange={(e) => updateCartLine(line.id, { foc_unit_id: e.target.value })}
+                                                            sx={{ width: 82, minWidth: 0 }}
+                                                            error={exceedsStock}
+                                                        >
+                                                            {(line.units || []).map((u) => (
+                                                                <MenuItem key={u.unit_id} value={u.unit_id}>
+                                                                    {u.short_name || u.name}
+                                                                </MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                    </Stack>
+                                                    {exceedsStock && (
+                                                        <Typography variant="caption" color="error" sx={{ display: 'block', lineHeight: 1.1 }}>
+                                                            {__('Stock exceeded')}
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
                                                     {currencySymbol}{lineTotal.toFixed(2)}
                                                 </TableCell>
                                                 <TableCell align="right">
-                                                    <IconButton size="small" color="error" onClick={() => removeCartLine(line.id)}>
+                                                    <IconButton size="small" color="error" onClick={() => removeCartLine(line.id)} sx={{ p: 0.25 }}>
                                                         <DeleteIcon fontSize="small" />
                                                     </IconButton>
                                                 </TableCell>
@@ -1192,7 +1397,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     })}
                                     {cart.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
+                                            <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
                                                 <Typography variant="body2" color="text.secondary italic">
                                                     {__('Cart is empty.')}
                                                 </Typography>
@@ -1223,40 +1428,16 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                     {currencySymbol}{totals.tax.toFixed(2)}
                                 </Typography>
                             </Stack>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography variant="body2" color="text.secondary">
-                                    {__('Discount')}
-                                </Typography>
-                                {discountExpanded || Number(data.discount || 0) > 0 ? (
-                                    <Stack direction="row" spacing={0.5} alignItems="center">
-                                        <TextField
-                                            size="small"
-                                            type="number"
-                                            value={data.discount}
-                                            onChange={(e) => setData('discount', e.target.value)}
-                                            InputProps={{
-                                                startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
-                                            }}
-                                            inputProps={{ min: 0, step: '0.01' }}
-                                            sx={{ width: 120 }}
-                                        />
-                                        <Button
-                                            size="small"
-                                            color="inherit"
-                                            onClick={() => {
-                                                setData('discount', 0);
-                                                setDiscountExpanded(false);
-                                            }}
-                                        >
-                                            {__('Remove')}
-                                        </Button>
-                                    </Stack>
-                                ) : (
-                                    <Button size="small" onClick={() => setDiscountExpanded(true)}>
-                                        {__('Add discount')}
-                                    </Button>
-                                )}
-                            </Stack>
+                            {totals.productDiscount > 0 && (
+                                <Stack direction="row" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">
+                                        {__('Product Discount')}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main' }}>
+                                        -{currencySymbol}{totals.productDiscount.toFixed(2)}
+                                    </Typography>
+                                </Stack>
+                            )}
                             <Stack direction="row" justifyContent="space-between" alignItems="baseline">
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                                     {__('Grand Total')}
@@ -1344,7 +1525,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                                 <Button
                                     variant="contained"
                                     startIcon={<CheckoutIcon />}
-                                    disabled={processing || (hasActiveSession && cart.length === 0)}
+                                    disabled={processing || (hasActiveSession && (cart.length === 0 || hasStockIssue))}
                                     fullWidth
                                     onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
                                     sx={{ minHeight: 46, fontWeight: 800, letterSpacing: '0.02em' }}
@@ -1568,7 +1749,7 @@ export default function PosIndex({ auth, paymentMethods, paymentStatuses, posDef
                             type="submit"
                             variant="contained"
                             startIcon={<CheckoutIcon />}
-                            disabled={processing || cart.length === 0 || !hasActiveSession || (isPaidCashSale && cashShortageValue > 0)}
+                            disabled={processing || cart.length === 0 || !hasActiveSession || hasStockIssue || (isPaidCashSale && cashShortageValue > 0)}
                         >
                             {__('Complete Sale')}
                         </Button>

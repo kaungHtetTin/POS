@@ -40,7 +40,7 @@ class PurchaseController extends Controller
             'products' => Product::select('id', 'name')
                 ->with([
                     'product_units' => function ($unitQuery) {
-                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'is_base_unit')
+                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                             ->with(['unit:id,name,short_name']);
                     },
                 ])
@@ -49,6 +49,70 @@ class PurchaseController extends Controller
                 ->get(),
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
             'filters' => $request->only(['search']),
+        ]);
+    }
+
+    public function show(string $locale, Purchase $purchase)
+    {
+        $purchase->load([
+            'supplier:id,name,phone,email,address,credit_limit,balance',
+            'branch:id,name,address,phone,email',
+            'items' => function ($q) {
+                $q->with(['product:id,name,generic_name,barcode', 'unit:id,name,short_name']);
+            },
+        ]);
+
+        $productUnitRows = DB::table('product_units')
+            ->select('product_id', 'unit_id', 'selling_price', 'wholesale_price', 'conversion_factor')
+            ->whereIn('product_id', $purchase->items->pluck('product_id')->unique()->values())
+            ->whereIn('unit_id', $purchase->items->pluck('unit_id')->unique()->values())
+            ->get()
+            ->keyBy(function ($row) {
+                return $row->product_id . ':' . $row->unit_id;
+            });
+
+        return Inertia::render('Purchases/Show', [
+            'purchase' => [
+                'id' => $purchase->id,
+                'invoice_number' => $purchase->invoice_number,
+                'purchase_date' => optional($purchase->purchase_date)->format('Y-m-d'),
+                'payment_status' => $purchase->payment_status,
+                'total_amount' => (float) $purchase->total_amount,
+                'paid_amount' => (float) $purchase->paid_amount,
+                'due_amount' => (float) $purchase->due_amount,
+                'created_at' => optional($purchase->created_at)->toISOString(),
+                'updated_at' => optional($purchase->updated_at)->toISOString(),
+                'supplier' => $purchase->supplier,
+                'branch' => $purchase->branch,
+                'items' => $purchase->items->map(function ($item) use ($productUnitRows) {
+                    $productUnit = $productUnitRows->get($item->product_id . ':' . $item->unit_id);
+                    $paidQuantity = (int) $item->quantity;
+                    $focQuantity = (int) ($item->foc_quantity ?? 0);
+                    $receivedQuantity = $paidQuantity + $focQuantity;
+
+                    return [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product?->name,
+                        'generic_name' => $item->product?->generic_name,
+                        'barcode' => $item->product?->barcode,
+                        'unit_id' => $item->unit_id,
+                        'unit_name' => $item->unit?->short_name ?: $item->unit?->name,
+                        'batch_number' => $item->batch_number,
+                        'expiry_date' => optional($item->expiry_date)->format('Y-m-d'),
+                        'quantity' => $paidQuantity,
+                        'foc_quantity' => $focQuantity,
+                        'received_quantity' => $receivedQuantity,
+                        'base_quantity' => (int) $item->base_quantity,
+                        'foc_base_quantity' => (int) ($item->foc_base_quantity ?? 0),
+                        'conversion_factor' => (int) ($productUnit->conversion_factor ?? 1),
+                        'unit_price' => (float) $item->unit_price,
+                        'selling_price' => (float) ($productUnit->selling_price ?? 0),
+                        'wholesale_price' => (float) ($productUnit->wholesale_price ?? $productUnit->selling_price ?? 0),
+                        'total_price' => (float) $item->total_price,
+                    ];
+                })->values(),
+            ],
         ]);
     }
 
@@ -67,8 +131,10 @@ class PurchaseController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'required|date|after:today',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
             'items.*.selling_price' => 'required|numeric|min:0.01|max:999999999999.99',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0.01|max:999999999999.99',
         ]);
 
         $items = collect($validated['items']);
@@ -100,8 +166,12 @@ class PurchaseController extends Controller
                 ])->withInput();
             }
 
-            $baseQuantity = (int) $item['quantity'] * $conversionFactor;
-            $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
+            $paidQuantity = (int) $item['quantity'];
+            $focQuantity = (int) ($item['foc_quantity'] ?? 0);
+            $receivedQuantity = $paidQuantity + $focQuantity;
+            $baseQuantity = $receivedQuantity * $conversionFactor;
+            $focBaseQuantity = $focQuantity * $conversionFactor;
+            $lineTotal = $paidQuantity * (float) $item['unit_price'];
             $batchNumber = $this->resolveBatchNumber(
                 $item['batch_number'] ?? null,
                 $validated['branch_id'],
@@ -113,8 +183,11 @@ class PurchaseController extends Controller
                 'batch_number' => $batchNumber,
                 'conversion_factor' => $conversionFactor,
                 'base_quantity' => $baseQuantity,
-                'base_unit_price' => (float) $item['unit_price'] / $conversionFactor,
+                'foc_quantity' => $focQuantity,
+                'foc_base_quantity' => $focBaseQuantity,
+                'base_unit_price' => $baseQuantity > 0 ? $lineTotal / $baseQuantity : 0,
                 'base_selling_price' => (float) $item['selling_price'] / $conversionFactor,
+                'wholesale_price' => (float) ($item['wholesale_price'] ?? $item['selling_price']),
                 'line_total' => $lineTotal,
             ]);
         }
@@ -166,7 +239,9 @@ class PurchaseController extends Controller
                     'batch_number' => $item['batch_number'],
                     'expiry_date' => $item['expiry_date'],
                     'quantity' => $item['quantity'],
+                    'foc_quantity' => $item['foc_quantity'],
                     'base_quantity' => $item['base_quantity'],
+                    'foc_base_quantity' => $item['foc_base_quantity'],
                     'unit_price' => $item['unit_price'],
                     'total_price' => $item['line_total'],
                     'created_at' => now(),
@@ -222,6 +297,14 @@ class PurchaseController extends Controller
                 $inventory->update([
                     'quantity' => $inventory->quantity + $item['base_quantity'],
                 ]);
+
+                DB::table('product_units')
+                    ->where('product_id', $item['product_id'])
+                    ->where('unit_id', $item['unit_id'])
+                    ->update([
+                        'selling_price' => $item['selling_price'],
+                        'wholesale_price' => $item['wholesale_price'],
+                    ]);
             }
 
             $supplier->update([
@@ -232,7 +315,7 @@ class PurchaseController extends Controller
         return redirect()->back()->with('success', 'Purchase order created and stock received successfully.');
     }
 
-    public function update(Request $request, Purchase $purchase)
+    public function update(Request $request, string $locale, Purchase $purchase)
     {
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
@@ -247,8 +330,10 @@ class PurchaseController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'required|date|after:today',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
             'items.*.selling_price' => 'required|numeric|min:0.01|max:999999999999.99',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0.01|max:999999999999.99',
         ]);
 
         $items = collect($validated['items']);
@@ -273,8 +358,19 @@ class PurchaseController extends Controller
             }
 
             $conversionFactor = (int) $productUnit->conversion_factor;
-            $baseQuantity = (int) $item['quantity'] * $conversionFactor;
-            $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
+
+            if ($conversionFactor < 1) {
+                return redirect()->back()->withErrors([
+                    "items.$index.unit_id" => 'Invalid conversion factor for selected product unit.',
+                ])->withInput();
+            }
+
+            $paidQuantity = (int) $item['quantity'];
+            $focQuantity = (int) ($item['foc_quantity'] ?? 0);
+            $receivedQuantity = $paidQuantity + $focQuantity;
+            $baseQuantity = $receivedQuantity * $conversionFactor;
+            $focBaseQuantity = $focQuantity * $conversionFactor;
+            $lineTotal = $paidQuantity * (float) $item['unit_price'];
             $batchNumber = $this->resolveBatchNumber(
                 $item['batch_number'] ?? null,
                 $validated['branch_id'],
@@ -286,8 +382,11 @@ class PurchaseController extends Controller
                 'batch_number' => $batchNumber,
                 'conversion_factor' => $conversionFactor,
                 'base_quantity' => $baseQuantity,
-                'base_unit_price' => (float) $item['unit_price'] / $conversionFactor,
+                'foc_quantity' => $focQuantity,
+                'foc_base_quantity' => $focBaseQuantity,
+                'base_unit_price' => $baseQuantity > 0 ? $lineTotal / $baseQuantity : 0,
                 'base_selling_price' => (float) $item['selling_price'] / $conversionFactor,
+                'wholesale_price' => (float) ($item['wholesale_price'] ?? $item['selling_price']),
                 'line_total' => $lineTotal,
             ]);
         }
@@ -350,7 +449,9 @@ class PurchaseController extends Controller
                     'batch_number' => $item['batch_number'],
                     'expiry_date' => $item['expiry_date'],
                     'quantity' => $item['quantity'],
+                    'foc_quantity' => $item['foc_quantity'],
                     'base_quantity' => $item['base_quantity'],
+                    'foc_base_quantity' => $item['foc_base_quantity'],
                     'unit_price' => $item['unit_price'],
                     'total_price' => $item['line_total'],
                     'created_at' => now(),
@@ -390,6 +491,14 @@ class PurchaseController extends Controller
                         'selling_price' => $item['base_selling_price'],
                     ]);
                 }
+
+                DB::table('product_units')
+                    ->where('product_id', $item['product_id'])
+                    ->where('unit_id', $item['unit_id'])
+                    ->update([
+                        'selling_price' => $item['selling_price'],
+                        'wholesale_price' => $item['wholesale_price'],
+                    ]);
             }
 
             // 4. Update new supplier balance
@@ -400,7 +509,7 @@ class PurchaseController extends Controller
         return redirect()->back()->with('success', 'Purchase record updated and inventory synchronized successfully.');
     }
 
-    public function destroy(Purchase $purchase)
+    public function destroy(string $locale, Purchase $purchase)
     {
         DB::transaction(function () use ($purchase) {
             $supplier = $purchase->supplier;
