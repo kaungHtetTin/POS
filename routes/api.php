@@ -71,6 +71,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Receipt Settings
         Route::get('/receipt-settings', [CashierPosController::class, 'getReceiptSettings']);
+
+        // Branch Management
+        Route::get('/branches', [CashierPosController::class, 'getBranches']);
+        Route::post('/branches/switch', [CashierPosController::class, 'switchBranch']);
     });
 
     /*

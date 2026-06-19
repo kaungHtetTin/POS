@@ -26,7 +26,6 @@ import {
     InputLabel,
     Select,
     Avatar,
-    Grid,
     Tooltip,
     Checkbox,
     ListItemText,
@@ -491,7 +490,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             </Box>
 
             {/* Add/Edit Product Dialog */}
-            <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+            <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         Add New Medicine
@@ -499,231 +498,267 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             <CloseIcon />
                         </IconButton>
                     </DialogTitle>
-                    <DialogContent dividers>
-                        <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                            {/* Image Section */}
-                            <Grid item xs={12} sm={3}>
-                                <Stack alignItems="center" spacing={1.5}>
-                                    <Avatar
-                                        src={data.image ? URL.createObjectURL(data.image) : null}
-                                        variant="rounded"
-                                        sx={{ width: 120, height: 120, border: '1px solid', borderColor: 'divider' }}
+                    <DialogContent dividers sx={{ p: 0 }}>
+                        <Stack spacing={3} sx={{ p: 3 }}>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                    MEDICINE IDENTITY
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: {
+                                            xs: '1fr',
+                                            md: '220px repeat(4, minmax(0, 1fr))',
+                                        },
+                                        gap: 2,
+                                        alignItems: 'start',
+                                    }}
+                                >
+                                    <Stack
+                                        alignItems="center"
+                                        spacing={1.5}
+                                        sx={{
+                                            gridColumn: { xs: '1', md: '1 / 2' },
+                                            gridRow: { md: '1 / span 3' },
+                                            height: '100%',
+                                            p: 2,
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            borderRadius: 1,
+                                            justifyContent: 'center',
+                                        }}
                                     >
-                                        <ProductIcon sx={{ fontSize: 60 }} />
-                                    </Avatar>
-                                    <Button
-                                        variant="outlined"
-                                        component="label"
-                                        size="small"
-                                        fullWidth
-                                        startIcon={<PhotoCameraIcon />}
-                                    >
-                                        Upload Photo
-                                        <input
-                                            type="file"
-                                            hidden
-                                            accept="image/*"
-                                            onChange={(e) => setData('image', e.target.files[0])}
-                                        />
-                                    </Button>
-                                    {errors.image && <Typography variant="caption" color="error">{errors.image}</Typography>}
-                                </Stack>
-                            </Grid>
-
-                            {/* Basic Info */}
-                            <Grid item xs={12} sm={9}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} sm={6}>
-                                        <TextField
-                                            label="Medicine Name"
-                                            fullWidth
-                                            size="small"
-                                            value={data.name}
-                                            onChange={e => setData('name', e.target.value)}
-                                            error={!!errors.name}
-                                            helperText={errors.name}
-                                            required
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <FormControl fullWidth size="small" error={!!errors.category_id} required sx={{ minWidth: 180 }}>
-                                            <InputLabel>Category</InputLabel>
-                                            <Select
-                                                value={data.category_id}
-                                                label="Category"
-                                                onChange={e => setData('category_id', e.target.value)}
-                                            >
-                                                {categories.map(cat => (
-                                                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <TextField
-                                            label="Generic Name"
-                                            fullWidth
-                                            size="small"
-                                            value={data.generic_name}
-                                            onChange={e => setData('generic_name', e.target.value)}
-                                            error={!!errors.generic_name}
-                                            helperText={errors.generic_name}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <TextField
-                                            label="Brand Name"
-                                            fullWidth
-                                            size="small"
-                                            value={data.brand_name}
-                                            onChange={e => setData('brand_name', e.target.value)}
-                                            error={!!errors.brand_name}
-                                            helperText={errors.brand_name}
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-
-                            {/* Additional Details Row 1 */}
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    label="Manufacturer"
-                                    fullWidth
-                                    size="small"
-                                    value={data.manufacturer}
-                                    onChange={e => setData('manufacturer', e.target.value)}
-                                    error={!!errors.manufacturer}
-                                    helperText={errors.manufacturer}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    label="Strength (e.g. 500mg)"
-                                    fullWidth
-                                    size="small"
-                                    value={data.strength}
-                                    onChange={e => setData('strength', e.target.value)}
-                                    error={!!errors.strength}
-                                    helperText={errors.strength}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <Stack direction="row" spacing={1} alignItems="flex-start">
-                                    <TextField
-                                        label="Barcode / SKU"
-                                        fullWidth
-                                        size="small"
-                                        autoFocus
-                                        inputRef={barcodeInputRef}
-                                        value={data.barcode}
-                                        onChange={e => setData('barcode', e.target.value)}
-                                        error={!!errors.barcode}
-                                        helperText={errors.barcode}
-                                    />
-                                    <Tooltip title="Generate Internal Barcode">
-                                        <IconButton 
-                                            size="small" 
-                                            sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider' }}
-                                            onClick={generateBarcode}
+                                        <Avatar
+                                            src={data.image ? URL.createObjectURL(data.image) : null}
+                                            variant="rounded"
+                                            sx={{ width: 128, height: 128, border: '1px solid', borderColor: 'divider' }}
                                         >
-                                            <BarcodeIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Stack>
-                            </Grid>
-
-                            {/* Additional Details Row 2 */}
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small" error={!!errors.tax_id || !!errors.tax_ids} sx={{ minWidth: 150 }}>
-                                    <InputLabel>Applied Taxes</InputLabel>
-                                    <Select
-                                        multiple
-                                        value={data.tax_ids}
-                                        label="Applied Taxes"
-                                        onChange={(e) => {
-                                            const selected = e.target.value;
-                                            const selectedIds = Array.isArray(selected) ? selected : [];
-                                            setData((prev) => ({
-                                                ...prev,
-                                                tax_ids: selectedIds,
-                                                tax_id: selectedIds[0] || '',
-                                            }));
-                                        }}
-                                        renderValue={(selected) => {
-                                            const selectedIds = Array.isArray(selected) ? selected : [];
-                                            if (selectedIds.length === 0) return 'None';
-                                            const names = taxes
-                                                .filter((t) => selectedIds.includes(t.id))
-                                                .map((t) => t.name);
-                                            return names.join(', ');
-                                        }}
+                                            <ProductIcon sx={{ fontSize: 60 }} />
+                                        </Avatar>
+                                        <Button
+                                            variant="outlined"
+                                            component="label"
+                                            size="small"
+                                            fullWidth
+                                            startIcon={<PhotoCameraIcon />}
+                                        >
+                                            Upload Photo
+                                            <input
+                                                type="file"
+                                                hidden
+                                                accept="image/*"
+                                                onChange={(e) => setData('image', e.target.files[0])}
+                                            />
+                                        </Button>
+                                        {errors.image && <Typography variant="caption" color="error">{errors.image}</Typography>}
+                                    </Stack>
+                                    <TextField
+                                        label="Medicine Name"
+                                        fullWidth
+                                        size="small"
+                                        value={data.name}
+                                        onChange={e => setData('name', e.target.value)}
+                                        error={!!errors.name}
+                                        helperText={errors.name}
+                                        required
+                                        sx={{ gridColumn: { xs: '1', md: '2 / span 2' } }}
+                                    />
+                                    <FormControl
+                                        fullWidth
+                                        size="small"
+                                        error={!!errors.category_id}
+                                        required
+                                        sx={{ gridColumn: { xs: '1', md: '4 / span 2' } }}
                                     >
-                                        {taxes.map((tax) => (
-                                            <MenuItem key={tax.id} value={tax.id}>
-                                                <Checkbox size="small" checked={(data.tax_ids || []).includes(tax.id)} />
-                                                <ListItemText primary={`${tax.name} (${tax.rate}%)`} />
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                    {(errors.tax_id || errors.tax_ids) && (
-                                        <FormHelperText>{errors.tax_ids || errors.tax_id}</FormHelperText>
-                                    )}
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small" required>
-                                    <InputLabel>Tax Method</InputLabel>
-                                    <Select
-                                        value={data.tax_method}
-                                        label="Tax Method"
-                                        onChange={e => setData('tax_method', e.target.value)}
+                                        <InputLabel>Category</InputLabel>
+                                        <Select
+                                            value={data.category_id}
+                                            label="Category"
+                                            onChange={e => setData('category_id', e.target.value)}
+                                        >
+                                            {categories.map(cat => (
+                                                <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                                            ))}
+                                        </Select>
+                                        {errors.category_id && <FormHelperText>{errors.category_id}</FormHelperText>}
+                                    </FormControl>
+                                    <TextField
+                                        label="Generic Name"
+                                        fullWidth
+                                        size="small"
+                                        value={data.generic_name}
+                                        onChange={e => setData('generic_name', e.target.value)}
+                                        error={!!errors.generic_name}
+                                        helperText={errors.generic_name}
+                                        sx={{ gridColumn: { xs: '1', md: '2 / span 1' } }}
+                                    />
+                                    <TextField
+                                        label="Brand Name"
+                                        fullWidth
+                                        size="small"
+                                        value={data.brand_name}
+                                        onChange={e => setData('brand_name', e.target.value)}
+                                        error={!!errors.brand_name}
+                                        helperText={errors.brand_name}
+                                        sx={{ gridColumn: { xs: '1', md: '3 / span 1' } }}
+                                    />
+                                    <TextField
+                                        label="Manufacturer"
+                                        fullWidth
+                                        size="small"
+                                        value={data.manufacturer}
+                                        onChange={e => setData('manufacturer', e.target.value)}
+                                        error={!!errors.manufacturer}
+                                        helperText={errors.manufacturer}
+                                        sx={{ gridColumn: { xs: '1', md: '4 / span 1' } }}
+                                    />
+                                    <TextField
+                                        label="Strength (e.g. 500mg)"
+                                        fullWidth
+                                        size="small"
+                                        value={data.strength}
+                                        onChange={e => setData('strength', e.target.value)}
+                                        error={!!errors.strength}
+                                        helperText={errors.strength}
+                                        sx={{ gridColumn: { xs: '1', md: '5 / span 1' } }}
+                                    />
+                                    <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="flex-start"
+                                        sx={{ gridColumn: { xs: '1', md: '2 / span 4' } }}
                                     >
-                                        <MenuItem value="Exclusive">Exclusive</MenuItem>
-                                        <MenuItem value="Inclusive">Inclusive</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    label="Min Stock Level"
-                                    fullWidth
-                                    size="small"
-                                    type="number"
-                                    value={data.min_stock_level}
-                                    onChange={e => setData('min_stock_level', e.target.value)}
-                                    error={!!errors.min_stock_level}
-                                    helperText={errors.min_stock_level}
-                                />
-                            </Grid>
+                                        <TextField
+                                            label="Barcode / SKU"
+                                            fullWidth
+                                            size="small"
+                                            autoFocus
+                                            inputRef={barcodeInputRef}
+                                            value={data.barcode}
+                                            onChange={e => setData('barcode', e.target.value)}
+                                            error={!!errors.barcode}
+                                            helperText={errors.barcode}
+                                        />
+                                        <Tooltip title="Generate Internal Barcode">
+                                            <IconButton
+                                                size="small"
+                                                sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider' }}
+                                                onClick={generateBarcode}
+                                            >
+                                                <BarcodeIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Stack>
+                                </Box>
+                            </Box>
 
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small" required>
-                                    <InputLabel>Status</InputLabel>
-                                    <Select
-                                        value={data.status}
-                                        label="Status"
-                                        onChange={e => setData('status', e.target.value)}
-                                    >
-                                        <MenuItem value="Active">Active</MenuItem>
-                                        <MenuItem value="Inactive">Inactive</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
+                            <Divider />
 
-                            <Grid item xs={12}>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                    TAX, STOCK & STATUS
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: {
+                                            xs: '1fr',
+                                            sm: 'repeat(2, minmax(0, 1fr))',
+                                            md: 'repeat(4, minmax(0, 1fr))',
+                                        },
+                                        gap: 2,
+                                    }}
+                                >
+                                    <FormControl fullWidth size="small" error={!!errors.tax_id || !!errors.tax_ids}>
+                                        <InputLabel>Applied Taxes</InputLabel>
+                                        <Select
+                                            multiple
+                                            value={data.tax_ids}
+                                            label="Applied Taxes"
+                                            onChange={(e) => {
+                                                const selected = e.target.value;
+                                                const selectedIds = Array.isArray(selected) ? selected : [];
+                                                setData((prev) => ({
+                                                    ...prev,
+                                                    tax_ids: selectedIds,
+                                                    tax_id: selectedIds[0] || '',
+                                                }));
+                                            }}
+                                            renderValue={(selected) => {
+                                                const selectedIds = Array.isArray(selected) ? selected : [];
+                                                if (selectedIds.length === 0) return 'None';
+                                                const names = taxes
+                                                    .filter((t) => selectedIds.includes(t.id))
+                                                    .map((t) => t.name);
+                                                return names.join(', ');
+                                            }}
+                                        >
+                                            {taxes.map((tax) => (
+                                                <MenuItem key={tax.id} value={tax.id}>
+                                                    <Checkbox size="small" checked={(data.tax_ids || []).includes(tax.id)} />
+                                                    <ListItemText primary={`${tax.name} (${tax.rate}%)`} />
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                        {(errors.tax_id || errors.tax_ids) && (
+                                            <FormHelperText>{errors.tax_ids || errors.tax_id}</FormHelperText>
+                                        )}
+                                    </FormControl>
+                                    <FormControl fullWidth size="small" required>
+                                        <InputLabel>Tax Method</InputLabel>
+                                        <Select
+                                            value={data.tax_method}
+                                            label="Tax Method"
+                                            onChange={e => setData('tax_method', e.target.value)}
+                                        >
+                                            <MenuItem value="Exclusive">Exclusive</MenuItem>
+                                            <MenuItem value="Inclusive">Inclusive</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <TextField
+                                        label="Min Stock Level"
+                                        fullWidth
+                                        size="small"
+                                        type="number"
+                                        value={data.min_stock_level}
+                                        onChange={e => setData('min_stock_level', e.target.value)}
+                                        error={!!errors.min_stock_level}
+                                        helperText={errors.min_stock_level}
+                                    />
+                                    <FormControl fullWidth size="small" required>
+                                        <InputLabel>Status</InputLabel>
+                                        <Select
+                                            value={data.status}
+                                            label="Status"
+                                            onChange={e => setData('status', e.target.value)}
+                                        >
+                                            <MenuItem value="Active">Active</MenuItem>
+                                            <MenuItem value="Inactive">Inactive</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                            </Box>
+
+                            <Divider />
+
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                    NOTES
+                                </Typography>
                                 <TextField
                                     label="Description"
                                     fullWidth
                                     size="small"
                                     multiline
-                                    rows={2}
+                                    rows={3}
                                     value={data.description}
                                     onChange={e => setData('description', e.target.value)}
                                     error={!!errors.description}
                                     helperText={errors.description}
                                 />
-                            </Grid>
-                        </Grid>
+                            </Box>
+                        </Stack>
                     </DialogContent>
                     
                     {/* Unit Conversion Section (Systematic Grid) */}

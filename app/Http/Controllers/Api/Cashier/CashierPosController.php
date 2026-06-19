@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Cashier;
 use App\Http\Controllers\Controller;
 use App\Models\CashSession;
 use App\Models\Customer;
+use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -306,6 +307,7 @@ class CashierPosController extends Controller
             foreach ($items as $item) {
                 SaleItem::create([
                     'sale_id' => $sale->id,
+                    'branch_id' => $branchId,
                     'product_id' => $item['product_id'],
                     'product_unit_id' => $item['product_unit_id'],
                     'quantity' => $item['quantity'],
@@ -314,6 +316,15 @@ class CashierPosController extends Controller
                     'tax_amount' => ($item['quantity'] * $item['unit_price']) * (($item['tax_rate'] ?? 0) / 100),
                     'total' => $item['quantity'] * $item['unit_price'],
                 ]);
+
+                // Reduce inventory for this branch + product
+                $inventory = Inventory::firstOrNew([
+                    'branch_id' => $branchId,
+                    'product_id' => $item['product_id'],
+                ]);
+
+                $inventory->quantity = max(($inventory->quantity ?? 0) - $item['quantity'], 0);
+                $inventory->save();
             }
 
             return $sale->load(['items.product:id,name', 'items.productUnit.unit:id,name,short_name', 'customer:id,name,phone']);
@@ -464,5 +475,74 @@ class CashierPosController extends Controller
         ];
 
         return response()->json($settings);
+    }
+
+    /**
+     * Get list of branches the current user can access.
+     * Also indicates which branch is currently active.
+     */
+    public function getBranches(Request $request)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $user = $request->user();
+        $currentBranchId = $user->currentBranchId();
+
+        // Get primary branch
+        $branches = collect();
+
+        if ($user->branch) {
+            $branches->push($user->branch);
+        }
+
+        // Get additional branches
+        $additionalBranches = $user->branches()->get();
+        $branches = $branches->merge($additionalBranches)->unique('id');
+
+        $result = $branches->map(function ($branch) use ($currentBranchId) {
+            return [
+                'id' => $branch->id,
+                'name' => $branch->name,
+                'address' => $branch->address,
+                'phone' => $branch->phone,
+                'is_current' => $branch->id === $currentBranchId,
+            ];
+        })->values();
+
+        return response()->json($result);
+    }
+
+    /**
+     * Switch the user's active branch.
+     */
+    public function switchBranch(Request $request)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'branch_id' => 'required|exists:branches,id',
+        ]);
+
+        $user = $request->user();
+
+        // Check if user has access to this branch
+        if (!$user->canAccessBranch($validated['branch_id'])) {
+            return response()->json([
+                'message' => 'You do not have access to this branch.',
+            ], 403);
+        }
+
+        // Update active branch
+        $user->active_branch_id = $validated['branch_id'];
+        $user->save();
+
+        return response()->json([
+            'message' => 'Branch switched successfully.',
+            'current_branch_id' => $user->currentBranchId(),
+        ]);
     }
 }
