@@ -116,7 +116,12 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                                     ),
                                 }}
                             />
-                            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>
+                            <Button
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={handleOpen}
+                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            >
                                 New Adjustment
                             </Button>
                         </Stack>

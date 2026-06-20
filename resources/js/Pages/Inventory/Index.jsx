@@ -17,8 +17,8 @@ import {
     TableRow,
     Chip,
     Button,
-    Divider,
     IconButton,
+    Tooltip,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -28,6 +28,7 @@ import {
     Category as CategoryIcon,
     InfoOutlined as StatusIcon,
     Refresh as ResetIcon,
+    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function InventoryIndex({ auth, inventory, branches, categories, filters }) {
@@ -67,6 +68,11 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
         setStockStatus('');
         router.get(route('inventory.index'), {}, { replace: true });
     };
+
+    const detailUrl = (productId) => route('inventory.show', {
+        product: productId,
+        ...(branchId ? { branch_id: branchId } : {}),
+    });
 
     return (
         <MainLayout auth={auth} header="Inventory Stock Reports">
@@ -198,6 +204,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Current Stock</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Stock Status</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Product Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Action</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -236,11 +243,18 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                                 sx={{ height: 20, fontSize: '11px' }}
                                             />
                                         </TableCell>
+                                        <TableCell align="center">
+                                            <Tooltip title="View batch details">
+                                                <IconButton size="small" component="a" href={detailUrl(item.id)}>
+                                                    <ViewIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                                 {inventory.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No inventory records found for the selected filters.
                                             </Typography>

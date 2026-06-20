@@ -67,7 +67,7 @@ const drawerWidth = 200; // More compact sidebar
 export default function MainLayout({ children, header }) {
     const theme = useTheme();
     const colorMode = useContext(ColorModeContext);
-    const { auth, flash, settings = {}, pending_returns_count = 0, translations = {}, locale, ziggy = {} } = usePage().props;
+    const { auth, flash, settings = {}, nav_counts = {}, translations = {}, locale, ziggy = {} } = usePage().props;
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
     const appBase = ziggy?.base || window.laravel_base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -208,11 +208,29 @@ export default function MainLayout({ children, header }) {
         .map((group) => ({
             ...group,
             visibleItems: group.keys
-                .map((k) => menuItems[k])
+                .map((k) => menuItems[k] ? ({
+                    ...menuItems[k],
+                    key: k,
+                    count: Number(nav_counts?.[k] || 0),
+                }) : null)
                 .filter(Boolean)
                 .filter((item) => canSee(item)),
         }))
         .filter((group) => group.visibleItems.length > 0);
+
+    const navIconBoxSx = (isActive) => ({
+        width: 22,
+        height: 22,
+        borderRadius: 0.75,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: '1px solid',
+        borderColor: isActive ? 'primary.main' : 'divider',
+        bgcolor: isActive ? 'primary.main' : 'action.hover',
+        color: isActive ? 'primary.contrastText' : 'text.secondary',
+        transition: 'all 180ms ease',
+    });
 
     const drawer = (
         <div>
@@ -434,65 +452,28 @@ export default function MainLayout({ children, header }) {
                                             }}
                                         >
                                             <ListItemIcon sx={{ minWidth: 40, color: isActive ? 'primary.main' : 'inherit' }}>
-                                                {item.text === 'Returns' && pending_returns_count > 0 ? (
-                                                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                                        <Box
-                                                            sx={{
-                                                                width: 22,
-                                                                height: 22,
-                                                                borderRadius: 0.75,
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                border: '1px solid',
-                                                                borderColor: isActive ? 'primary.main' : 'divider',
-                                                                bgcolor: isActive ? 'primary.main' : 'action.hover',
-                                                                color: isActive ? 'primary.contrastText' : 'text.secondary',
-                                                                transition: 'all 180ms ease',
-                                                            }}
-                                                        >
-                                                            {item.icon}
-                                                        </Box>
-                                                        <Box
-                                                            sx={{
-                                                                position: 'absolute',
-                                                                top: -4,
-                                                                right: -4,
-                                                                width: 16,
-                                                                height: 16,
-                                                                borderRadius: '50%',
-                                                                bgcolor: 'error.main',
-                                                                color: 'white',
-                                                                fontSize: 10,
-                                                                fontWeight: 'bold',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                boxShadow: 1,
-                                                            }}
-                                                        >
-                                                            {pending_returns_count > 9 ? '9+' : pending_returns_count}
-                                                        </Box>
-                                                    </Box>
-                                                ) : (
-                                                    <Box
-                                                        sx={{
-                                                            width: 22,
-                                                            height: 22,
-                                                            borderRadius: 0.75,
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            border: '1px solid',
-                                                            borderColor: isActive ? 'primary.main' : 'divider',
-                                                            bgcolor: isActive ? 'primary.main' : 'action.hover',
-                                                            color: isActive ? 'primary.contrastText' : 'text.secondary',
-                                                            transition: 'all 180ms ease',
-                                                        }}
-                                                    >
+                                                <Badge
+                                                    badgeContent={item.count}
+                                                    max={99}
+                                                    color="error"
+                                                    invisible={item.count <= 0}
+                                                    overlap="circular"
+                                                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                                    sx={{
+                                                        '& .MuiBadge-badge': {
+                                                            minWidth: 16,
+                                                            height: 16,
+                                                            px: 0.4,
+                                                            fontSize: 10,
+                                                            fontWeight: 800,
+                                                            boxShadow: 1,
+                                                        },
+                                                    }}
+                                                >
+                                                    <Box sx={navIconBoxSx(isActive)}>
                                                         {item.icon}
                                                     </Box>
-                                                )}
+                                                </Badge>
                                             </ListItemIcon>
                                             <ListItemText primary={__(item.text)} primaryTypographyProps={{ variant: 'body2', fontWeight: isActive ? 600 : 400 }} />
                                         </ListItemButton>

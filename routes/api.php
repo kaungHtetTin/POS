@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user()->only('id', 'name', 'email', 'branch_id', 'active_branch_id');
     });
+    Route::get('/user/access', [AccountController::class, 'access']);
 
     // Account, profile, security, and current branch context
     Route::get('/account/profile', [AccountController::class, 'show']);
@@ -112,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/products/{product}', [StaffProductController::class, 'destroy']);
 
         Route::get('/inventory/stock', [StaffProductController::class, 'stock']);
+        Route::get('/inventory/products/{product}/batches', [StaffProductController::class, 'inventoryBatches']);
 
         Route::get('/purchases', [StaffPurchaseController::class, 'index']);
         Route::post('/purchases', [StaffPurchaseController::class, 'store']);

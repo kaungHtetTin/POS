@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Category;
-use App\Models\Inventory;
+use App\Models\InventoryBatch;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
@@ -76,5 +75,85 @@ class InventoryController extends Controller
             'categories' => Category::select('id', 'name')->orderBy('name')->get(),
             'filters' => $request->only(['search', 'branch_id', 'category_id', 'product_status', 'stock_status']),
         ]);
+    }
+
+    public function show(Request $request, string $locale, Product $product)
+    {
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'exists:branches,id'],
+        ]);
+
+        $branchId = $validated['branch_id'] ?? null;
+        $product->load(['category:id,name']);
+
+        $batches = InventoryBatch::query()
+            ->select('id', 'branch_id', 'product_id', 'batch_number', 'expiry_date', 'quantity', 'purchase_price', 'selling_price')
+            ->with(['branch:id,name'])
+            ->where('product_id', $product->id)
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->where('quantity', '>', 0)
+            ->orderBy('branch_id')
+            ->orderBy('expiry_date')
+            ->orderBy('batch_number')
+            ->get();
+
+        $branchGroups = $batches
+            ->groupBy('branch_id')
+            ->map(function ($items) {
+                $branch = $items->first()->branch;
+
+                return [
+                    'branch' => $branch ? [
+                        'id' => $branch->id,
+                        'name' => $branch->name,
+                    ] : null,
+                    'total_quantity' => (int) $items->sum('quantity'),
+                    'batches' => $items->map(fn ($batch) => [
+                        'id' => $batch->id,
+                        'batch_number' => $batch->batch_number,
+                        'expiry_date' => optional($batch->expiry_date)->toDateString(),
+                        'quantity' => (int) $batch->quantity,
+                        'purchase_price' => $batch->purchase_price,
+                        'selling_price' => $batch->selling_price,
+                    ])->values(),
+                ];
+            })
+            ->values();
+
+        $aggregateQuantity = (int) $product->inventories()
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->sum('quantity');
+
+        $batchQuantity = (int) $batches->sum('quantity');
+
+        return Inertia::render('Inventory/Show', [
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'generic_name' => $product->generic_name,
+                'barcode' => $product->barcode,
+                'category' => $product->category->name ?? 'N/A',
+                'min_stock_level' => (int) $product->min_stock_level,
+                'status' => $product->status,
+            ],
+            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
+            'branchGroups' => $branchGroups,
+            'summary' => [
+                'batch_quantity' => $batchQuantity,
+                'aggregate_quantity' => $aggregateQuantity,
+                'quantity_difference' => $aggregateQuantity - $batchQuantity,
+                'stock_status' => $this->stockStatus($aggregateQuantity, (int) $product->min_stock_level),
+            ],
+            'filters' => $request->only(['branch_id']),
+        ]);
+    }
+
+    private function stockStatus(int $stock, int $minStockLevel): string
+    {
+        if ($stock <= 0) {
+            return 'Out of Stock';
+        }
+
+        return $stock < $minStockLevel ? 'Low Stock' : 'In Stock';
     }
 }

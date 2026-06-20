@@ -97,6 +97,49 @@ class AccountController extends Controller
         ]);
     }
 
+    public function access(Request $request)
+    {
+        $user = $request->user()->loadMissing(['roles.permissions']);
+
+        $roles = $user->roles
+            ->map(fn ($role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+            ])
+            ->values();
+
+        $permissions = $user->roles
+            ->flatMap->permissions
+            ->unique('id')
+            ->sortBy('slug')
+            ->map(fn ($permission) => [
+                'id' => $permission->id,
+                'name' => $permission->name,
+                'slug' => $permission->slug,
+            ])
+            ->values();
+
+        $permissionSlugs = $permissions->pluck('slug')->values();
+        $roleNames = $roles->pluck('name')->values();
+        $canAccessAllBranches = $roleNames->contains('Owner')
+            || $roleNames->contains('Root')
+            || $permissionSlugs->contains('manage_branches');
+
+        return response()->json([
+            'user_id' => $user->id,
+            'roles' => $roles,
+            'role_names' => $roleNames,
+            'permissions' => $permissions,
+            'permission_slugs' => $permissionSlugs,
+            'access' => [
+                'can_access_all_branches' => $canAccessAllBranches,
+                'current_branch_id' => $user->currentBranchId(),
+                'branch_id' => $user->branch_id,
+                'active_branch_id' => $user->active_branch_id,
+            ],
+        ]);
+    }
+
     public function switchBranch(Request $request)
     {
         $validated = $request->validate([

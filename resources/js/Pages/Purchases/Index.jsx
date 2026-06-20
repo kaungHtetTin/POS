@@ -312,7 +312,19 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                 sx={{ minWidth: { sm: 250 } }}
                             />
                             <Button variant="outlined" size="small" onClick={handleSearch}>Search</Button>
-                            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<AddIcon />}
+                                onClick={() => handleOpen()}
+                                sx={{
+                                    height: 40,
+                                    minWidth: 164,
+                                    px: 2,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                }}
+                            >
                                 Create Purchase
                             </Button>
                         </Stack>

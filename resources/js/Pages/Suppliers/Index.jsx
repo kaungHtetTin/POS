@@ -150,6 +150,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 size="small"
                                 startIcon={<AddIcon />}
                                 onClick={() => handleOpen()}
+                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
                                 Add Supplier
                             </Button>

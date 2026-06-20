@@ -93,7 +93,13 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             EXPENSE CATEGORIES
                         </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => handleOpen()}
+                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
                             Add New Category
                         </Button>
                     </Box>
@@ -217,4 +223,3 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
         </MainLayout>
     );
 }
-

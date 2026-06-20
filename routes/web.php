@@ -126,6 +126,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         
         Route::get('/inventory/transfers', [StockTransferController::class, 'index'])->name('inventory.transfers.index')->middleware('permission:manage_inventory');
         Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store')->middleware('permission:manage_inventory');
+        Route::get('/inventory/{product}', [InventoryController::class, 'show'])->name('inventory.show')->middleware('permission:manage_inventory');
 
         Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware('permission:view_financial_reports');
         Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store')->middleware('permission:view_financial_reports');

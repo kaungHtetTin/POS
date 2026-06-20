@@ -160,7 +160,13 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                             <ExpenseIcon fontSize="small" color="primary" />
                             EXPENSE TRACKING
                         </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => handleOpen()}
+                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
                             Add Expense
                         </Button>
                     </Stack>

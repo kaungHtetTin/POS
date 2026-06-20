@@ -281,6 +281,83 @@ class StaffProductController extends Controller
         ]);
     }
 
+    public function inventoryBatches(Request $request, Product $product)
+    {
+        if (!$this->canManageInventory($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'exists:branches,id'],
+        ]);
+
+        $branchId = $validated['branch_id'] ?? null;
+        $product->load(['category:id,name']);
+
+        $batches = InventoryBatch::query()
+            ->select('id', 'branch_id', 'product_id', 'batch_number', 'expiry_date', 'quantity', 'purchase_price', 'selling_price')
+            ->with(['branch:id,name,address,phone'])
+            ->where('product_id', $product->id)
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->where('quantity', '>', 0)
+            ->orderBy('branch_id')
+            ->orderBy('expiry_date')
+            ->orderBy('batch_number')
+            ->get();
+
+        $branchGroups = $batches
+            ->groupBy('branch_id')
+            ->map(function ($items) {
+                $branch = $items->first()->branch;
+
+                return [
+                    'branch' => $branch ? [
+                        'id' => $branch->id,
+                        'name' => $branch->name,
+                        'address' => $branch->address,
+                        'phone' => $branch->phone,
+                    ] : null,
+                    'total_quantity' => (int) $items->sum('quantity'),
+                    'batches' => $items->map(fn ($batch) => [
+                        'id' => $batch->id,
+                        'batch_number' => $batch->batch_number,
+                        'expiry_date' => optional($batch->expiry_date)->toDateString(),
+                        'quantity' => (int) $batch->quantity,
+                        'purchase_price' => $batch->purchase_price,
+                        'selling_price' => $batch->selling_price,
+                    ])->values(),
+                ];
+            })
+            ->values();
+
+        $aggregateQuantity = (int) $product->inventories()
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->sum('quantity');
+        $batchQuantity = (int) $batches->sum('quantity');
+
+        return response()->json([
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'generic_name' => $product->generic_name,
+                'barcode' => $product->barcode,
+                'category' => $product->category ? [
+                    'id' => $product->category->id,
+                    'name' => $product->category->name,
+                ] : null,
+                'min_stock_level' => (int) $product->min_stock_level,
+                'status' => $product->status,
+            ],
+            'summary' => [
+                'batch_quantity' => $batchQuantity,
+                'aggregate_quantity' => $aggregateQuantity,
+                'quantity_difference' => $aggregateQuantity - $batchQuantity,
+                'stock_status' => $this->stockStatus($aggregateQuantity, (int) $product->min_stock_level),
+            ],
+            'branch_groups' => $branchGroups,
+        ]);
+    }
+
     private function validateProduct(Request $request, ?Product $product = null): array
     {
         return $request->validate([

@@ -199,7 +199,13 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                             <ReturnIcon fontSize="small" color="primary" />
                             RETURNS & REFUNDS
                         </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleOpen}>
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={handleOpen}
+                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
                             New Return
                         </Button>
                     </Stack>

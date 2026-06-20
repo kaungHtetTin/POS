@@ -364,6 +364,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             size="small" 
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
+                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Medicine
                         </Button>

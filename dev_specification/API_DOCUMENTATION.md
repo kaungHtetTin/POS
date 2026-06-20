@@ -42,6 +42,41 @@ Requires `Authorization: Bearer <token>`.
 
 Returns the current authenticated user: `id`, `name`, `email`, `branch_id`, `active_branch_id`.
 
+### GET `/api/user/access`
+
+Requires `Authorization: Bearer <token>`.
+
+Returns the current authenticated user's roles, permissions, and branch access flags.
+
+Response:
+
+```json
+{
+  "user_id": "user-uuid",
+  "roles": [
+    {
+      "id": "role-uuid",
+      "name": "Cashier"
+    }
+  ],
+  "role_names": ["Cashier"],
+  "permissions": [
+    {
+      "id": "permission-uuid",
+      "name": "Process Sale",
+      "slug": "process_sale"
+    }
+  ],
+  "permission_slugs": ["process_sale"],
+  "access": {
+    "can_access_all_branches": false,
+    "current_branch_id": "branch-uuid",
+    "branch_id": "assigned-branch-uuid",
+    "active_branch_id": "active-branch-uuid"
+  }
+}
+```
+
 ## Account API
 
 All account endpoints require `Authorization: Bearer <token>`.
@@ -734,9 +769,65 @@ Response:
 }
 ```
 
+### GET `/api/staff/inventory/products/{product}/batches`
+
+Returns one product's active inventory batches grouped by branch. Use `branch_id` to limit the result to one branch.
+
+Query parameters:
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `branch_id` | UUID | No | Filters batch groups to one branch. |
+
+Response:
+
+```json
+{
+  "product": {
+    "id": "product-uuid",
+    "name": "Paracetamol",
+    "generic_name": "Acetaminophen",
+    "barcode": "885000000001",
+    "category": {
+      "id": "category-uuid",
+      "name": "Pain Relief"
+    },
+    "min_stock_level": 20,
+    "status": "Active"
+  },
+  "summary": {
+    "batch_quantity": 120,
+    "aggregate_quantity": 120,
+    "quantity_difference": 0,
+    "stock_status": "In Stock"
+  },
+  "branch_groups": [
+    {
+      "branch": {
+        "id": "branch-uuid",
+        "name": "Main Branch",
+        "address": "Yangon",
+        "phone": "09123456789"
+      },
+      "total_quantity": 120,
+      "batches": [
+        {
+          "id": "batch-uuid",
+          "batch_number": "B-001",
+          "expiry_date": "2027-06-19",
+          "quantity": 120,
+          "purchase_price": "500.00",
+          "selling_price": "700.00"
+        }
+      ]
+    }
+  ]
+}
+```
+
 ### GET `/api/staff/suppliers`
 
-Returns active suppliers with credit fields.
+Returns suppliers with credit fields.
 
 ### GET `/api/staff/products`
 

@@ -146,6 +146,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                             size="small" 
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
+                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Staff
                         </Button>

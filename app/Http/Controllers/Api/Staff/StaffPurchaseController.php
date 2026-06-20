@@ -24,7 +24,6 @@ class StaffPurchaseController extends Controller
         }
 
         $suppliers = Supplier::select('id', 'name', 'phone', 'email', 'address', 'credit_limit', 'balance')
-            ->where('status', true)
             ->orderBy('name')
             ->get();
 
