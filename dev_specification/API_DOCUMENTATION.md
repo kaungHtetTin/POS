@@ -1,6 +1,6 @@
 # Pharmacy POS API Documentation
 
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 This document describes the implemented HTTP API in `routes/api.php`. All protected endpoints use Laravel Sanctum bearer tokens.
 
@@ -41,6 +41,124 @@ Response:
 Requires `Authorization: Bearer <token>`.
 
 Returns the current authenticated user: `id`, `name`, `email`, `branch_id`, `active_branch_id`.
+
+## Account API
+
+All account endpoints require `Authorization: Bearer <token>`.
+
+### GET `/api/account/profile`
+
+Returns the authenticated user's profile plus assigned/current branch context.
+
+Response:
+
+```json
+{
+  "id": "user-uuid",
+  "name": "Staff User",
+  "email": "staff@example.com",
+  "phone": "09123456789",
+  "image_url": "http://localhost/storage/profile-images/avatar.jpg",
+  "branch_id": "assigned-branch-uuid",
+  "active_branch_id": "active-branch-uuid",
+  "current_branch_id": "active-or-assigned-branch-uuid",
+  "assigned_branch": {
+    "id": "assigned-branch-uuid",
+    "name": "Main Branch",
+    "address": "Yangon",
+    "phone": "09123456789",
+    "email": "main@example.com"
+  },
+  "active_branch": {
+    "id": "active-branch-uuid",
+    "name": "Downtown Branch",
+    "address": "Yangon",
+    "phone": "09999999999",
+    "email": "downtown@example.com"
+  }
+}
+```
+
+### PUT `/api/account/profile`
+
+Updates profile details. Send as `multipart/form-data` when uploading `image`.
+
+Request:
+
+```json
+{
+  "name": "Staff User",
+  "email": "staff@example.com",
+  "phone": "09123456789",
+  "image": "optional image file"
+}
+```
+
+### POST `/api/account/password`
+
+Updates account security password.
+
+Request:
+
+```json
+{
+  "current_password": "old-password",
+  "password": "new-password",
+  "password_confirmation": "new-password"
+}
+```
+
+### GET `/api/account/branches`
+
+Returns the assigned branch, active branch, effective `current_branch_id`, and all branches the user can access.
+
+### POST `/api/account/branches/switch`
+
+Sets the authenticated user's active branch after access checks.
+
+Request:
+
+```json
+{
+  "branch_id": "branch-uuid"
+}
+```
+
+## Settings API
+
+All settings endpoints require `Authorization: Bearer <token>`.
+
+### GET `/api/settings/invoice`
+
+Returns invoice, receipt, currency, and default tax settings.
+
+Response:
+
+```json
+{
+  "pharmacy_name": "Pharmacy POS",
+  "logo_path": "settings/logo.png",
+  "logo_url": "http://localhost/storage/settings/logo.png",
+  "default_tax_id": "tax-uuid",
+  "receipt_header": "",
+  "receipt_footer": "",
+  "invoice_prefix": "S",
+  "enable_tax": true,
+  "currency_code": "USD",
+  "currency_symbol": "$",
+  "date_format": "Y-m-d",
+  "time_format": "H:i:s",
+  "receipt_width": 80,
+  "auto_print_receipt": false,
+  "silent_print": false,
+  "silent_printer_name": "",
+  "default_tax": {
+    "id": "tax-uuid",
+    "name": "Commercial Tax",
+    "rate": "5.00"
+  }
+}
+```
 
 ### POST `/api/logout`
 
@@ -323,13 +441,169 @@ All staff endpoints require:
 - Sanctum bearer token.
 - `manage_inventory` permission.
 
+### Product CRUD Endpoints
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET | `/api/staff/products/lookups` | Returns categories, active taxes, units, and default tax ID for product forms. |
+| GET | `/api/staff/products` | Lists products with units and taxes. Defaults to active products. |
+| POST | `/api/staff/products` | Creates a product with taxes and product units. |
+| GET | `/api/staff/products/{product}` | Shows one product. |
+| PUT/PATCH | `/api/staff/products/{product}` | Updates product details, taxes, and units. |
+| DELETE | `/api/staff/products/{product}` | Soft-deletes product if it has no inventory batches. |
+
+List query parameters:
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `search` | string | No | Searches name, generic name, brand name, or barcode. |
+| `category_id` | UUID | No | Filters by category. |
+| `status` | string | No | `Active`, `Inactive`, or `all`; defaults to `Active`. |
+| `per_page` | integer | No | 1-100; defaults to 50. |
+
+Create/update request:
+
+```json
+{
+  "category_id": "category-uuid",
+  "tax_id": "tax-uuid",
+  "tax_ids": ["tax-uuid"],
+  "name": "Paracetamol",
+  "generic_name": "Acetaminophen",
+  "brand_name": "Paramacy",
+  "manufacturer": "ABC Pharma",
+  "strength": "500mg",
+  "barcode": "885000000001",
+  "description": "Pain reliever",
+  "min_stock_level": 20,
+  "discount_percentage": 5,
+  "tax_method": "Exclusive",
+  "status": "Active",
+  "image": "optional image file",
+  "product_units": [
+    {
+      "unit_id": "unit-uuid",
+      "conversion_factor": 1,
+      "selling_price": 100,
+      "wholesale_price": 90,
+      "is_base_unit": true
+    }
+  ]
+}
+```
+
+Use `multipart/form-data` when uploading `image`; otherwise JSON is accepted.
+
+Product response shape:
+
+```json
+{
+  "id": "product-uuid",
+  "category_id": "category-uuid",
+  "category": {
+    "id": "category-uuid",
+    "name": "Pain Relief"
+  },
+  "tax_id": "tax-uuid",
+  "tax_ids": ["tax-uuid"],
+  "taxes": [
+    {
+      "id": "tax-uuid",
+      "name": "Commercial Tax",
+      "rate": "5.00"
+    }
+  ],
+  "name": "Paracetamol",
+  "generic_name": "Acetaminophen",
+  "brand_name": "Paramacy",
+  "manufacturer": "ABC Pharma",
+  "strength": "500mg",
+  "barcode": "885000000001",
+  "description": "Pain reliever",
+  "min_stock_level": 20,
+  "discount_percentage": 5,
+  "tax_method": "Exclusive",
+  "status": "Active",
+  "image_url": "http://localhost/storage/product-images/paracetamol.jpg",
+  "units": [
+    {
+      "id": "product-unit-uuid",
+      "unit_id": "unit-uuid",
+      "unit_name": "Tablet",
+      "unit_short_name": "tab",
+      "conversion_factor": 1,
+      "selling_price": "100.00",
+      "wholesale_price": "90.00",
+      "is_base_unit": true
+    }
+  ]
+}
+```
+
+### GET `/api/staff/inventory/stock`
+
+Returns stock for a given branch. Use `include_batches=1` to include non-empty batch details.
+
+Query parameters:
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `branch_id` | UUID | Yes | Branch to inspect. |
+| `search` | string | No | Searches product name, generic name, or barcode. |
+| `category_id` | UUID | No | Filters by category. |
+| `product_status` | string | No | `Active`, `Inactive`, or `all`; defaults to `Active`. |
+| `stock_status` | string | No | `In Stock`, `Low Stock`, or `Out of Stock`. |
+| `include_batches` | boolean | No | Include batch numbers, expiry dates, and prices. |
+| `per_page` | integer | No | 1-100; defaults to 50. |
+
+Response:
+
+```json
+{
+  "branch": {
+    "id": "branch-uuid",
+    "name": "Main Branch",
+    "address": "Yangon",
+    "phone": "09123456789"
+  },
+  "stock": {
+    "data": [
+      {
+        "id": "product-uuid",
+        "name": "Paracetamol",
+        "generic_name": "Acetaminophen",
+        "barcode": "885000000001",
+        "category": {
+          "id": "category-uuid",
+          "name": "Pain Relief"
+        },
+        "min_stock_level": 20,
+        "current_stock": 120,
+        "product_status": "Active",
+        "stock_status": "In Stock",
+        "batches": [
+          {
+            "id": "batch-uuid",
+            "batch_number": "B-001",
+            "expiry_date": "2027-06-19",
+            "quantity": 120,
+            "purchase_price": "500.00",
+            "selling_price": "700.00"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ### GET `/api/staff/suppliers`
 
 Returns active suppliers with credit fields.
 
 ### GET `/api/staff/products`
 
-Returns active products and units for purchase entry.
+Returns active products and units for purchase entry. This endpoint is now also the product list endpoint; use `status=all` to include inactive products.
 
 Important pricing fields:
 
