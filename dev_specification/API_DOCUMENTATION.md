@@ -827,7 +827,7 @@ Response:
 
 ### GET `/api/staff/suppliers`
 
-Returns suppliers with credit fields.
+Returns suppliers with credit fields. `balance` is the outstanding supplier balance managed by unpaid purchase dues.
 
 ### GET `/api/staff/products`
 
@@ -959,6 +959,11 @@ Response:
   }
 }
 ```
+
+Possible errors:
+
+- `422` if `paid_amount` exceeds the purchase total.
+- `422` if the purchase due amount would exceed the supplier credit limit.
 
 ## Status Codes
 

@@ -10,6 +10,7 @@ use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StaffPurchaseController extends Controller
 {
@@ -167,7 +168,21 @@ class StaffPurchaseController extends Controller
                 $paidAmount = 0;
             }
 
-            $dueAmount = max($totalAmount - $paidAmount, 0);
+            if ($paidAmount > $totalAmount) {
+                throw ValidationException::withMessages([
+                    'paid_amount' => 'Paid amount cannot exceed total purchase amount.',
+                ]);
+            }
+
+            $dueAmount = $totalAmount - $paidAmount;
+            $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
+            $projectedBalance = (float) $supplier->balance + $dueAmount;
+
+            if ($projectedBalance > (float) $supplier->credit_limit) {
+                throw ValidationException::withMessages([
+                    'supplier_id' => 'Credit limit exceeded for selected supplier.',
+                ]);
+            }
 
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
@@ -226,7 +241,9 @@ class StaffPurchaseController extends Controller
                     ]);
             }
 
-            Supplier::whereKey($validated['supplier_id'])->increment('balance', $dueAmount);
+            $supplier->update([
+                'balance' => $projectedBalance,
+            ]);
 
             return $purchase;
         });

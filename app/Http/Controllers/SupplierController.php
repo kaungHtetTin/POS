@@ -35,7 +35,6 @@ class SupplierController extends Controller
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
             'credit_limit' => 'required|numeric|min:0|max:999999999999.99',
-            'balance' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
         Supplier::create($validated);
@@ -43,7 +42,7 @@ class SupplierController extends Controller
         return redirect()->back()->with('success', 'Supplier created successfully.');
     }
 
-    public function update(Request $request, Supplier $supplier)
+    public function update(Request $request, string $locale, Supplier $supplier)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -52,7 +51,6 @@ class SupplierController extends Controller
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
             'credit_limit' => 'required|numeric|min:0|max:999999999999.99',
-            'balance' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
         $supplier->update($validated);
@@ -60,7 +58,7 @@ class SupplierController extends Controller
         return redirect()->back()->with('success', 'Supplier updated successfully.');
     }
 
-    public function destroy(Supplier $supplier)
+    public function destroy(string $locale, Supplier $supplier)
     {
         if ($supplier->purchases()->exists()) {
             return redirect()->back()->with('error', 'Supplier cannot be deleted because it has related purchases.');

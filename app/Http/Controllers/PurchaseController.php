@@ -404,8 +404,10 @@ class PurchaseController extends Controller
         $dueAmount = $totalAmount - $paidAmount;
         $supplier = Supplier::findOrFail($validated['supplier_id']);
 
-        // Check credit limit (ignoring the current purchase's existing due amount)
-        $projectedBalance = (float) $supplier->balance - (float) $purchase->due_amount + $dueAmount;
+        $existingDueForSelectedSupplier = $purchase->supplier_id === $validated['supplier_id']
+            ? (float) $purchase->due_amount
+            : 0;
+        $projectedBalance = (float) $supplier->balance - $existingDueForSelectedSupplier + $dueAmount;
         if ($projectedBalance > (float) $supplier->credit_limit) {
             return redirect()->back()->withErrors(['supplier_id' => 'Credit limit exceeded for selected supplier.'])->withInput();
         }

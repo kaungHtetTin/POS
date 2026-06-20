@@ -49,7 +49,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
         address: '',
         payment_terms: '',
         credit_limit: '0',
-        balance: '0',
     });
 
     const handleOpen = (supplier = null) => {
@@ -63,7 +62,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                 address: supplier.address || '',
                 payment_terms: supplier.payment_terms || '',
                 credit_limit: supplier.credit_limit ?? '0',
-                balance: supplier.balance ?? '0',
             });
         } else {
             setEditMode(false);
@@ -76,7 +74,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                 address: '',
                 payment_terms: '',
                 credit_limit: '0',
-                balance: '0',
             });
         }
         setOpen(true);
@@ -323,32 +320,18 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 error={!!errors.payment_terms}
                                 helperText={errors.payment_terms}
                             />
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <TextField
-                                    label="Credit Limit"
-                                    type="number"
-                                    fullWidth
-                                    size="small"
-                                    value={data.credit_limit}
-                                    onChange={(e) => setData('credit_limit', e.target.value)}
-                                    error={!!errors.credit_limit}
-                                    helperText={errors.credit_limit}
-                                    inputProps={{ min: 0, step: '0.01' }}
-                                    required
-                                />
-                                <TextField
-                                    label="Outstanding Balance"
-                                    type="number"
-                                    fullWidth
-                                    size="small"
-                                    value={data.balance}
-                                    onChange={(e) => setData('balance', e.target.value)}
-                                    error={!!errors.balance}
-                                    helperText={errors.balance}
-                                    inputProps={{ min: 0, step: '0.01' }}
-                                    required
-                                />
-                            </Stack>
+                            <TextField
+                                label="Credit Limit"
+                                type="number"
+                                fullWidth
+                                size="small"
+                                value={data.credit_limit}
+                                onChange={(e) => setData('credit_limit', e.target.value)}
+                                error={!!errors.credit_limit}
+                                helperText={errors.credit_limit}
+                                inputProps={{ min: 0, step: '0.01' }}
+                                required
+                            />
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
