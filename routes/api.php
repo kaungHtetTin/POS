@@ -75,7 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/customers/{customer}', [CashierPosController::class, 'destroyCustomer']);
 
         // Sales
+        Route::get('/sales', [CashierPosController::class, 'sales']);
         Route::post('/sales', [CashierPosController::class, 'checkout']);
+        Route::get('/sales/{sale}', [CashierPosController::class, 'showSale']);
 
         // Cash Sessions
         Route::get('/sessions/active', [CashierPosController::class, 'activeSession']);

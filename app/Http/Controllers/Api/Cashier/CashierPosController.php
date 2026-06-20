@@ -236,6 +236,111 @@ class CashierPosController extends Controller
     }
 
     /**
+     * List sale history for the current branch.
+     * Requires: process_sale permission
+     */
+    public function sales(Request $request)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'payment_method' => 'nullable|in:Cash,Card,Mobile,Wallet',
+            'payment_status' => 'nullable|in:Paid,Partial,Due',
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date|after_or_equal:from_date',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $branchId = $request->user()->currentBranchId();
+        if (!$branchId) {
+            return response()->json(['message' => 'No branch assigned'], 422);
+        }
+
+        $query = Sale::query()
+            ->where('branch_id', $branchId)
+            ->with(['customer:id,name,phone', 'user:id,name', 'branch:id,name'])
+            ->withCount('items');
+
+        if (!empty($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if (!empty($validated['payment_method'])) {
+            $query->where('payment_method', $validated['payment_method']);
+        }
+
+        if (!empty($validated['payment_status'])) {
+            $query->where('payment_status', $validated['payment_status']);
+        }
+
+        if (!empty($validated['from_date'])) {
+            $query->whereDate('sale_date', '>=', $validated['from_date']);
+        }
+
+        if (!empty($validated['to_date'])) {
+            $query->whereDate('sale_date', '<=', $validated['to_date']);
+        }
+
+        $sales = $query
+            ->latest('sale_date')
+            ->latest()
+            ->paginate((int) ($validated['per_page'] ?? 15));
+
+        $sales->getCollection()->transform(function ($sale) {
+            return $this->formatSaleSummary($sale);
+        });
+
+        return response()->json($sales);
+    }
+
+    /**
+     * Get one sale with item details for the current branch.
+     * Requires: process_sale permission
+     */
+    public function showSale(Request $request, Sale $sale)
+    {
+        if (!$request->user()->hasPermission('process_sale')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $branchId = $request->user()->currentBranchId();
+        if (!$branchId) {
+            return response()->json(['message' => 'No branch assigned'], 422);
+        }
+
+        if ($sale->branch_id !== $branchId) {
+            return response()->json(['message' => 'Sale not found'], 404);
+        }
+
+        $sale->load([
+            'customer:id,name,phone,address',
+            'branch:id,name,address,phone',
+            'user:id,name',
+            'cashSession:id,opened_at,closed_at',
+            'items' => function ($q) {
+                $q->with([
+                    'product:id,name,generic_name,barcode',
+                    'unit:id,name,short_name',
+                    'focUnit:id,name,short_name',
+                    'batch:id,batch_number,expiry_date',
+                ])->orderBy('created_at')->orderBy('id');
+            },
+        ]);
+
+        return response()->json($this->formatSaleDetail($sale));
+    }
+
+    /**
      * Create a new sale (checkout).
      * Requires: process_sale permission
      */
@@ -560,6 +665,105 @@ class CashierPosController extends Controller
         ]);
 
         return response()->json(['message' => 'Session closed successfully.', 'session' => $session]);
+    }
+
+    private function formatSaleSummary(Sale $sale): array
+    {
+        return [
+            'id' => $sale->id,
+            'invoice_number' => $sale->invoice_number,
+            'sale_date' => $sale->sale_date?->toIso8601String(),
+            'total_amount' => $sale->total_amount,
+            'discount' => $sale->discount,
+            'tax' => $sale->tax,
+            'grand_total' => $sale->grand_total,
+            'amount_received' => $sale->amount_received,
+            'change_due' => $sale->change_due,
+            'payment_method' => $sale->payment_method,
+            'payment_status' => $sale->payment_status,
+            'items_count' => (int) ($sale->items_count ?? 0),
+            'customer' => $sale->customer ? [
+                'id' => $sale->customer->id,
+                'name' => $sale->customer->name,
+                'phone' => $sale->customer->phone,
+            ] : null,
+            'branch' => $sale->branch ? [
+                'id' => $sale->branch->id,
+                'name' => $sale->branch->name,
+            ] : null,
+            'cashier' => $sale->user ? [
+                'id' => $sale->user->id,
+                'name' => $sale->user->name,
+            ] : null,
+        ];
+    }
+
+    private function formatSaleDetail(Sale $sale): array
+    {
+        $summary = $this->formatSaleSummary($sale);
+
+        $summary['customer'] = $sale->customer ? [
+            'id' => $sale->customer->id,
+            'name' => $sale->customer->name,
+            'phone' => $sale->customer->phone,
+            'address' => $sale->customer->address,
+        ] : null;
+
+        $summary['branch'] = $sale->branch ? [
+            'id' => $sale->branch->id,
+            'name' => $sale->branch->name,
+            'address' => $sale->branch->address,
+            'phone' => $sale->branch->phone,
+        ] : null;
+
+        $summary['cash_session'] = $sale->cashSession ? [
+            'id' => $sale->cashSession->id,
+            'opened_at' => $sale->cashSession->opened_at?->toIso8601String(),
+            'closed_at' => $sale->cashSession->closed_at?->toIso8601String(),
+        ] : null;
+
+        $summary['items'] = $sale->items->map(function (SaleItem $item) {
+            return [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'product' => $item->product ? [
+                    'id' => $item->product->id,
+                    'name' => $item->product->name,
+                    'generic_name' => $item->product->generic_name,
+                    'barcode' => $item->product->barcode,
+                ] : null,
+                'batch_id' => $item->batch_id,
+                'batch' => $item->batch ? [
+                    'id' => $item->batch->id,
+                    'batch_number' => $item->batch->batch_number,
+                    'expiry_date' => $item->batch->expiry_date?->toDateString(),
+                ] : null,
+                'unit_id' => $item->unit_id,
+                'unit' => $item->unit ? [
+                    'id' => $item->unit->id,
+                    'name' => $item->unit->name,
+                    'short_name' => $item->unit->short_name,
+                ] : null,
+                'quantity' => $item->quantity,
+                'foc_quantity' => $item->foc_quantity,
+                'foc_unit_id' => $item->foc_unit_id,
+                'foc_unit' => $item->focUnit ? [
+                    'id' => $item->focUnit->id,
+                    'name' => $item->focUnit->name,
+                    'short_name' => $item->focUnit->short_name,
+                ] : null,
+                'base_quantity' => $item->base_quantity,
+                'foc_base_quantity' => $item->foc_base_quantity,
+                'unit_price' => $item->unit_price,
+                'original_unit_price' => $item->original_unit_price,
+                'price_type' => $item->price_type,
+                'discount_percentage' => $item->discount_percentage,
+                'discount_amount' => $item->discount_amount,
+                'total_price' => $item->total_price,
+            ];
+        })->values();
+
+        return $summary;
     }
 
     private function buildSessionPayload(CashSession $session)

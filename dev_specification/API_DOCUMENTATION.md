@@ -330,6 +330,143 @@ Possible errors:
 - `422` if selected product unit is invalid.
 - `422` if stock is insufficient.
 
+### GET `/api/cashier/sales`
+
+Returns paginated sale history for the cashier's current branch.
+
+Query parameters:
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `search` | string | No | Searches invoice number, customer name, or customer phone. |
+| `payment_method` | string | No | One of `Cash`, `Card`, `Mobile`, `Wallet`. |
+| `payment_status` | string | No | One of `Paid`, `Partial`, `Due`. |
+| `from_date` | date | No | Filters `sale_date` on or after this date. |
+| `to_date` | date | No | Filters `sale_date` on or before this date. |
+| `per_page` | integer | No | 1-100; defaults to 15. |
+
+Response item shape:
+
+```json
+{
+  "id": "sale-uuid",
+  "invoice_number": "S2026061909580012",
+  "sale_date": "2026-06-19T09:58:00+06:30",
+  "total_amount": "190.00",
+  "discount": "10.00",
+  "tax": "3.80",
+  "grand_total": "193.80",
+  "amount_received": "10000.00",
+  "change_due": "9806.20",
+  "payment_method": "Cash",
+  "payment_status": "Paid",
+  "items_count": 1,
+  "customer": {
+    "id": "customer-uuid",
+    "name": "Walk-in Customer",
+    "phone": "09123456789"
+  },
+  "branch": {
+    "id": "branch-uuid",
+    "name": "Main Branch"
+  },
+  "cashier": {
+    "id": "user-uuid",
+    "name": "Cashier"
+  }
+}
+```
+
+### GET `/api/cashier/sales/{sale}`
+
+Returns one sale from the cashier's current branch with customer, branch, cashier, cash session, and item details.
+
+Response:
+
+```json
+{
+  "id": "sale-uuid",
+  "invoice_number": "S2026061909580012",
+  "sale_date": "2026-06-19T09:58:00+06:30",
+  "total_amount": "190.00",
+  "discount": "10.00",
+  "tax": "3.80",
+  "grand_total": "193.80",
+  "amount_received": "10000.00",
+  "change_due": "9806.20",
+  "payment_method": "Cash",
+  "payment_status": "Paid",
+  "items_count": 1,
+  "customer": {
+    "id": "customer-uuid",
+    "name": "Walk-in Customer",
+    "phone": "09123456789",
+    "address": "Yangon"
+  },
+  "branch": {
+    "id": "branch-uuid",
+    "name": "Main Branch",
+    "address": "Yangon",
+    "phone": "09123456789"
+  },
+  "cashier": {
+    "id": "user-uuid",
+    "name": "Cashier"
+  },
+  "cash_session": {
+    "id": "session-uuid",
+    "opened_at": "2026-06-19T03:00:00+06:30",
+    "closed_at": null
+  },
+  "items": [
+    {
+      "id": "sale-item-uuid",
+      "product_id": "product-uuid",
+      "product": {
+        "id": "product-uuid",
+        "name": "Paracetamol",
+        "generic_name": "Acetaminophen",
+        "barcode": "885000000001"
+      },
+      "batch_id": "batch-uuid",
+      "batch": {
+        "id": "batch-uuid",
+        "batch_number": "B-001",
+        "expiry_date": "2027-06-19"
+      },
+      "unit_id": "unit-uuid",
+      "unit": {
+        "id": "unit-uuid",
+        "name": "Tablet",
+        "short_name": "tab"
+      },
+      "quantity": "2.00",
+      "foc_quantity": "1.00",
+      "foc_unit_id": "unit-uuid",
+      "foc_unit": {
+        "id": "unit-uuid",
+        "name": "Tablet",
+        "short_name": "tab"
+      },
+      "base_quantity": 2,
+      "foc_base_quantity": 1,
+      "unit_price": "95.00",
+      "original_unit_price": "100.00",
+      "price_type": "retail",
+      "discount_percentage": "5.00",
+      "discount_amount": "10.00",
+      "total_price": "190.00"
+    }
+  ]
+}
+```
+
+Possible errors:
+
+- `403` if the user lacks `process_sale`.
+- `404` if the sale does not belong to the current branch.
+- `422` if no branch is assigned.
+
 ### Customer Endpoints
 
 All require `process_sale`.
