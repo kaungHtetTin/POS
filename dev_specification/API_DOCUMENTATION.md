@@ -829,6 +829,96 @@ Response:
 
 Returns suppliers with credit fields. `balance` is the outstanding supplier balance managed by unpaid purchase dues.
 
+### GET `/api/staff/suppliers/{supplier}/statement`
+
+Returns one supplier's purchase statement, outstanding purchase list, and payment history.
+
+Response:
+
+```json
+{
+  "supplier": {
+    "id": "supplier-uuid",
+    "name": "ABC Supplier",
+    "phone": "09123456789",
+    "email": "abc@example.com",
+    "credit_limit": "500000.00",
+    "balance": "125000.00",
+    "purchases_count": 3
+  },
+  "summary": {
+    "total_purchases": 300000,
+    "total_due": 125000,
+    "total_payments": 175000,
+    "outstanding_balance": 125000
+  },
+  "purchases": [],
+  "due_purchases": [],
+  "payments": []
+}
+```
+
+### GET `/api/staff/supplier-payments`
+
+Returns paginated supplier payment history.
+
+Query parameters:
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `supplier_id` | UUID | No | Filters by supplier. |
+| `purchase_id` | UUID | No | Filters by purchase. |
+| `payment_method` | string | No | One of `Cash`, `Card`, `Mobile`, `Wallet`. |
+| `from_date` | date | No | Filters `payment_date` on or after this date. |
+| `to_date` | date | No | Filters `payment_date` on or before this date. |
+| `per_page` | integer | No | 1-100; defaults to 15. |
+
+### POST `/api/staff/supplier-payments`
+
+Records a supplier payment and reduces supplier outstanding balance plus purchase due amounts.
+
+Behavior:
+
+- If `purchase_id` is provided, the payment is applied only to that purchase.
+- If `purchase_id` is omitted, the payment is applied to the supplier's oldest due purchases first.
+- A single payment can create multiple payment rows when it is auto-applied across multiple purchases.
+- Purchase `paid_amount`, `due_amount`, and `payment_status` are updated.
+- Supplier `balance` is reduced by the applied amount.
+
+Request:
+
+```json
+{
+  "supplier_id": "supplier-uuid",
+  "purchase_id": "optional-purchase-uuid",
+  "branch_id": "optional-branch-uuid",
+  "payment_date": "2026-06-21",
+  "amount": 50000,
+  "payment_method": "Cash",
+  "reference_number": "PAY-2026-0001",
+  "notes": "Bank transfer confirmation"
+}
+```
+
+Validation:
+
+| Field | Rule |
+| --- | --- |
+| `supplier_id` | required existing supplier ID |
+| `purchase_id` | nullable existing purchase ID |
+| `branch_id` | nullable existing branch ID |
+| `payment_date` | required date |
+| `amount` | required numeric min 0.01 |
+| `payment_method` | required, one of `Cash`, `Card`, `Mobile`, `Wallet` |
+| `reference_number` | nullable string max 255 |
+| `notes` | nullable string max 1000 |
+
+Possible errors:
+
+- `422` if no outstanding purchase due exists for the supplier.
+- `422` if `amount` exceeds outstanding purchase due.
+- `422` if `amount` exceeds supplier outstanding balance.
+
 ### GET `/api/staff/products`
 
 Returns active products and units for purchase entry. This endpoint is now also the product list endpoint; use `status=all` to include inactive products.
@@ -874,6 +964,12 @@ Current wholesale behavior:
 - `items.*.wholesale_price` is optional.
 - When provided, it updates the matching `product_units.wholesale_price`.
 - If omitted, it falls back to the submitted `selling_price`.
+
+Current supplier balance behavior:
+
+- Purchase creation increases supplier `balance` by the purchase `due_amount`.
+- Later supplier payments should be recorded with `POST /api/staff/supplier-payments`.
+- Supplier payments reduce supplier `balance` and purchase `due_amount`.
 
 Request:
 

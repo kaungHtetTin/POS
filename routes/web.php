@@ -12,6 +12,7 @@ use App\Http\Controllers\UnitController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierPaymentController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\InventoryController;
@@ -109,9 +110,11 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:manage_inventory');
 
         Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index')->middleware('permission:manage_inventory');
+        Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show')->middleware('permission:manage_inventory');
         Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store')->middleware('permission:manage_inventory');
         Route::patch('/suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update')->middleware('permission:manage_inventory');
         Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy')->middleware('permission:manage_inventory');
+        Route::post('/supplier-payments', [SupplierPaymentController::class, 'store'])->name('supplier-payments.store')->middleware('permission:manage_inventory');
 
         Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index')->middleware('permission:manage_inventory');
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show')->middleware('permission:manage_inventory');

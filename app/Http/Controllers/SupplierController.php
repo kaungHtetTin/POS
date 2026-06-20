@@ -26,6 +26,32 @@ class SupplierController extends Controller
         ]);
     }
 
+    public function show(string $locale, Supplier $supplier)
+    {
+        $supplier->loadCount('purchases');
+
+        $purchases = $supplier->purchases()
+            ->with(['branch:id,name'])
+            ->withCount('items')
+            ->latest()
+            ->get();
+
+        $payments = $supplier->payments()
+            ->with(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name'])
+            ->latest('payment_date')
+            ->latest()
+            ->get();
+
+        return Inertia::render('Suppliers/Show', [
+            'supplier' => $supplier,
+            'purchases' => $purchases,
+            'duePurchases' => $purchases
+                ->where('due_amount', '>', 0)
+                ->values(),
+            'payments' => $payments,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

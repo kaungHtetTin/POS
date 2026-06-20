@@ -31,6 +31,7 @@ import {
     Delete as DeleteIcon,
     Edit as EditIcon,
     Inventory as InventoryIcon,
+    Payment as PaymentIcon,
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
     Visibility as VisibilityIcon,
@@ -51,6 +52,8 @@ const emptyItem = {
 
 export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters }) {
     const [open, setOpen] = useState(false);
+    const [paymentOpen, setPaymentOpen] = useState(false);
+    const [paymentPurchase, setPaymentPurchase] = useState(null);
     const [editingPurchase, setEditingPurchase] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
 
@@ -62,6 +65,24 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         payment_status: 'Due',
         paid_amount: 0,
         items: [{ ...emptyItem }],
+    });
+
+    const {
+        data: paymentData,
+        setData: setPaymentData,
+        post: postPayment,
+        processing: paymentProcessing,
+        errors: paymentErrors,
+        reset: resetPayment,
+    } = useForm({
+        supplier_id: '',
+        purchase_id: '',
+        branch_id: '',
+        payment_date: new Date().toISOString().split('T')[0],
+        amount: '',
+        payment_method: 'Cash',
+        reference_number: '',
+        notes: '',
     });
 
     const selectedSupplier = useMemo(
@@ -90,8 +111,12 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         if (!selectedSupplier) {
             return null;
         }
-        return Number(selectedSupplier.balance || 0) + dueAmount;
-    }, [selectedSupplier, dueAmount]);
+        const existingDueForSelectedSupplier = editingPurchase?.supplier_id === selectedSupplier.id
+            ? Number(editingPurchase?.due_amount || 0)
+            : 0;
+
+        return Number(selectedSupplier.balance || 0) - existingDueForSelectedSupplier + dueAmount;
+    }, [selectedSupplier, dueAmount, editingPurchase]);
 
     const exceedsCredit = selectedSupplier && projectedBalance > Number(selectedSupplier.credit_limit || 0);
 
@@ -198,6 +223,36 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         setOpen(false);
         setEditingPurchase(null);
         reset();
+    };
+
+    const handlePaymentOpen = (purchase) => {
+        setPaymentPurchase(purchase);
+        resetPayment();
+        setPaymentData({
+            supplier_id: purchase.supplier_id,
+            purchase_id: purchase.id,
+            branch_id: purchase.branch_id || auth.user?.current_branch_id || auth.user?.branch_id || '',
+            payment_date: new Date().toISOString().split('T')[0],
+            amount: Number(purchase.due_amount || 0).toFixed(2),
+            payment_method: 'Cash',
+            reference_number: '',
+            notes: '',
+        });
+        setPaymentOpen(true);
+    };
+
+    const handlePaymentClose = () => {
+        setPaymentOpen(false);
+        setPaymentPurchase(null);
+        resetPayment();
+    };
+
+    const submitPayment = (event) => {
+        event.preventDefault();
+        postPayment(route('supplier-payments.store'), {
+            preserveScroll: true,
+            onSuccess: () => handlePaymentClose(),
+        });
     };
 
     const handleDelete = (purchase) => {
@@ -398,8 +453,18 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 </IconButton>
                                                 <IconButton
                                                     size="small"
+                                                    color="success"
+                                                    onClick={() => handlePaymentOpen(purchase)}
+                                                    disabled={Number(purchase.due_amount || 0) <= 0}
+                                                    title="Record Payment"
+                                                >
+                                                    <PaymentIcon fontSize="inherit" />
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
                                                     color="primary"
                                                     onClick={() => handleOpen(purchase)}
+                                                    disabled={Number(purchase.payments_count || 0) > 0}
                                                     title="Edit Purchase"
                                                 >
                                                     <EditIcon fontSize="inherit" />
@@ -408,6 +473,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     size="small"
                                                     color="error"
                                                     onClick={() => handleDelete(purchase)}
+                                                    disabled={Number(purchase.payments_count || 0) > 0}
                                                     title="Delete Purchase"
                                                 >
                                                     <DeleteIcon fontSize="inherit" />
@@ -753,6 +819,97 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                         <Button onClick={handleClose} size="small">Cancel</Button>
                         <Button type="submit" variant="contained" size="small" disabled={processing}>
                             {editingPurchase ? 'Update Purchase' : 'Save Purchase & Receive Stock'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            <Dialog open={paymentOpen} onClose={handlePaymentClose} maxWidth="sm" fullWidth>
+                <form onSubmit={submitPayment}>
+                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Record Purchase Payment
+                        <IconButton size="small" onClick={handlePaymentClose}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            <Paper variant="outlined" sx={{ p: 1.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                    {paymentPurchase?.invoice_number || '-'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Supplier: {paymentPurchase?.supplier?.name || '-'} | Due: ${Number(paymentPurchase?.due_amount || 0).toFixed(2)}
+                                </Typography>
+                            </Paper>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField
+                                    label="Payment Date"
+                                    type="date"
+                                    fullWidth
+                                    size="small"
+                                    value={paymentData.payment_date}
+                                    onChange={(event) => setPaymentData('payment_date', event.target.value)}
+                                    error={!!paymentErrors.payment_date}
+                                    helperText={paymentErrors.payment_date}
+                                    InputLabelProps={{ shrink: true }}
+                                    required
+                                />
+                                <TextField
+                                    select
+                                    label="Method"
+                                    fullWidth
+                                    size="small"
+                                    value={paymentData.payment_method}
+                                    onChange={(event) => setPaymentData('payment_method', event.target.value)}
+                                    error={!!paymentErrors.payment_method}
+                                    helperText={paymentErrors.payment_method}
+                                    required
+                                >
+                                    <MenuItem value="Cash">Cash</MenuItem>
+                                    <MenuItem value="Card">Card</MenuItem>
+                                    <MenuItem value="Mobile">Mobile</MenuItem>
+                                    <MenuItem value="Wallet">Wallet</MenuItem>
+                                </TextField>
+                            </Stack>
+                            <TextField
+                                label="Amount"
+                                type="number"
+                                fullWidth
+                                size="small"
+                                value={paymentData.amount}
+                                onChange={(event) => setPaymentData('amount', event.target.value)}
+                                error={!!paymentErrors.amount}
+                                helperText={paymentErrors.amount || `Maximum: $${Number(paymentPurchase?.due_amount || 0).toFixed(2)}`}
+                                inputProps={{ min: 0.01, max: Number(paymentPurchase?.due_amount || 0), step: '0.01' }}
+                                required
+                            />
+                            <TextField
+                                label="Reference Number"
+                                fullWidth
+                                size="small"
+                                value={paymentData.reference_number}
+                                onChange={(event) => setPaymentData('reference_number', event.target.value)}
+                                error={!!paymentErrors.reference_number}
+                                helperText={paymentErrors.reference_number}
+                            />
+                            <TextField
+                                label="Notes"
+                                fullWidth
+                                size="small"
+                                multiline
+                                rows={3}
+                                value={paymentData.notes}
+                                onChange={(event) => setPaymentData('notes', event.target.value)}
+                                error={!!paymentErrors.notes}
+                                helperText={paymentErrors.notes}
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={handlePaymentClose} size="small">Cancel</Button>
+                        <Button type="submit" variant="contained" size="small" disabled={paymentProcessing}>
+                            Save Payment
                         </Button>
                     </DialogActions>
                 </form>

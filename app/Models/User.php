@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->belongsTo(Branch::class, 'active_branch_id');
     }
 
+    public function supplierPayments()
+    {
+        return $this->hasMany(SupplierPayment::class);
+    }
+
     public function currentBranchId()
     {
         return $this->active_branch_id ?: $this->branch_id;

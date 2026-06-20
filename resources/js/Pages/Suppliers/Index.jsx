@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -34,6 +34,7 @@ import {
     AccountBalanceWallet as BalanceIcon,
     CreditCard as CreditIcon,
     Search as SearchIcon,
+    Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 
 export default function SupplierIndex({ auth, suppliers, filters }) {
@@ -174,7 +175,19 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <SupplierIcon fontSize="small" color="primary" />
                                                 <Stack spacing={0.2}>
-                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{supplier.name}</Typography>
+                                                    <Typography
+                                                        component={Link}
+                                                        href={route('suppliers.show', { supplier: supplier.id })}
+                                                        variant="body2"
+                                                        sx={{
+                                                            color: 'primary.main',
+                                                            fontWeight: 700,
+                                                            textDecoration: 'none',
+                                                            '&:hover': { textDecoration: 'underline' },
+                                                        }}
+                                                    >
+                                                        {supplier.name}
+                                                    </Typography>
                                                     <Typography variant="caption" color="text.secondary">{supplier.address || 'No address provided'}</Typography>
                                                 </Stack>
                                             </Stack>
@@ -223,6 +236,14 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                             />
                                         </TableCell>
                                         <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <IconButton
+                                                component={Link}
+                                                href={route('suppliers.show', { supplier: supplier.id })}
+                                                size="small"
+                                                color="info"
+                                            >
+                                                <VisibilityIcon fontSize="inherit" />
+                                            </IconButton>
                                             <IconButton
                                                 size="small"
                                                 color="primary"

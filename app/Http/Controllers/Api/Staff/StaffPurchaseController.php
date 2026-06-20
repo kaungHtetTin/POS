@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Supplier;
+use App\Models\SupplierPayment;
+use App\Services\SupplierPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +31,127 @@ class StaffPurchaseController extends Controller
             ->get();
 
         return response()->json($suppliers);
+    }
+
+    /**
+     * Supplier statement with purchases and payment history.
+     * Requires: manage_inventory permission
+     */
+    public function supplierStatement(Request $request, Supplier $supplier)
+    {
+        if (!$request->user()->hasPermission('manage_inventory')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $supplier->loadCount('purchases');
+
+        $purchases = $supplier->purchases()
+            ->with(['branch:id,name'])
+            ->withCount('items')
+            ->latest()
+            ->get();
+
+        $payments = $supplier->payments()
+            ->with(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name'])
+            ->latest('payment_date')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'supplier' => $supplier,
+            'summary' => [
+                'total_purchases' => (float) $purchases->sum('total_amount'),
+                'total_due' => (float) $purchases->sum('due_amount'),
+                'total_payments' => (float) $payments->sum('amount'),
+                'outstanding_balance' => (float) $supplier->balance,
+            ],
+            'purchases' => $purchases,
+            'due_purchases' => $purchases->where('due_amount', '>', 0)->values(),
+            'payments' => $payments,
+        ]);
+    }
+
+    /**
+     * List supplier payments.
+     * Requires: manage_inventory permission
+     */
+    public function supplierPayments(Request $request)
+    {
+        if (!$request->user()->hasPermission('manage_inventory')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'supplier_id' => 'nullable|exists:suppliers,id',
+            'purchase_id' => 'nullable|exists:purchases,id',
+            'payment_method' => 'nullable|in:Cash,Card,Mobile,Wallet',
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $query = SupplierPayment::with([
+            'supplier:id,name',
+            'purchase:id,invoice_number',
+            'branch:id,name',
+            'user:id,name',
+        ]);
+
+        if (!empty($validated['supplier_id'])) {
+            $query->where('supplier_id', $validated['supplier_id']);
+        }
+
+        if (!empty($validated['purchase_id'])) {
+            $query->where('purchase_id', $validated['purchase_id']);
+        }
+
+        if (!empty($validated['payment_method'])) {
+            $query->where('payment_method', $validated['payment_method']);
+        }
+
+        if (!empty($validated['from_date'])) {
+            $query->whereDate('payment_date', '>=', $validated['from_date']);
+        }
+
+        if (!empty($validated['to_date'])) {
+            $query->whereDate('payment_date', '<=', $validated['to_date']);
+        }
+
+        return response()->json(
+            $query->latest('payment_date')
+                ->latest()
+                ->paginate($validated['per_page'] ?? 15)
+        );
+    }
+
+    /**
+     * Record a supplier payment.
+     * Requires: manage_inventory permission
+     */
+    public function storeSupplierPayment(Request $request, SupplierPaymentService $supplierPaymentService)
+    {
+        if (!$request->user()->hasPermission('manage_inventory')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'purchase_id' => 'nullable|exists:purchases,id',
+            'branch_id' => 'nullable|exists:branches,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
+            'reference_number' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $result = $supplierPaymentService->record($validated, $request->user());
+
+        return response()->json([
+            'message' => 'Supplier payment recorded successfully.',
+            'supplier' => $result['supplier'],
+            'payments' => $result['payments']->load(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name']),
+        ], 201);
     }
 
     /**
@@ -302,6 +425,7 @@ class StaffPurchaseController extends Controller
             'supplier:id,name,phone,email',
             'branch:id,name',
             'user:id,name',
+            'payments:id,purchase_id,payment_date,amount,payment_method,reference_number',
             'items' => function ($q) {
                 $q->with(['product:id,name,generic_name', 'unit:id,name,short_name']);
             }

@@ -28,4 +28,9 @@ class Branch extends Model
     {
         return $this->belongsToMany(User::class)->withTimestamps();
     }
+
+    public function supplierPayments()
+    {
+        return $this->hasMany(SupplierPayment::class);
+    }
 }

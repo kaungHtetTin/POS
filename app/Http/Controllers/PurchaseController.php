@@ -23,7 +23,7 @@ class PurchaseController extends Controller
                 $q->with(['product:id,name', 'unit:id,name,short_name']);
             }
         ])
-            ->withCount('items');
+            ->withCount(['items', 'payments']);
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -57,6 +57,8 @@ class PurchaseController extends Controller
         $purchase->load([
             'supplier:id,name,phone,email,address,credit_limit,balance',
             'branch:id,name,address,phone,email',
+            'payments:id,purchase_id,payment_date,amount,payment_method,reference_number,notes,user_id',
+            'payments.user:id,name',
             'items' => function ($q) {
                 $q->with(['product:id,name,generic_name,barcode', 'unit:id,name,short_name']);
             },
@@ -74,6 +76,8 @@ class PurchaseController extends Controller
         return Inertia::render('Purchases/Show', [
             'purchase' => [
                 'id' => $purchase->id,
+                'supplier_id' => $purchase->supplier_id,
+                'branch_id' => $purchase->branch_id,
                 'invoice_number' => $purchase->invoice_number,
                 'purchase_date' => optional($purchase->purchase_date)->format('Y-m-d'),
                 'payment_status' => $purchase->payment_status,
@@ -84,6 +88,20 @@ class PurchaseController extends Controller
                 'updated_at' => optional($purchase->updated_at)->toISOString(),
                 'supplier' => $purchase->supplier,
                 'branch' => $purchase->branch,
+                'payments' => $purchase->payments->map(function ($payment) {
+                    return [
+                        'id' => $payment->id,
+                        'payment_date' => optional($payment->payment_date)->format('Y-m-d'),
+                        'amount' => (float) $payment->amount,
+                        'payment_method' => $payment->payment_method,
+                        'reference_number' => $payment->reference_number,
+                        'notes' => $payment->notes,
+                        'user' => $payment->user ? [
+                            'id' => $payment->user->id,
+                            'name' => $payment->user->name,
+                        ] : null,
+                    ];
+                })->values(),
                 'items' => $purchase->items->map(function ($item) use ($productUnitRows) {
                     $productUnit = $productUnitRows->get($item->product_id . ':' . $item->unit_id);
                     $paidQuantity = (int) $item->quantity;
@@ -317,6 +335,12 @@ class PurchaseController extends Controller
 
     public function update(Request $request, string $locale, Purchase $purchase)
     {
+        if ($purchase->payments()->exists()) {
+            return redirect()->back()->withErrors([
+                'purchase_id' => 'Purchase cannot be edited after supplier payments have been recorded.',
+            ]);
+        }
+
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
             'branch_id' => 'required|exists:branches,id',
@@ -513,6 +537,10 @@ class PurchaseController extends Controller
 
     public function destroy(string $locale, Purchase $purchase)
     {
+        if ($purchase->payments()->exists()) {
+            return redirect()->back()->with('error', 'Purchase cannot be deleted after supplier payments have been recorded.');
+        }
+
         DB::transaction(function () use ($purchase) {
             $supplier = $purchase->supplier;
             $dueAmount = (float) $purchase->due_amount;

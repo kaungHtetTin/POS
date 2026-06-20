@@ -1,11 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Divider,
+    IconButton,
+    MenuItem,
     Paper,
     Stack,
     Table,
@@ -14,10 +20,13 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TextField,
     Typography,
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
+    Close as CloseIcon,
+    Payment as PaymentIcon,
     Print as PrintIcon,
     ReceiptLong as PurchaseIcon,
 } from '@mui/icons-material';
@@ -25,6 +34,25 @@ import {
 export default function PurchaseShow({ auth, purchase }) {
     const { settings = {} } = usePage().props;
     const currencySymbol = settings.app?.currency_symbol || '$';
+    const [paymentOpen, setPaymentOpen] = useState(false);
+
+    const {
+        data: paymentData,
+        setData: setPaymentData,
+        post: postPayment,
+        processing: paymentProcessing,
+        errors: paymentErrors,
+        reset: resetPayment,
+    } = useForm({
+        supplier_id: purchase.supplier_id,
+        purchase_id: purchase.id,
+        branch_id: purchase.branch_id || auth.user?.current_branch_id || auth.user?.branch_id || '',
+        payment_date: new Date().toISOString().split('T')[0],
+        amount: Number(purchase.due_amount || 0).toFixed(2),
+        payment_method: 'Cash',
+        reference_number: '',
+        notes: '',
+    });
 
     const money = (value) => `${currencySymbol}${Number(value || 0).toFixed(2)}`;
 
@@ -70,6 +98,34 @@ export default function PurchaseShow({ auth, purchase }) {
             ? 'warning'
             : 'error';
 
+    const openPaymentDialog = () => {
+        resetPayment();
+        setPaymentData({
+            supplier_id: purchase.supplier_id,
+            purchase_id: purchase.id,
+            branch_id: purchase.branch_id || auth.user?.current_branch_id || auth.user?.branch_id || '',
+            payment_date: new Date().toISOString().split('T')[0],
+            amount: Number(purchase.due_amount || 0).toFixed(2),
+            payment_method: 'Cash',
+            reference_number: '',
+            notes: '',
+        });
+        setPaymentOpen(true);
+    };
+
+    const closePaymentDialog = () => {
+        setPaymentOpen(false);
+        resetPayment();
+    };
+
+    const submitPayment = (event) => {
+        event.preventDefault();
+        postPayment(route('supplier-payments.store'), {
+            preserveScroll: true,
+            onSuccess: () => closePaymentDialog(),
+        });
+    };
+
     return (
         <MainLayout auth={auth} header="Purchase Invoice">
             <Head title={`Purchase ${purchase.invoice_number}`} />
@@ -92,14 +148,28 @@ export default function PurchaseShow({ auth, purchase }) {
                     >
                         Back
                     </Button>
-                    <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<PrintIcon />}
-                        onClick={() => window.print()}
-                    >
-                        Print
-                    </Button>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<PaymentIcon />}
+                            onClick={openPaymentDialog}
+                            disabled={Number(purchase.due_amount || 0) <= 0}
+                            sx={{ height: 40, whiteSpace: 'nowrap' }}
+                        >
+                            Record Payment
+                        </Button>
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<PrintIcon />}
+                            onClick={() => window.print()}
+                            sx={{ height: 40, whiteSpace: 'nowrap' }}
+                        >
+                            Print
+                        </Button>
+                    </Stack>
                 </Stack>
 
                 <Paper sx={{ p: { xs: 2, md: 3 } }}>
@@ -266,8 +336,136 @@ export default function PurchaseShow({ auth, purchase }) {
                             </Stack>
                         </Box>
                     </Stack>
+
+                    <Divider sx={{ my: 2.5 }} />
+
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5 }}>
+                        Supplier Payments
+                    </Typography>
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255,255,255,0.05)' }}>
+                                    <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>Method</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>Reference</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>Recorded By</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }} align="right">Amount</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {(purchase.payments || []).map((payment) => (
+                                    <TableRow key={payment.id} hover>
+                                        <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                                        <TableCell>{payment.payment_method}</TableCell>
+                                        <TableCell>{payment.reference_number || '-'}</TableCell>
+                                        <TableCell>{payment.user?.name || '-'}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>{money(payment.amount)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {(purchase.payments || []).length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center" sx={{ py: 2.5 }}>
+                                            <Typography variant="body2" color="text.secondary">No supplier payments recorded.</Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
                 </Paper>
             </Box>
+
+            <Dialog open={paymentOpen} onClose={closePaymentDialog} maxWidth="sm" fullWidth>
+                <form onSubmit={submitPayment}>
+                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Record Purchase Payment
+                        <IconButton size="small" onClick={closePaymentDialog}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            <Paper variant="outlined" sx={{ p: 1.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                    {purchase.invoice_number}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Supplier: {purchase.supplier?.name || '-'} | Due: {money(purchase.due_amount)}
+                                </Typography>
+                            </Paper>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField
+                                    label="Payment Date"
+                                    type="date"
+                                    fullWidth
+                                    size="small"
+                                    value={paymentData.payment_date}
+                                    onChange={(event) => setPaymentData('payment_date', event.target.value)}
+                                    error={!!paymentErrors.payment_date}
+                                    helperText={paymentErrors.payment_date}
+                                    InputLabelProps={{ shrink: true }}
+                                    required
+                                />
+                                <TextField
+                                    select
+                                    label="Method"
+                                    fullWidth
+                                    size="small"
+                                    value={paymentData.payment_method}
+                                    onChange={(event) => setPaymentData('payment_method', event.target.value)}
+                                    error={!!paymentErrors.payment_method}
+                                    helperText={paymentErrors.payment_method}
+                                    required
+                                >
+                                    <MenuItem value="Cash">Cash</MenuItem>
+                                    <MenuItem value="Card">Card</MenuItem>
+                                    <MenuItem value="Mobile">Mobile</MenuItem>
+                                    <MenuItem value="Wallet">Wallet</MenuItem>
+                                </TextField>
+                            </Stack>
+                            <TextField
+                                label="Amount"
+                                type="number"
+                                fullWidth
+                                size="small"
+                                value={paymentData.amount}
+                                onChange={(event) => setPaymentData('amount', event.target.value)}
+                                error={!!paymentErrors.amount}
+                                helperText={paymentErrors.amount || `Maximum: ${money(purchase.due_amount)}`}
+                                inputProps={{ min: 0.01, max: Number(purchase.due_amount || 0), step: '0.01' }}
+                                required
+                            />
+                            <TextField
+                                label="Reference Number"
+                                fullWidth
+                                size="small"
+                                value={paymentData.reference_number}
+                                onChange={(event) => setPaymentData('reference_number', event.target.value)}
+                                error={!!paymentErrors.reference_number}
+                                helperText={paymentErrors.reference_number}
+                            />
+                            <TextField
+                                label="Notes"
+                                fullWidth
+                                size="small"
+                                multiline
+                                rows={3}
+                                value={paymentData.notes}
+                                onChange={(event) => setPaymentData('notes', event.target.value)}
+                                error={!!paymentErrors.notes}
+                                helperText={paymentErrors.notes}
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={closePaymentDialog} size="small">Cancel</Button>
+                        <Button type="submit" variant="contained" size="small" disabled={paymentProcessing}>
+                            Save Payment
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
         </MainLayout>
     );
 }

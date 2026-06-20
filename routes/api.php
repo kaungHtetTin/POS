@@ -102,6 +102,9 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::prefix('staff')->group(function () {
         Route::get('/suppliers', [StaffPurchaseController::class, 'suppliers']);
+        Route::get('/suppliers/{supplier}/statement', [StaffPurchaseController::class, 'supplierStatement']);
+        Route::get('/supplier-payments', [StaffPurchaseController::class, 'supplierPayments']);
+        Route::post('/supplier-payments', [StaffPurchaseController::class, 'storeSupplierPayment']);
         Route::get('/branches', [StaffPurchaseController::class, 'branches']);
 
         Route::get('/products/lookups', [StaffProductController::class, 'lookupData']);
