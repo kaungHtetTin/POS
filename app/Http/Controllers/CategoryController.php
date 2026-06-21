@@ -27,7 +27,7 @@ class CategoryController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Category $category)
+    public function update(Request $request, string $locale, Category $category)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
@@ -39,7 +39,7 @@ class CategoryController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Category $category)
+    public function destroy(string $locale, Category $category)
     {
         if ($category->products()->exists()) {
             abort(403, 'Category cannot be deleted because it has assigned products.');

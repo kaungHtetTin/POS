@@ -95,7 +95,7 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Expense created successfully.');
     }
 
-    public function update(Request $request, Expense $expense)
+    public function update(Request $request, string $locale, Expense $expense)
     {
         $validated = $request->validate([
             'branch_id' => 'required|exists:branches,id',
@@ -115,7 +115,7 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Expense updated successfully.');
     }
 
-    public function destroy(Expense $expense)
+    public function destroy(string $locale, Expense $expense)
     {
         if (!$this->canAccessAllBranches(request()->user()) && !request()->user()->canAccessBranch($expense->branch_id)) {
             abort(403);

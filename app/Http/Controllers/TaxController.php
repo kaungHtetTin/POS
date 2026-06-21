@@ -28,7 +28,7 @@ class TaxController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Tax $tax)
+    public function update(Request $request, string $locale, Tax $tax)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:taxes,name,' . $tax->id,
@@ -41,7 +41,7 @@ class TaxController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Tax $tax)
+    public function destroy(string $locale, Tax $tax)
     {
         if ($tax->products()->exists()) {
             abort(403, 'Tax cannot be deleted because it is assigned to products.');

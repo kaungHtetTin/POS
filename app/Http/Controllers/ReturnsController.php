@@ -361,7 +361,7 @@ class ReturnsController extends Controller
         return redirect()->back()->with('success', 'Return created.');
     }
 
-    public function updateStatus(Request $request, ReturnEntry $return)
+    public function updateStatus(Request $request, string $locale, ReturnEntry $return)
     {
         $validated = $request->validate([
             'status' => 'required|in:Pending,Approved,Rejected',

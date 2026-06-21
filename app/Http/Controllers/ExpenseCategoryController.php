@@ -27,7 +27,7 @@ class ExpenseCategoryController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, ExpenseCategory $expenseCategory)
+    public function update(Request $request, string $locale, ExpenseCategory $expenseCategory)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:expense_categories,name,' . $expenseCategory->id,
@@ -39,7 +39,7 @@ class ExpenseCategoryController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(ExpenseCategory $expenseCategory)
+    public function destroy(string $locale, ExpenseCategory $expenseCategory)
     {
         if ($expenseCategory->expenses()->exists()) {
             abort(403, 'Category cannot be deleted because it has assigned expenses.');
@@ -50,4 +50,3 @@ class ExpenseCategoryController extends Controller
         return redirect()->back();
     }
 }
-

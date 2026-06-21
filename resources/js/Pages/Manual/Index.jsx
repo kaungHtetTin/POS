@@ -150,7 +150,60 @@ export default function Manual({ auth, appName }) {
                         </Table>
                     </TableContainer>
 
-                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">2. Staff Management & Multi-Branch Access</Typography>
+                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">2. Permission Reference</Typography>
+                    <Typography variant="body2" paragraph>
+                        Assign permissions through <strong>Role Management</strong>. A user can only see and use modules covered by the permissions attached to their role.
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                        <Table size="small">
+                            <TableHead sx={{ bgcolor: 'action.selected' }}>
+                                <TableRow>
+                                    <TableCell><strong>Permission</strong></TableCell>
+                                    <TableCell><strong>Allows Access To</strong></TableCell>
+                                    <TableCell><strong>Typical Users</strong></TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell><Chip label="manage_inventory" size="small" color="primary" variant="outlined" /></TableCell>
+                                    <TableCell>Products/Medicines, purchases, suppliers, inventory, stock adjustments, stock transfers, categories, units, taxes, expiry report, and label printing.</TableCell>
+                                    <TableCell>Owner, manager, inventory staff, purchasing staff.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="process_sale" size="small" color="success" variant="outlined" /></TableCell>
+                                    <TableCell>POS, checkout, cash sessions, POS product/customer search, customer records, and creating return requests.</TableCell>
+                                    <TableCell>Cashier, counter staff, branch operator.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="approve_returns" size="small" color="warning" variant="outlined" /></TableCell>
+                                    <TableCell>Approve or reject submitted return requests. This should be separated from normal cashier sale processing when approval control is required.</TableCell>
+                                    <TableCell>Manager, supervisor, owner.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="view_financial_reports" size="small" color="secondary" variant="outlined" /></TableCell>
+                                    <TableCell>Sales history, reports, cash session report, expenses, and expense categories.</TableCell>
+                                    <TableCell>Owner, accountant, manager.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="manage_branches" size="small" color="info" variant="outlined" /></TableCell>
+                                    <TableCell>Branch management, system settings, invoice/label settings, localization settings, and all-branch operational access where supported.</TableCell>
+                                    <TableCell>Owner, system administrator.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="manage_users" size="small" color="error" variant="outlined" /></TableCell>
+                                    <TableCell>Staff management, role management, permission list, and activity logs.</TableCell>
+                                    <TableCell>Owner, administrator.</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <Alert severity="info" variant="outlined" sx={{ mb: 3 }}>
+                        <Typography variant="caption">
+                            <strong>Purchase/Product Access:</strong> To manage purchase products, medicines, suppliers, stock intake, and inventory movement, assign a role with <code>manage_inventory</code>.
+                        </Typography>
+                    </Alert>
+
+                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">3. Staff Management & Multi-Branch Access</Typography>
                     <Box sx={{ pl: 2, borderLeft: '3px solid', borderColor: 'primary.light', mb: 3 }}>
                         <Typography variant="body2" fontWeight="bold">Primary vs. Accessible Branches:</Typography>
                         <Typography variant="body2" paragraph>
@@ -163,7 +216,7 @@ export default function Manual({ auth, appName }) {
                         </Typography>
                     </Box>
 
-                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">3. Activity Auditing</Typography>
+                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">4. Activity Auditing</Typography>
                     <Typography variant="body2" paragraph>
                         Every sensitive action (Create, Update, Delete) is logged in the <strong>Activity Logs</strong>. Each log entry captures:
                     </Typography>
@@ -176,12 +229,12 @@ export default function Manual({ auth, appName }) {
                         <Typography variant="caption"><strong>Auditor's Note:</strong> Activity logs are immutable and cannot be deleted or modified by any user, including Root, ensuring a transparent audit trail.</Typography>
                     </Alert>
 
-                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary" sx={{ mt: 3 }}>4. Role Customization</Typography>
+                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary" sx={{ mt: 3 }}>5. Role Customization</Typography>
                     <Typography variant="body2" paragraph>
                         The <strong>Role Management</strong> module allows Administrators to create custom roles beyond the defaults. When creating or editing a role, you can selectively toggle specific permissions to match the staff member's exact responsibilities.
                     </Typography>
 
-                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">5. Self-Service Profile Security</Typography>
+                    <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary">6. Self-Service Profile Security</Typography>
                     <Typography variant="body2">
                         All users have access to their own <strong>Profile Settings</strong>, where they can:
                     </Typography>

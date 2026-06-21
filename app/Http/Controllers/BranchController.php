@@ -41,7 +41,7 @@ class BranchController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Branch $branch)
+    public function update(Request $request, string $locale, Branch $branch)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:branches,name,' . $branch->id,
@@ -55,7 +55,7 @@ class BranchController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Branch $branch)
+    public function destroy(string $locale, Branch $branch)
     {
         if ($branch->users()->exists()) {
             abort(403, 'Branch cannot be deleted because it has assigned staff members.');

@@ -40,7 +40,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer created successfully.');
     }
 
-    public function update(Request $request, Customer $customer)
+    public function update(Request $request, string $locale, Customer $customer)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -54,7 +54,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer updated successfully.');
     }
 
-    public function destroy(Customer $customer)
+    public function destroy(string $locale, Customer $customer)
     {
         if ($customer->sales()->exists()) {
             return redirect()->back()->with('error', 'Customer cannot be deleted because they have related sales.');

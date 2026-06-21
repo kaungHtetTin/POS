@@ -27,7 +27,7 @@ class UnitController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Unit $unit)
+    public function update(Request $request, string $locale, Unit $unit)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:units,name,' . $unit->id,
@@ -39,7 +39,7 @@ class UnitController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Unit $unit)
+    public function destroy(string $locale, Unit $unit)
     {
         if ($unit->product_units()->exists()) {
             abort(403, 'Unit cannot be deleted because it is associated with products.');

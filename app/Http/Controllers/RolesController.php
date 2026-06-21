@@ -38,7 +38,7 @@ class RolesController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Role $role)
+    public function update(Request $request, string $locale, Role $role)
     {
         if ($role->name === 'Root') {
             abort(403, 'The Root role cannot be modified.');
@@ -62,7 +62,7 @@ class RolesController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Role $role)
+    public function destroy(string $locale, Role $role)
     {
         if ($role->name === 'Root' || $role->users()->exists()) {
             abort(403, 'Role cannot be deleted if it is Root or has assigned users.');
