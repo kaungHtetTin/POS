@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Cashier\CashierPosController;
 use App\Http\Controllers\Api\SettingsController as ApiSettingsController;
 use App\Http\Controllers\Api\Staff\StaffProductController;
 use App\Http\Controllers\Api\Staff\StaffPurchaseController;
+use App\Http\Controllers\Api\SyncController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,6 +31,8 @@ use App\Http\Controllers\Api\Staff\StaffPurchaseController;
 |--------------------------------------------------------------------------
 */
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/health', fn () => response()->json(['status' => 'ok', 'server_time' => now()->toIso8601String()]));
+Route::get('/v1/health', fn () => response()->json(['status' => 'ok', 'server_time' => now()->toIso8601String()]));
 
 /*
 |--------------------------------------------------------------------------
@@ -56,6 +59,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Logout (revoke current token)
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    foreach (['sync', 'v1/sync'] as $syncPrefix) {
+        Route::prefix($syncPrefix)->group(function () {
+            Route::post('/sales', [SyncController::class, 'sales']);
+            Route::post('/purchases', [SyncController::class, 'purchases']);
+        });
+    }
 
     /*
     |--------------------------------------------------------------------------

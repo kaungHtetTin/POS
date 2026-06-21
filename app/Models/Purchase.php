@@ -13,12 +13,17 @@ class Purchase extends Model
     protected $fillable = [
         'supplier_id',
         'branch_id',
+        'user_id',
         'invoice_number',
+        'client_reference',
         'purchase_date',
         'total_amount',
         'paid_amount',
         'due_amount',
         'payment_status',
+        'notes',
+        'is_synced',
+        'synced_at',
     ];
 
     protected $casts = [
@@ -26,6 +31,8 @@ class Purchase extends Model
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
+        'is_synced' => 'boolean',
+        'synced_at' => 'datetime',
     ];
 
     public function supplier()

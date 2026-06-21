@@ -16,6 +16,7 @@ class Sale extends Model
         'customer_id',
         'cash_session_id',
         'invoice_number',
+        'client_reference',
         'total_amount',
         'discount',
         'tax',
@@ -26,6 +27,7 @@ class Sale extends Model
         'payment_status',
         'sale_date',
         'is_synced',
+        'synced_at',
     ];
 
     protected $casts = [
@@ -37,6 +39,7 @@ class Sale extends Model
         'amount_received' => 'decimal:2',
         'change_due' => 'decimal:2',
         'is_synced' => 'boolean',
+        'synced_at' => 'datetime',
     ];
 
     public function branch()
