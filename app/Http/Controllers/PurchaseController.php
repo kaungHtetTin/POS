@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Product;
@@ -37,8 +38,10 @@ class PurchaseController extends Controller
         return Inertia::render('Purchases/Index', [
             'purchases' => $query->latest()->get(),
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
-            'products' => Product::select('id', 'name')
+            'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level')
                 ->with([
+                    'category:id,name',
+                    'inventories:id,product_id,branch_id,quantity',
                     'product_units' => function ($unitQuery) {
                         $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
                             ->with(['unit:id,name,short_name']);
@@ -49,6 +52,25 @@ class PurchaseController extends Controller
                 ->get(),
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
             'filters' => $request->only(['search']),
+        ]);
+    }
+
+    public function create()
+    {
+        return Inertia::render('Purchases/Create', [
+            'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
+            'products' => Product::select('id', 'name')
+                ->with([
+                    'product_units' => function ($unitQuery) {
+                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                            ->with(['unit:id,name,short_name']);
+                    },
+                ])
+                ->where('status', 'Active')
+                ->orderBy('name')
+                ->get(),
+            'categories' => Category::select('id', 'name')->orderBy('name')->get(),
+            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 

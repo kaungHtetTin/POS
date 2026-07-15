@@ -368,10 +368,11 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             />
                             <Button variant="outlined" size="small" onClick={handleSearch}>Search</Button>
                             <Button
+                                component={Link}
+                                href={route('purchases.create')}
                                 variant="contained"
                                 size="small"
                                 startIcon={<AddIcon />}
-                                onClick={() => handleOpen()}
                                 sx={{
                                     height: 40,
                                     minWidth: 164,
