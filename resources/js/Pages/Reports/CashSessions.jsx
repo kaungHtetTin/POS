@@ -8,6 +8,7 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -27,6 +28,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
     const [fromDate, setFromDate] = useState(filters?.from_date || '');
     const [toDate, setToDate] = useState(filters?.to_date || '');
     const [status, setStatus] = useState(filters?.status || 'all');
+    const sessionRows = sessions?.data || sessions || [];
 
     const money = (n) => Number(n || 0).toFixed(2);
     const diffColor = (value) => {
@@ -35,7 +37,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
         return n > 0 ? 'warning.main' : 'error.main';
     };
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('reports.cash-sessions'),
             {
@@ -43,6 +45,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
                 status: status || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -245,7 +248,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {sessions.map((row) => (
+                                    {sessionRows.map((row) => (
                                         <TableRow key={row.id} hover>
                                             <TableCell>{row.branch_name}</TableCell>
                                             <TableCell>{row.opened_by}</TableCell>
@@ -268,7 +271,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    {sessions.length === 0 && (
+                                    {sessionRows.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={11} align="center" sx={{ py: 3 }}>
                                                 <Typography variant="body2" color="text.secondary italic">
@@ -280,6 +283,17 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        {Number(sessions?.last_page || 1) > 1 && (
+                            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                                <Pagination
+                                    size="small"
+                                    count={sessions.last_page}
+                                    page={sessions.current_page}
+                                    onChange={(event, page) => applyFilters(page)}
+                                    color="primary"
+                                />
+                            </Stack>
+                        )}
                     </Paper>
                 </Paper>
             </Box>

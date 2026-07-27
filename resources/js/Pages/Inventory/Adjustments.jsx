@@ -13,6 +13,7 @@ import {
     IconButton,
     InputAdornment,
     MenuItem,
+    Pagination,
     Paper,
     Stack,
     Table,
@@ -37,6 +38,7 @@ import {
 export default function InventoryAdjustments({ auth, adjustments, products, branches, filters }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState(filters?.search || '');
+    const adjustmentRows = adjustments?.data || adjustments || [];
     const [batches, setBatches] = useState([]);
     const [loadingBatches, setLoadingBatches] = useState(false);
 
@@ -71,8 +73,8 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
         reset();
     };
 
-    const handleSearch = () => {
-        router.get(route('inventory.adjustments.index'), { search }, { preserveState: true, replace: true });
+    const handleSearch = (page = undefined) => {
+        router.get(route('inventory.adjustments.index'), { search: search || undefined, page }, { preserveState: true, replace: true });
     };
 
     const submit = (e) => {
@@ -142,7 +144,7 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {adjustments.map((adj) => (
+                                {adjustmentRows.map((adj) => (
                                     <TableRow key={adj.id} hover>
                                         <TableCell>{formatDate(adj.adjustment_date)}</TableCell>
                                         <TableCell>{adj.product?.name}</TableCell>
@@ -163,7 +165,7 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                                         <TableCell>{adj.user?.name}</TableCell>
                                     </TableRow>
                                 ))}
-                                {adjustments.length === 0 && (
+                                {adjustmentRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                             No adjustment records found.
@@ -173,6 +175,17 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(adjustments?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={adjustments.last_page}
+                                page={adjustments.current_page}
+                                onChange={(event, page) => handleSearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

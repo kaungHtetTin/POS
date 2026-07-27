@@ -70,12 +70,13 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         ->middleware(['auth', 'verified']);
 
     Route::middleware('auth')->group(function () {
-        $placeholderPage = function (string $title, string $section, string $description) {
-            return function () use ($title, $section, $description) {
+        $placeholderPage = function (string $title, string $section, string $description, array $actions = []) {
+            return function () use ($title, $section, $description, $actions) {
                 return Inertia::render('Placeholder/Index', [
                     'title' => $title,
                     'section' => $section,
                     'description' => $description,
+                    'actions' => $actions,
                 ]);
             };
         };
@@ -161,6 +162,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/reports/purchases/suppliers/{supplier}', [ReportsController::class, 'purchaseSupplier'])->name('reports.purchases.supplier')->middleware('permission:manage_inventory');
         Route::get('/reports/sales-by-customers', [ReportsController::class, 'salesByCustomers'])->name('reports.sales-by-customers')->middleware('permission:view_financial_reports');
         Route::get('/reports/cash-sessions', [ReportsController::class, 'cashSessions'])->name('reports.cash-sessions')->middleware('permission:view_financial_reports');
+        Route::get('/finance/sale-representative', [ReportsController::class, 'saleRepresentatives'])->name('finance.sale-representative')->middleware('permission:view_financial_reports');
         Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
         Route::post('/sales/{sale}/void', [SalesController::class, 'void'])->name('sales.void')->middleware('permission:view_financial_reports');
 
@@ -176,6 +178,8 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/returns/lookup/sale', [ReturnsController::class, 'lookupSale'])->name('returns.lookup.sale')->middleware('permission:process_sale');
         Route::get('/returns/lookup/purchase', [ReturnsController::class, 'lookupPurchase'])->name('returns.lookup.purchase')->middleware('permission:process_sale');
 
+        Route::get('/finance/amount-receivable', [FinanceController::class, 'amountReceivable'])->name('finance.amount-receivable')->middleware('permission:view_financial_reports');
+        Route::post('/finance/amount-receivable/{sale}/receive', [FinanceController::class, 'receiveReceivablePayment'])->name('finance.amount-receivable.receive')->middleware('permission:view_financial_reports');
         Route::get('/finance/outstanding-balance', [FinanceController::class, 'outstandingBalance'])->name('finance.outstanding-balance')->middleware('permission:view_financial_reports');
         Route::get('/finance/pending-payments', function (string $locale) {
             return redirect()->route('finance.outstanding-balance', array_merge(['locale' => $locale], request()->query()));
@@ -187,10 +191,12 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/finance/profit-report', $financeReportRedirect)->name('finance.profit-report')->middleware('permission:view_financial_reports');
         Route::get('/finance/balance-sheet', $financeReportRedirect)->name('finance.balance-sheet')->middleware('permission:view_financial_reports');
 
-        Route::get('/sale-person/reports', $placeholderPage('Sales Person Reports', 'Sale Person', 'Compare sales volume, revenue, voids, and customer activity by sales staff.'))->name('sale-person.reports')->middleware('permission:view_financial_reports');
+        Route::get('/sale-person/reports', function (string $locale) {
+            return redirect()->route('finance.sale-representative', array_merge(['locale' => $locale], request()->query()));
+        })->name('sale-person.reports')->middleware('permission:view_financial_reports');
         Route::get('/sale-person/bonus-calculation', $placeholderPage('Sales Person Bonus Calculation', 'Sale Person', 'Define and review bonus calculations based on sales-person performance.'))->name('sale-person.bonus-calculation')->middleware('permission:view_financial_reports');
 
-        Route::get('/administration', $placeholderPage('Administration', 'Administration', 'Central workspace for operational administration modules and controls.'))->name('administration.index')->middleware('permission:manage_users');
+        Route::get('/administration', [StaffController::class, 'index'])->name('administration.index')->middleware('permission:manage_users');
 
         Route::get('/pos', [PosController::class, 'index'])->name('pos.index')->middleware('permission:process_sale');
         Route::get('/pos/products', [PosController::class, 'products'])->name('pos.products')->middleware('permission:process_sale');

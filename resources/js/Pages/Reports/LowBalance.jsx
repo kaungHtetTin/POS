@@ -9,6 +9,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -36,8 +37,9 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
     const [categoryId, setCategoryId] = useState(filters.category_id ?? '');
     const [productStatus, setProductStatus] = useState(filters.product_status ?? 'Active');
     const [stockStatus, setStockStatus] = useState(filters.stock_status ?? 'attention');
+    const itemRows = items?.data || items || [];
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('reports.low-balance'),
             {
@@ -46,6 +48,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                 category_id: categoryId || undefined,
                 product_status: productStatus || undefined,
                 stock_status: stockStatus || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -233,7 +236,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {items.map((item) => (
+                                {itemRows.map((item) => (
                                     <TableRow key={item.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -267,7 +270,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {items.length === 0 && (
+                                {itemRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">
@@ -279,6 +282,17 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(items?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={items.last_page}
+                                page={items.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
         </MainLayout>

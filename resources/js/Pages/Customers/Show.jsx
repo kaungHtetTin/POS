@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -9,6 +9,7 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -55,9 +56,12 @@ export default function CustomerShow({
     top_products = [],
     sales = [],
 }) {
+    const { translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const [branchId, setBranchId] = useState(filters.branch_id || 'all');
     const [fromDate, setFromDate] = useState(filters.from_date || '');
     const [toDate, setToDate] = useState(filters.to_date || '');
+    const saleRows = sales?.data || sales || [];
 
     const money = (value) => Number(value || 0).toFixed(2);
     const percent = (value, total) => {
@@ -111,11 +115,12 @@ export default function CustomerShow({
         sales: Number(row.sale_count || 0),
     })), [top_products]);
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(route('customers.show', customer.id), {
             branch_id: branchId || undefined,
             from_date: fromDate || undefined,
             to_date: toDate || undefined,
+            page,
         }, {
             preserveState: true,
             replace: true,
@@ -130,8 +135,8 @@ export default function CustomerShow({
     };
 
     return (
-        <MainLayout auth={auth} header="Customer Detail">
-            <Head title={`${customer.name} - Customer Detail`} />
+        <MainLayout auth={auth} header={__('Customer Detail')}>
+            <Head title={`${customer.name} - ${__('Customer Detail')}`} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
@@ -144,11 +149,11 @@ export default function CustomerShow({
                             startIcon={<ArrowBackIcon />}
                             sx={{ flexShrink: 0 }}
                         >
-                            Back
+                            {__('Back')}
                         </Button>
                         <Box sx={{ minWidth: 0 }}>
                             <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                                Customer
+                                {__('Customer')}
                             </Typography>
                             <Typography variant="h5" sx={{ fontWeight: 900 }} noWrap>
                                 {customer.name}
@@ -157,7 +162,7 @@ export default function CustomerShow({
                     </Stack>
                     <Chip
                         icon={<CalendarIcon fontSize="small" />}
-                        label={summary.last_sale_date ? `Last sale ${formatDate(summary.last_sale_date)}` : 'No sales yet'}
+                        label={summary.last_sale_date ? `${__('Last sale')} ${formatDate(summary.last_sale_date)}` : __('No sales yet')}
                         variant="outlined"
                         sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
                     />
@@ -168,26 +173,26 @@ export default function CustomerShow({
                         <Stack spacing={1.5}>
                             <Stack direction="row" spacing={1} alignItems="center">
                                 <PersonIcon color="primary" fontSize="small" />
-                                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>CUSTOMER PROFILE</Typography>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{__('CUSTOMER PROFILE')}</Typography>
                             </Stack>
                             <Divider />
                             <Stack spacing={1.1}>
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <PhoneIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                    <Typography variant="body2">{customer.phone || 'No phone'}</Typography>
+                                    <Typography variant="body2">{customer.phone || __('No phone')}</Typography>
                                 </Stack>
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <EmailIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                    <Typography variant="body2">{customer.email || 'No email'}</Typography>
+                                    <Typography variant="body2">{customer.email || __('No email')}</Typography>
                                 </Stack>
                                 <Stack direction="row" spacing={1} alignItems="flex-start">
                                     <HomeIcon sx={{ fontSize: 16, color: 'text.secondary', mt: 0.2 }} />
-                                    <Typography variant="body2">{customer.address || 'No address provided'}</Typography>
+                                    <Typography variant="body2">{customer.address || __('No address provided')}</Typography>
                                 </Stack>
                             </Stack>
                             <Divider />
                             <Typography variant="caption" color="text.secondary">
-                                Created {formatDateTime(customer.created_at)}
+                                {__('Created')} {formatDateTime(customer.created_at)}
                             </Typography>
                         </Stack>
                     </Paper>
@@ -195,14 +200,14 @@ export default function CustomerShow({
                     <Paper sx={{ p: 2 }}>
                         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
                             <ReceiptIcon fontSize="small" color="primary" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>CUSTOMER SALES REPORT</Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{__('CUSTOMER SALES REPORT')}</Typography>
                         </Stack>
 
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}>
                             <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 220px' }, minWidth: 0 }}>
-                                <InputLabel>Branch</InputLabel>
-                                <Select value={branchId} label="Branch" onChange={(event) => setBranchId(event.target.value)}>
-                                    <MenuItem value="all">All Accessible</MenuItem>
+                                <InputLabel>{__('Branch')}</InputLabel>
+                                <Select value={branchId} label={__('Branch')} onChange={(event) => setBranchId(event.target.value)}>
+                                    <MenuItem value="all">{__('All Accessible')}</MenuItem>
                                     {branches.map((branch) => (
                                         <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>
                                     ))}
@@ -211,7 +216,7 @@ export default function CustomerShow({
                             <TextField
                                 size="small"
                                 type="date"
-                                label="From"
+                                label={__('From')}
                                 value={fromDate}
                                 onChange={(event) => setFromDate(event.target.value)}
                                 InputLabelProps={{ shrink: true }}
@@ -220,17 +225,17 @@ export default function CustomerShow({
                             <TextField
                                 size="small"
                                 type="date"
-                                label="To"
+                                label={__('To')}
                                 value={toDate}
                                 onChange={(event) => setToDate(event.target.value)}
                                 InputLabelProps={{ shrink: true }}
                                 sx={{ flex: { xs: '1 1 100%', sm: '0 1 170px' } }}
                             />
                             <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={applyFilters} sx={{ height: 40 }}>
-                                Apply
+                                {__('Apply')}
                             </Button>
                             <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters} sx={{ height: 40 }}>
-                                Reset
+                                {__('Reset')}
                             </Button>
                         </Box>
 
@@ -243,7 +248,7 @@ export default function CustomerShow({
                                 ['Avg Sale', `$${money(summary.average_sale)}`],
                             ].map(([label, value]) => (
                                 <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                    <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
                                     <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
                                 </Paper>
                             ))}
@@ -253,7 +258,7 @@ export default function CustomerShow({
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.35fr 1fr' }, gap: 2, mb: 2 }}>
                     <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Sales Trend</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>{__('Sales Trend')}</Typography>
                         <Box sx={{ height: 260 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
@@ -262,15 +267,15 @@ export default function CustomerShow({
                                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
                                     <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'sales' ? value : `$${money(value)}`} />
                                     <Legend />
-                                    <Line type="monotone" dataKey="total" name="Sales Amount" stroke="#087f74" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="tax" name="Tax" stroke="#b77700" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#087f74" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="tax" name={__('Tax')} stroke="#b77700" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </Box>
                     </Paper>
 
                     <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Top Products</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>{__('Top Products')}</Typography>
                         <Box sx={{ height: 260, mb: 1 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={topProductData} layout="vertical" margin={{ top: 8, right: 20, left: 42, bottom: 0 }}>
@@ -279,7 +284,7 @@ export default function CustomerShow({
                                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={128} />
                                     <ChartTooltip formatter={(value) => `$${money(value)}`} />
                                     <Legend />
-                                    <Bar dataKey="amount" name="Sale Amount" fill="#087f74" />
+                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#087f74" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -287,10 +292,10 @@ export default function CustomerShow({
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Product</TableCell>
-                                        <TableCell align="right">Qty</TableCell>
-                                        <TableCell align="right">Amount</TableCell>
-                                        <TableCell align="right">Share</TableCell>
+                                        <TableCell>{__('Product')}</TableCell>
+                                        <TableCell align="right">{__('Qty')}</TableCell>
+                                        <TableCell align="right">{__('Amount')}</TableCell>
+                                        <TableCell align="right">{__('Share')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -298,7 +303,7 @@ export default function CustomerShow({
                                         <TableRow key={product.product_id || product.product_name} hover>
                                             <TableCell>
                                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>{product.product_name}</Typography>
-                                                <Typography variant="caption" color="text.secondary">{product.generic_name || 'No generic name'}</Typography>
+                                                <Typography variant="caption" color="text.secondary">{product.generic_name || __('No generic name')}</Typography>
                                             </TableCell>
                                             <TableCell align="right">{Number(product.quantity || 0).toFixed(2)}</TableCell>
                                             <TableCell align="right" sx={{ fontWeight: 800 }}>${money(product.sale_amount)}</TableCell>
@@ -308,7 +313,7 @@ export default function CustomerShow({
                                     {(top_products || []).length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                                                <Typography variant="body2" color="text.secondary">No product sales found.</Typography>
+                                                <Typography variant="body2" color="text.secondary">{__('No product sales found.')}</Typography>
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -320,26 +325,26 @@ export default function CustomerShow({
 
                 <Paper sx={{ p: 2 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1} sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>SALE HISTORY</Typography>
-                        <Chip size="small" variant="outlined" label={`Showing latest ${sales.length} sales`} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{__('SALE HISTORY')}</Typography>
+                        <Chip size="small" variant="outlined" label={`${__('Sales')}: ${sales.total ?? saleRows.length}`} />
                     </Stack>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Invoice</TableCell>
-                                    <TableCell>Date</TableCell>
-                                    <TableCell>Branch</TableCell>
-                                    <TableCell>Sale Staff</TableCell>
-                                    <TableCell>Payment</TableCell>
-                                    <TableCell align="right">Total</TableCell>
-                                    <TableCell align="right">Tax</TableCell>
-                                    <TableCell align="right">Discount</TableCell>
-                                    <TableCell align="right">Grand</TableCell>
+                                    <TableCell>{__('Invoice')}</TableCell>
+                                    <TableCell>{__('Date')}</TableCell>
+                                    <TableCell>{__('Branch')}</TableCell>
+                                    <TableCell>{__('Sale Staff')}</TableCell>
+                                    <TableCell>{__('Payment')}</TableCell>
+                                    <TableCell align="right">{__('Total')}</TableCell>
+                                    <TableCell align="right">{__('Tax')}</TableCell>
+                                    <TableCell align="right">{__('Discount')}</TableCell>
+                                    <TableCell align="right">{__('Grand')}</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(sales || []).map((sale) => (
+                                {saleRows.map((sale) => (
                                     <TableRow key={sale.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 800 }}>{sale.invoice_number}</Typography>
@@ -350,7 +355,7 @@ export default function CustomerShow({
                                         <TableCell>{sale.sale_staff_name}</TableCell>
                                         <TableCell>
                                             <Typography variant="caption" color="text.secondary">
-                                                {sale.payment_method} / {sale.payment_status}
+                                                {__(sale.payment_method)} / {__(sale.payment_status)}
                                             </Typography>
                                         </TableCell>
                                         <TableCell align="right">${money(sale.total_amount)}</TableCell>
@@ -359,16 +364,27 @@ export default function CustomerShow({
                                         <TableCell align="right" sx={{ fontWeight: 900 }}>${money(sale.grand_total)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {(sales || []).length === 0 && (
+                                {saleRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
-                                            <Typography variant="body2" color="text.secondary">No sale history found for this customer.</Typography>
+                                            <Typography variant="body2" color="text.secondary">{__('No sale history found for this customer.')}</Typography>
                                         </TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(sales?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={sales.last_page}
+                                page={sales.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
         </MainLayout>

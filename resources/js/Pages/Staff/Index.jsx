@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -27,7 +27,9 @@ import {
     MenuItem,
     Avatar,
     Checkbox,
+    InputAdornment,
     ListItemText,
+    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -38,13 +40,17 @@ import {
     Store as StoreIcon,
     Badge as BadgeIcon,
     PhotoCamera as PhotoCameraIcon,
+    Search as SearchIcon,
 } from '@mui/icons-material';
 
-export default function StaffIndex({ auth, staff, roles, branches }) {
+export default function StaffIndex({ auth, staff, roles, branches, filters = {} }) {
+    const { translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
-    const money = (value) => Number(value || 0).toFixed(2);
+    const [search, setSearch] = useState(filters.search || '');
+    const staffRows = staff?.data || staff || [];
 
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
@@ -129,45 +135,71 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
         }
     };
 
+    const applySearch = (page = undefined) => {
+        router.get(route('staff.index'), { search: search || undefined, page }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     return (
         <MainLayout
             auth={auth}
-            header="Staff Management"
+            header={__('Staff Management')}
         >
-            <Head title="Staff" />
+            <Head title={__('Staff')} />
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            SYSTEM STAFF DIRECTORY
+                            {__('SYSTEM STAFF DIRECTORY')}
                         </Typography>
-                        <Button 
-                            variant="contained" 
-                            size="small" 
-                            startIcon={<AddIcon />}
-                            onClick={() => handleOpen()}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                        >
-                            Add New Staff
-                        </Button>
-                    </Box>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                            <TextField
+                                size="small"
+                                placeholder={__('Search staff...')}
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                onKeyDown={(event) => event.key === 'Enter' && applySearch()}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                sx={{ minWidth: { sm: 240 } }}
+                            />
+                            <Button variant="outlined" size="small" onClick={() => applySearch()}>
+                                {__('Search')}
+                            </Button>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<AddIcon />}
+                                onClick={() => handleOpen()}
+                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            >
+                                {__('Add New Staff')}
+                            </Button>
+                        </Stack>
+                    </Stack>
                     <Divider sx={{ mb: 2 }} />
 
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Staff Member</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Branch</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Contact</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Sales Power</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Staff Member')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Role')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Branch')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Contact')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Actions')}</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {staff.map((member) => (
+                                {staffRows.map((member) => (
                                     <TableRow key={member.id} hover>
                                         <TableCell>
                                             <Stack direction="row" spacing={1.5} alignItems="center">
@@ -210,26 +242,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                             </Stack>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2">{member.phone || 'N/A'}</Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                {money(member.sales_total)}
-                                            </Typography>
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {member.sales_count || 0} sales
-                                                </Typography>
-                                                {(member.open_pos_sessions_count || 0) > 0 && (
-                                                    <Chip
-                                                        size="small"
-                                                        color="success"
-                                                        label="POS open"
-                                                        variant="outlined"
-                                                        sx={{ height: 18, fontSize: 10 }}
-                                                    />
-                                                )}
-                                            </Stack>
+                                            <Typography variant="body2">{member.phone || __('N/A')}</Typography>
                                         </TableCell>
                                         <TableCell align="right">
                                             <IconButton 
@@ -253,6 +266,17 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(staff?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={staff.last_page}
+                                page={staff.current_page}
+                                onChange={(event, page) => applySearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 
@@ -260,7 +284,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {editMode ? 'Edit Staff Member' : 'Add New Staff Member'}
+                        {editMode ? __('Edit Staff Member') : __('Add New Staff Member')}
                         <IconButton size="small" onClick={handleClose}>
                             <CloseIcon />
                         </IconButton>
@@ -280,7 +304,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     size="small"
                                     startIcon={<PhotoCameraIcon />}
                                 >
-                                    {editMode ? 'Change Photo' : 'Upload Photo'}
+                                    {editMode ? __('Change Photo') : __('Upload Photo')}
                                     <input
                                         type="file"
                                         hidden
@@ -296,7 +320,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                             </Box>
 
                             <TextField
-                                label="Full Name"
+                                label={__('Full Name')}
                                 fullWidth
                                 size="small"
                                 value={data.name}
@@ -306,7 +330,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                 required
                             />
                             <TextField
-                                label="Email Address"
+                                label={__('Email Address')}
                                 fullWidth
                                 size="small"
                                 type="email"
@@ -317,7 +341,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                 required
                             />
                             <TextField
-                                label="Phone Number"
+                                label={__('Phone Number')}
                                 fullWidth
                                 size="small"
                                 value={data.phone}
@@ -328,10 +352,10 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
 
                             <Stack direction="row" spacing={2}>
                                 <FormControl fullWidth size="small" error={!!errors.branch_id} required>
-                                    <InputLabel>Primary Branch</InputLabel>
+                                    <InputLabel>{__('Primary Branch')}</InputLabel>
                                     <Select
                                         value={data.branch_id}
-                                        label="Primary Branch"
+                                        label={__('Primary Branch')}
                                         onChange={(e) => {
                                             const newPrimaryId = e.target.value;
                                             const oldPrimaryId = data.branch_id;
@@ -366,10 +390,10 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                 </FormControl>
 
                                 <FormControl fullWidth size="small" error={!!errors.role_id} required>
-                                    <InputLabel>Role</InputLabel>
+                                    <InputLabel>{__('Role')}</InputLabel>
                                     <Select
                                         value={data.role_id}
-                                        label="Role"
+                                        label={__('Role')}
                                         onChange={e => setData('role_id', e.target.value)}
                                     >
                                         {roles.map(role => (
@@ -380,11 +404,11 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                             </Stack>
 
                             <FormControl fullWidth size="small" error={!!errors.branch_ids}>
-                                <InputLabel>Branch Access</InputLabel>
+                                <InputLabel>{__('Branch Access')}</InputLabel>
                                 <Select
                                     multiple
                                     value={data.branch_ids}
-                                    label="Branch Access"
+                                    label={__('Branch Access')}
                                     onChange={(e) => {
                                         const selected = e.target.value;
                                         setData((prev) => ({
@@ -408,7 +432,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                                 <Checkbox size="small" checked={checked} />
                                                 <ListItemText primary={branch.name} />
                                                 {isPrimary && (
-                                                    <Chip size="small" label="Primary" sx={{ ml: 1, height: 18, fontSize: 10 }} />
+                                                    <Chip size="small" label={__('Primary')} sx={{ ml: 1, height: 18, fontSize: 10 }} />
                                                 )}
                                             </MenuItem>
                                         );
@@ -422,12 +446,12 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                             </FormControl>
 
                             <Divider sx={{ my: 1 }}>
-                                <Chip label="Security" size="small" />
+                                <Chip label={__('Security')} size="small" />
                             </Divider>
 
                             <Stack direction="row" spacing={2}>
                                 <TextField
-                                    label={editMode ? "New Password (Optional)" : "Password"}
+                                    label={editMode ? __('New Password (Optional)') : __('Password')}
                                     fullWidth
                                     size="small"
                                     type="password"
@@ -438,7 +462,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     autoComplete="new-password"
                                 />
                                 <TextField
-                                    label="Confirm Password"
+                                    label={__('Confirm Password')}
                                     fullWidth
                                     size="small"
                                     type="password"
@@ -450,14 +474,14 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={handleClose} size="small">Cancel</Button>
+                        <Button onClick={handleClose} size="small">{__('Cancel')}</Button>
                         <Button 
                             type="submit" 
                             variant="contained" 
                             size="small" 
                             disabled={processing}
                         >
-                            {editMode ? 'Update Staff' : 'Add Staff'}
+                            {editMode ? __('Update Staff') : __('Add Staff')}
                         </Button>
                     </DialogActions>
                 </form>

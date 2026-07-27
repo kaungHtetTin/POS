@@ -22,6 +22,7 @@ import {
     DialogActions,
     TextField,
     InputAdornment,
+    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -42,6 +43,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
     const [editMode, setEditMode] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
+    const supplierRows = suppliers?.data || suppliers || [];
 
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
@@ -87,8 +89,8 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
         setEditingSupplier(null);
     };
 
-    const handleSearch = () => {
-        router.get(route('suppliers.index'), { search }, {
+    const handleSearch = (page = undefined) => {
+        router.get(route('suppliers.index'), { search: search || undefined, page }, {
             preserveState: true,
             replace: true,
         });
@@ -169,7 +171,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {suppliers.map((supplier) => (
+                                {supplierRows.map((supplier) => (
                                     <TableRow key={supplier.id} hover>
                                         <TableCell sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Stack direction="row" spacing={1} alignItems="center">
@@ -262,7 +264,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {suppliers.length === 0 && (
+                                {supplierRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -274,6 +276,17 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(suppliers?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={suppliers.last_page}
+                                page={suppliers.current_page}
+                                onChange={(event, page) => handleSearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

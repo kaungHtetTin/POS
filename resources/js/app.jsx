@@ -12,7 +12,8 @@ import { router } from '@inertiajs/react';
 import { ColorModeContext } from './contexts/ColorModeContext';
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
-const translatableAttributes = ['title', 'placeholder', 'aria-label'];
+const translatableAttributes = ['title', 'placeholder', 'aria-label', 'alt'];
+let currentTranslations = {};
 
 const normalizeDuplicatedBasePath = (pathname, base) => {
     if (!pathname || !base || base === '/') {
@@ -75,6 +76,21 @@ const translateValue = (value, translations) => {
     const trimmed = value.trim();
     const translated = translations?.[trimmed];
     if (!translated) {
+        const colonMatch = trimmed.match(/^(.+?)(:\s.*)$/);
+        if (colonMatch && translations?.[colonMatch[1]]) {
+            return value.replace(trimmed, `${translations[colonMatch[1]]}${colonMatch[2]}`);
+        }
+
+        const countMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+        if (countMatch && translations?.[countMatch[2]]) {
+            return value.replace(trimmed, `${countMatch[1]} ${translations[countMatch[2]]}`);
+        }
+
+        const parentheticalMatch = trimmed.match(/^(.+?)\s+\((.+)\)$/);
+        if (parentheticalMatch && translations?.[parentheticalMatch[1]]) {
+            return value.replace(trimmed, `${translations[parentheticalMatch[1]]} (${parentheticalMatch[2]})`);
+        }
+
         return value;
     }
 
@@ -155,7 +171,7 @@ const buildGetUrl = (rawUrl, data = {}) => {
 };
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => `${translateValue(title, currentTranslations)} - ${translateValue(appName, currentTranslations)}`,
     resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
     setup({ el, App, props }) {
         // Fix for subfolder routing duplication
@@ -212,7 +228,8 @@ createInertiaApp({
         }
 
         if (props.initialPage.props.locale === 'my') {
-            scheduleStaticTranslations(props.initialPage.props.translations || {});
+            currentTranslations = props.initialPage.props.translations || {};
+            scheduleStaticTranslations(currentTranslations);
         }
 
         if (!window.__inertiaUrlGuardBound) {
@@ -303,8 +320,10 @@ createInertiaApp({
 router.on('navigate', (event) => {
     const page = event?.detail?.page;
     if (!page || page.props?.locale !== 'my') {
+        currentTranslations = {};
         return;
     }
 
-    scheduleStaticTranslations(page.props.translations || {});
+    currentTranslations = page.props.translations || {};
+    scheduleStaticTranslations(currentTranslations);
 });

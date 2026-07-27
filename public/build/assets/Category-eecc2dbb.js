@@ -1,0 +1,1 @@
+import{a}from"./app-f13c325e.js";import{a as o}from"./Box-73c6b625.js";const t=o([a("path",{d:"m12 2-5.5 9h11z"},"0"),a("circle",{cx:"17.5",cy:"17.5",r:"4.5"},"1"),a("path",{d:"M3 13.5h8v8H3z"},"2")]);export{t as C};

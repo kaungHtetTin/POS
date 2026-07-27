@@ -135,10 +135,25 @@ class SalesController extends Controller
                 });
             });
 
-        $sales = $query->latest('sales.sale_date')->latest()->get();
+        $summary = (clone $query)
+            ->selectRaw('COUNT(*) as sales_count')
+            ->selectRaw("SUM(CASE WHEN COALESCE(status, 'Completed') = 'Voided' THEN 1 ELSE 0 END) as voided_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(status, 'Completed') != 'Voided' THEN grand_total ELSE 0 END), 0) as active_total")
+            ->first();
+
+        $sales = $query
+            ->latest('sales.sale_date')
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Sales/Index', [
             'sales' => $sales,
+            'summary' => [
+                'sales_count' => (int) ($summary->sales_count ?? 0),
+                'voided_count' => (int) ($summary->voided_count ?? 0),
+                'active_total' => (float) ($summary->active_total ?? 0),
+            ],
             'branches' => $branches,
             'salesStaff' => $salesStaff,
             'filters' => [

@@ -96,7 +96,7 @@ class CustomerController extends Controller
         }
 
         return Inertia::render('Customers/Index', [
-            'customers' => $query->latest()->get(),
+            'customers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
     }
@@ -198,9 +198,9 @@ class CustomerController extends Controller
             ->with(['branch:id,name', 'user:id,name', 'saleStaff:id,name'])
             ->latest('sales.sale_date')
             ->latest('sales.created_at')
-            ->limit(100)
-            ->get()
-            ->map(function ($sale) {
+            ->paginate(15)
+            ->withQueryString()
+            ->through(function ($sale) {
                 return [
                     'id' => $sale->id,
                     'invoice_number' => $sale->invoice_number,

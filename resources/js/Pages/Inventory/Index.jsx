@@ -18,6 +18,7 @@ import {
     Chip,
     Button,
     IconButton,
+    Pagination,
     Tooltip,
 } from '@mui/material';
 import {
@@ -37,6 +38,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
     const [categoryId, setCategoryId] = useState(filters?.category_id || '');
     const [productStatus, setProductStatus] = useState(filters?.product_status || '');
     const [stockStatus, setStockStatus] = useState(filters?.stock_status || '');
+    const inventoryRows = inventory?.data || inventory || [];
 
     const applyFilters = (newFilters = {}) => {
         const query = {
@@ -84,8 +86,8 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                     title="Stock Level Reports"
                     icon={<StockIcon color="primary" fontSize="small" />}
                     meta={
-                        <Typography variant="body2" color="text.secondary">
-                            {inventory.length} records
+        <Typography variant="body2" color="text.secondary">
+                            {inventory?.total ?? inventoryRows.length} records
                         </Typography>
                     }
                     actions={
@@ -211,7 +213,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {inventory.map((item) => (
+                                {inventoryRows.map((item) => (
                                     <TableRow key={item.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.name}</Typography>
@@ -255,7 +257,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {inventory.length === 0 && (
+                                {inventoryRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -267,6 +269,17 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(inventory?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={inventory.last_page}
+                                page={inventory.current_page}
+                                onChange={(event, page) => applyFilters({ page })}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </MergedTablePanel>
             </Box>
         </MainLayout>

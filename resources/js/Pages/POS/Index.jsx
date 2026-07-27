@@ -9,16 +9,20 @@ import {
     Card,
     CardActionArea,
     CardContent,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     Divider,
+    FormControlLabel,
     IconButton,
     InputAdornment,
     MenuItem,
     Paper,
+    Radio,
+    RadioGroup,
     Stack,
     Table,
     TableBody,
@@ -30,9 +34,12 @@ import {
     ToggleButton,
     ToggleButtonGroup,
     Typography,
+    useMediaQuery,
 } from '@mui/material';
 import {
     Add as AddIcon,
+    ChevronLeft as ChevronLeftIcon,
+    ChevronRight as ChevronRightIcon,
     PersonAdd as PersonAddIcon,
     Delete as DeleteIcon,
     Close as CloseIcon,
@@ -59,6 +66,7 @@ export default function PosIndex({
     const pageErrors = page.props?.errors || {};
     const displayError = error || flash?.error || pageErrors?.error;
     const __ = (key) => translations[key] || key;
+    const isSmallScreen = useMediaQuery((theme) => theme.breakpoints.down('md'));
     const currencySymbol = settings.app?.currency_symbol || '$';
     const appBase = ziggy?.base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -100,12 +108,13 @@ export default function PosIndex({
     const [shiftDialogOpen, setShiftDialogOpen] = useState(!activeSession?.id);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [customerSectionExpanded, setCustomerSectionExpanded] = useState(false);
-    const [paymentOptionsExpanded, setPaymentOptionsExpanded] = useState(false);
     const [salePriceType, setSalePriceType] = useState('retail');
+    const [mobileStep, setMobileStep] = useState('products');
 
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
     const searchInputRef = useRef(null);
+    const categoryScrollRef = useRef(null);
     const silentPrintFallbackRef = useRef(false);
 
     const { data, setData, post, processing, errors } = useForm({
@@ -178,6 +187,12 @@ export default function PosIndex({
     }, [selectedCustomer, setData]);
 
     useEffect(() => {
+        if (!selectedCustomer?.id && data.payment_status !== 'Paid') {
+            setData('payment_status', 'Paid');
+        }
+    }, [selectedCustomer, data.payment_status, setData]);
+
+    useEffect(() => {
         if (data.payment_method !== 'Cash' && Number(data.amount_received || 0) !== 0) {
             setData('amount_received', 0);
         }
@@ -198,6 +213,12 @@ export default function PosIndex({
         const t = setTimeout(() => searchInputRef.current?.focus(), 150);
         return () => clearTimeout(t);
     }, [behavior.barcode_focus]);
+
+    useEffect(() => {
+        if (isSmallScreen && cart.length === 0 && mobileStep !== 'products') {
+            setMobileStep('products');
+        }
+    }, [cart.length, isSmallScreen, mobileStep]);
 
     const fetchCustomers = useCallback(async (query) => {
         setCustomerLoading(true);
@@ -301,18 +322,18 @@ export default function PosIndex({
     };
 
     const fetchSearch = async (options = {}) => {
-        const { autoAddFromBarcode = false, clearInputAfterSearch = false } = options;
+        const { autoAddFromBarcode = false, clearInputAfterSearch = false, categoryId = selectedCategoryId } = options;
         const query = searchQuery.trim();
         setScanError('');
 
         if (!query) {
-            setSearchResults([]);
+            await fetchCatalog({ categoryId, page: 1, append: false });
             return;
         }
 
         setSearchLoading(true);
         try {
-            const response = await fetch(route('pos.products', { query }));
+            const response = await fetch(route('pos.products', { query, category_id: categoryId || null }));
             const data = await response.json();
             const products = Array.isArray(data) ? data : [];
             setSearchResults(products);
@@ -364,17 +385,33 @@ export default function PosIndex({
     };
 
     useEffect(() => {
-        if (resultsView !== 'grid') return;
         if (catalogCategories.length === 0) {
             fetchCategories();
         }
+        if (!searchQuery.trim()) {
+            fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
+            return;
+        }
+        fetchSearch({ categoryId: selectedCategoryId });
+    }, [selectedCategoryId]);
+
+    useEffect(() => {
+        if (resultsView !== 'grid' || searchQuery.trim()) return;
         fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
     }, [resultsView]);
 
-    useEffect(() => {
-        if (resultsView !== 'grid') return;
-        fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
-    }, [selectedCategoryId]);
+    const scrollCategories = (direction) => {
+        categoryScrollRef.current?.scrollBy({
+            left: direction * 240,
+            behavior: 'smooth',
+        });
+    };
 
     const handleBarcodeScan = async (barcode) => {
         setScanError('');
@@ -539,6 +576,7 @@ export default function PosIndex({
     const changeDueValue = isCashPayment ? Math.max(amountReceivedValue - totals.grandTotal, 0) : 0;
     const cashShortageValue = isCashPayment ? Math.max(totals.grandTotal - amountReceivedValue, 0) : 0;
     const isPaidCashSale = isCashPayment && data.payment_status === 'Paid';
+    const isWalkInCustomer = !selectedCustomer?.id;
     const hasActiveSession = Boolean(activeSession?.id);
     const activeSessionExpected = Number(activeSession?.expected_amount || 0);
     const activeSessionDifference = activeSession?.difference == null ? null : Number(activeSession.difference || 0);
@@ -830,8 +868,8 @@ export default function PosIndex({
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
                 setData('sale_channel', salePriceType);
                 setPaymentDialogOpen(false);
+                setMobileStep('products');
                 setCustomerSectionExpanded(false);
-                setPaymentOptionsExpanded(false);
                 if (behavior.barcode_focus) {
                     setTimeout(() => searchInputRef.current?.focus(), 100);
                 }
@@ -878,6 +916,11 @@ export default function PosIndex({
         }
 
         if (cart.length > 0) {
+            setCustomerSectionExpanded(false);
+            if (isSmallScreen) {
+                setMobileStep('checkout');
+                return;
+            }
             setPaymentDialogOpen(true);
         }
     };
@@ -892,8 +935,41 @@ export default function PosIndex({
                         {displayError}
                     </Alert>
                 )}
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'flex-start' }}>
-                    <Paper sx={{ p: 2, flex: { xs: '1 1 auto', md: '0 1 42%' }, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
+
+                <Box
+                    sx={{
+                        display: { xs: 'grid', md: 'none' },
+                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                        gap: 0.75,
+                        mb: 1,
+                    }}
+                >
+                    {[
+                        ['products', __('Products')],
+                        ['cart', `${__('Cart')} (${cart.length})`],
+                        ['checkout', __('Checkout')],
+                    ].map(([step, label]) => (
+                        <Button
+                            key={step}
+                            size="small"
+                            variant={mobileStep === step ? 'contained' : 'outlined'}
+                            disabled={(step === 'cart' || step === 'checkout') && cart.length === 0}
+                            onClick={() => setMobileStep(step)}
+                            sx={{
+                                minWidth: 0,
+                                px: 0.5,
+                                fontSize: 12,
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {label}
+                        </Button>
+                    ))}
+                </Box>
+
+                <Box sx={{ display: { xs: mobileStep === 'checkout' ? 'none' : 'flex', md: 'flex' }, flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'flex-start' }}>
+                    <Paper sx={{ p: 2, flex: { xs: '1 1 auto', md: '0 1 42%' }, width: '100%', display: { xs: mobileStep === 'products' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                             <ScanIcon color="primary" fontSize="small" />
                             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -943,73 +1019,221 @@ export default function PosIndex({
                             </ToggleButtonGroup>
                         </Stack>
 
-                        {resultsView === 'table' ? (
-                            <Stack direction="row" spacing={1}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    inputRef={searchInputRef}
-                                    placeholder={__('Search by name, generic name, or barcode...')}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            fetchSearch({ autoAddFromBarcode: true, clearInputAfterSearch: true });
-                                        }
+                        <Stack direction="row" spacing={1}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                inputRef={searchInputRef}
+                                placeholder={__('Search by name, generic name, or barcode...')}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        fetchSearch({ autoAddFromBarcode: true, clearInputAfterSearch: true });
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon fontSize="small" />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <Button
+                                variant="contained"
+                                size="small"
+                                onClick={() => fetchSearch()}
+                                disabled={searchLoading || catalogLoading}
+                                sx={{ minWidth: 110 }}
+                            >
+                                {__('Search')}
+                            </Button>
+                        </Stack>
+
+                        <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{
+                                mt: 1.25,
+                                mb: 0.35,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <IconButton
+                                size="small"
+                                aria-label={__('Scroll categories left')}
+                                onClick={() => scrollCategories(-1)}
+                                sx={{
+                                    width: 30,
+                                    height: 34,
+                                    flexShrink: 0,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.paper',
+                                }}
+                            >
+                                <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <Box
+                                ref={categoryScrollRef}
+                                sx={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    px: 0.5,
+                                    pt: 0.35,
+                                    pb: 0.9,
+                                    overflowX: 'auto',
+                                    overflowY: 'hidden',
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none',
+                                    '&::-webkit-scrollbar': { display: 'none' },
+                                }}
+                            >
+                                <RadioGroup
+                                    row
+                                    value={String(selectedCategoryId)}
+                                    onChange={(event) => setSelectedCategoryId(event.target.value)}
+                                    sx={{
+                                        flexWrap: 'nowrap',
+                                        gap: 0.85,
+                                        minWidth: 'max-content',
+                                        width: 'max-content',
+                                        '& .MuiFormControlLabel-root': {
+                                            mr: 0,
+                                            ml: 0,
+                                            px: 1,
+                                            pr: 1.25,
+                                            height: 34,
+                                            minWidth: 'fit-content',
+                                            flexShrink: 0,
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            bgcolor: 'background.paper',
+                                            borderRadius: 1,
+                                        },
+                                        '& .MuiFormControlLabel-root:has(.Mui-checked)': {
+                                            borderColor: 'primary.main',
+                                            bgcolor: 'rgba(10, 23, 91, 0.06)',
+                                        },
+                                        '& .MuiFormControlLabel-label': {
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            whiteSpace: 'nowrap',
+                                        },
+                                        '& .MuiRadio-root': {
+                                            p: 0.25,
+                                            mr: 0.25,
+                                        },
                                     }}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <SearchIcon fontSize="small" />
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                />
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    onClick={fetchSearch}
-                                    disabled={searchLoading}
-                                    sx={{ minWidth: 110 }}
                                 >
-                                    {__('Search')}
-                                </Button>
-                            </Stack>
-                        ) : (
-                            <Box sx={{ pb: 0.5 }}>
+                                    <FormControlLabel value="" control={<Radio size="small" />} label={__('All')} />
+                                    {catalogCategories.map((cat) => (
+                                        <FormControlLabel key={cat.id} value={String(cat.id)} control={<Radio size="small" />} label={cat.name} />
+                                    ))}
+                                </RadioGroup>
+                            </Box>
+                            <IconButton
+                                size="small"
+                                aria-label={__('Scroll categories right')}
+                                onClick={() => scrollCategories(1)}
+                                sx={{
+                                    width: 30,
+                                    height: 34,
+                                    flexShrink: 0,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.paper',
+                                }}
+                            >
+                                <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+
+                        {cart.length > 0 && (
+                            <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 0.75 }}>
+                                <Stack direction="row" spacing={0.5} sx={{ mb: 0.75, alignItems: 'baseline' }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary' }}>
+                                        {__('Selected products')}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                        {cart.length} {cart.length === 1 ? __('item') : __('items')}
+                                    </Typography>
+                                </Stack>
                                 <Box
                                     sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                                        display: 'flex',
                                         gap: 1,
+                                        overflowX: 'auto',
+                                        overflowY: 'hidden',
+                                        pb: 0.75,
+                                        scrollbarWidth: 'none',
+                                        msOverflowStyle: 'none',
+                                        '&::-webkit-scrollbar': { display: 'none' },
                                     }}
                                 >
-                                    <Button
-                                        variant={selectedCategoryId === '' ? 'contained' : 'outlined'}
-                                        size="small"
-                                        onClick={() => setSelectedCategoryId('')}
-                                        sx={{ justifyContent: 'flex-start', textTransform: 'none', fontWeight: 700 }}
-                                    >
-                                        {__('All')}
-                                    </Button>
-                                    {catalogCategories.map((cat) => (
-                                        <Button
-                                            key={cat.id}
-                                            variant={selectedCategoryId === cat.id ? 'contained' : 'outlined'}
-                                            size="small"
-                                            onClick={() => setSelectedCategoryId(cat.id)}
-                                            sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
-                                        >
-                                            {cat.name}
-                                        </Button>
-                                    ))}
+                                    {cart.map((line) => {
+                                        const lineTotal = resolveDiscountedLineTotal(line);
+                                        const imageUrl = line.image_path ? storageUrl(line.image_path) : null;
+
+                                        return (
+                                            <Box
+                                                key={line.id}
+                                                sx={{
+                                                    width: 220,
+                                                    minWidth: 220,
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '48px minmax(0, 1fr) 28px',
+                                                    gap: 0.75,
+                                                    alignItems: 'center',
+                                                    p: 0.75,
+                                                    border: '1px solid',
+                                                    borderColor: 'divider',
+                                                    bgcolor: 'background.paper',
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        display: 'grid',
+                                                        placeItems: 'center',
+                                                        bgcolor: 'action.hover',
+                                                        overflow: 'hidden',
+                                                        border: '1px solid',
+                                                        borderColor: 'divider',
+                                                    }}
+                                                >
+                                                    {imageUrl ? (
+                                                        <Box component="img" src={imageUrl} alt="" loading="lazy" decoding="async" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9, fontWeight: 800, textAlign: 'center', px: 0.25 }}>
+                                                            {line.barcode || __('No Image')}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                                <Box sx={{ minWidth: 0 }}>
+                                                    <Typography variant="caption" title={line.name} sx={{ display: 'block', fontWeight: 800, lineHeight: 1.12 }} noWrap>
+                                                        {line.name}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                                                        x{line.quantity} - {currencySymbol}{lineTotal.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    aria-label={`${__('Remove item')} ${line.name}`}
+                                                    onClick={() => removeCartLine(line.id)}
+                                                    sx={{ width: 28, height: 28, alignSelf: 'start' }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        );
+                                    })}
                                 </Box>
-                                {catalogLoading && (
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                                        {__('Loading...')}
-                                    </Typography>
-                                )}
                             </Box>
                         )}
 
@@ -1092,7 +1316,7 @@ export default function PosIndex({
                                 sx={{
                                     mt: 1,
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, 1fr)' },
                                     gap: 1.5,
                                 }}
                             >
@@ -1207,9 +1431,21 @@ export default function PosIndex({
                                 )}
                             </Box>
                         )}
+
+                        <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 2 }}>
+                            <Button
+                                variant="contained"
+                                fullWidth
+                                disabled={cart.length === 0}
+                                onClick={() => setMobileStep('cart')}
+                                sx={{ minHeight: 44, fontWeight: 800 }}
+                            >
+                                {__('View Cart')} ({cart.length})
+                            </Button>
+                        </Box>
                     </Paper>
 
-                    <Paper sx={{ p: { xs: 1.25, md: 1.5 }, flex: { xs: '1 1 auto', md: '1 1 58%' }, width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
+                    <Paper sx={{ p: { xs: 1.25, md: 1.5 }, flex: { xs: '1 1 auto', md: '1 1 58%' }, width: '100%', display: { xs: mobileStep === 'cart' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                             <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -1235,7 +1471,128 @@ export default function PosIndex({
                             {__('Cart')}
                         </Typography>
 
-                        <TableContainer sx={{ minHeight: 220, overflowX: 'hidden' }}>
+                        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+                            <Stack spacing={1}>
+                                {cart.map((line) => {
+                                    const unitPrice = Number(line.unit_price || 0);
+                                    const lineDiscount = resolveLineDiscount(line);
+                                    const lineTotal = resolveDiscountedLineTotal(line);
+                                    const maxQty = Math.floor((Number(line.stock_quantity || 0) || 0) / (Number(line.conversion_factor || 1) || 1));
+                                    const requestedBase = resolveRequestedBaseQuantity(line);
+                                    const stockBase = Number(line.stock_quantity || 0);
+                                    const exceedsStock = stockBase >= 0 && requestedBase > stockBase;
+
+                                    return (
+                                        <Paper key={line.id} variant="outlined" sx={{ p: 1.25 }}>
+                                            <Stack spacing={1}>
+                                                <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="flex-start">
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography variant="body2" title={line.name} sx={{ fontWeight: 800 }} noWrap>
+                                                            {line.name}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
+                                                            {line.barcode || '-'}
+                                                        </Typography>
+                                                        {Number(line.discount_percentage || 0) > 0 && (
+                                                            <Typography variant="caption" color="success.main" sx={{ display: 'block', fontWeight: 700 }}>
+                                                                {Number(line.discount_percentage || 0)}% {__('off')} ({currencySymbol}{lineDiscount.toFixed(2)})
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    <IconButton size="small" color="error" onClick={() => removeCartLine(line.id)} sx={{ mt: -0.5 }}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Stack>
+
+                                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                                    <TextField
+                                                        select
+                                                        label={__('Unit')}
+                                                        size="small"
+                                                        value={line.unit_id}
+                                                        onChange={(e) => updateCartLine(line.id, { unit_id: e.target.value })}
+                                                    >
+                                                        {(line.units || []).map((u) => (
+                                                            <MenuItem key={u.unit_id} value={u.unit_id}>
+                                                                {u.short_name || u.name}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                    <TextField
+                                                        size="small"
+                                                        label={__('Qty')}
+                                                        type="number"
+                                                        value={line.quantity}
+                                                        onChange={(e) => updateCartLine(line.id, { quantity: e.target.value })}
+                                                        inputProps={{ min: 0.01, step: '0.01' }}
+                                                        error={exceedsStock}
+                                                        helperText={exceedsStock ? `${__('Max')} ${maxQty}` : ''}
+                                                    />
+                                                </Box>
+
+                                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                                    <TextField
+                                                        size="small"
+                                                        label={__('FOC Qty')}
+                                                        type="number"
+                                                        value={line.foc_quantity || 0}
+                                                        onChange={(e) => updateCartLine(line.id, { foc_quantity: e.target.value })}
+                                                        inputProps={{ min: 0, step: '0.01' }}
+                                                        error={exceedsStock}
+                                                    />
+                                                    <TextField
+                                                        select
+                                                        label={__('FOC Unit')}
+                                                        size="small"
+                                                        value={line.foc_unit_id || line.unit_id}
+                                                        onChange={(e) => updateCartLine(line.id, { foc_unit_id: e.target.value })}
+                                                        error={exceedsStock}
+                                                    >
+                                                        {(line.units || []).map((u) => (
+                                                            <MenuItem key={u.unit_id} value={u.unit_id}>
+                                                                {u.short_name || u.name}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                </Box>
+
+                                                {exceedsStock && (
+                                                    <Alert severity="error" sx={{ py: 0 }}>
+                                                        {__('Stock exceeded')}
+                                                    </Alert>
+                                                )}
+
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                    <Box>
+                                                        {salePriceType === 'wholesale' && (
+                                                            <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 800 }}>
+                                                                {__('Wholesale')}
+                                                            </Typography>
+                                                        )}
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {__('Price')}: {currencySymbol}{unitPrice.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                                                        {currencySymbol}{lineTotal.toFixed(2)}
+                                                    </Typography>
+                                                </Stack>
+                                            </Stack>
+                                        </Paper>
+                                    );
+                                })}
+
+                                {cart.length === 0 && (
+                                    <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                        <Typography variant="body2" color="text.secondary italic">
+                                            {__('Cart is empty.')}
+                                        </Typography>
+                                    </Paper>
+                                )}
+                            </Stack>
+                        </Box>
+
+                        <TableContainer sx={{ display: { xs: 'none', md: 'block' }, minHeight: 220, overflowX: 'hidden' }}>
                             <Table
                                 size="small"
                                 stickyHeader
@@ -1451,24 +1808,122 @@ export default function PosIndex({
 
                         <Divider sx={{ my: 2 }} />
 
-                        <Box>
-                            <Stack spacing={1.5}>
+                        <Stack spacing={1.5}>
+                            {!hasActiveSession && (
+                                <Alert severity="warning">
+                                    {__('Start your shift before completing sales.')}
+                                </Alert>
+                            )}
+
+                            {errors.items && (
+                                <Alert severity="error">{errors.items}</Alert>
+                            )}
+
+                            <Stack direction="row" spacing={1} sx={{ display: { xs: 'flex', md: 'none' } }}>
+                                <Button
+                                    variant="outlined"
+                                    fullWidth
+                                    onClick={() => setMobileStep('products')}
+                                    sx={{ minHeight: 44, fontWeight: 800 }}
+                                >
+                                    {__('Products')}
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<CheckoutIcon />}
+                                    disabled={processing || !hasActiveSession || cart.length === 0 || hasStockIssue}
+                                    fullWidth
+                                    onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
+                                    sx={{ minHeight: 44, fontWeight: 800 }}
+                                >
+                                    {__('Checkout')}
+                                </Button>
+                            </Stack>
+
+                            <Button
+                                variant="contained"
+                                startIcon={<CheckoutIcon />}
+                                disabled={processing || (hasActiveSession && (cart.length === 0 || hasStockIssue))}
+                                fullWidth
+                                onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
+                                sx={{ display: { xs: 'none', md: 'flex' }, minHeight: 46, fontWeight: 800, letterSpacing: '0.02em' }}
+                            >
+                                {hasActiveSession
+                                    ? `${__('Pay')} ${currencySymbol}${totals.grandTotal.toFixed(2)}`
+                                    : __('Start Shift')}
+                            </Button>
+                        </Stack>
+                    </Paper>
+                </Box>
+
+                <Box
+                    component="form"
+                    onSubmit={submit}
+                    sx={{ display: { xs: mobileStep === 'checkout' ? 'block' : 'none', md: 'none' } }}
+                >
+                    <Paper sx={{ p: 1.5, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
+                        <Stack spacing={1.5}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
                                 <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                                        {__('Final Checkout')}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {cart.length} {cart.length === 1 ? __('item') : __('items')}
+                                    </Typography>
+                                </Box>
+                                <Button size="small" variant="outlined" onClick={() => setMobileStep('cart')}>
+                                    {__('Back to Cart')}
+                                </Button>
+                            </Stack>
+
+                            {!hasActiveSession && (
+                                <Alert
+                                    severity="warning"
+                                    action={(
+                                        <Button color="inherit" size="small" onClick={() => setShiftDialogOpen(true)}>
+                                            {__('Start Shift')}
+                                        </Button>
+                                    )}
+                                >
+                                    {__('Start your shift before completing sales.')}
+                                </Alert>
+                            )}
+
+                            <Box sx={{ p: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                        {__('Amount to pay')}
+                                    </Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                        {currencySymbol}{totals.grandTotal.toFixed(2)}
+                                    </Typography>
+                                </Stack>
+                            </Box>
+
+                            <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'divider' }}>
+                                <Stack spacing={1.25}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                        <Box>
+                                        <Box sx={{ minWidth: 0 }}>
                                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                                 {__('Customer')}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
                                                 {selectedCustomer?.name || __('Walk-in customer')}
                                             </Typography>
+                                            {selectedCustomer && (
+                                                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                                                    {[selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(' / ') || __('No contact')}
+                                                </Typography>
+                                            )}
                                         </Box>
-                                        <Button size="small" onClick={() => setCustomerSectionExpanded((prev) => !prev)}>
+                                        <Button type="button" size="small" onClick={() => setCustomerSectionExpanded((prev) => !prev)}>
                                             {customerSectionExpanded ? __('Done') : __('Change')}
                                         </Button>
                                     </Stack>
+
                                     {customerSectionExpanded && (
-                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start" sx={{ mt: 1 }}>
+                                        <Stack spacing={1}>
                                             <Autocomplete
                                                 size="small"
                                                 fullWidth
@@ -1504,38 +1959,127 @@ export default function PosIndex({
                                                 size="small"
                                                 startIcon={<PersonAddIcon />}
                                                 onClick={openNewCustomer}
-                                                sx={{ minWidth: 140 }}
+                                                sx={{ alignSelf: 'stretch' }}
                                             >
                                                 {__('New customer')}
                                             </Button>
                                         </Stack>
                                     )}
-                                </Box>
 
-                                {!hasActiveSession && (
-                                    <Alert severity="warning">
-                                        {__('Start your shift before completing sales.')}
-                                    </Alert>
-                                )}
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                            {__('Payment Status')}
+                                        </Typography>
+                                        <Stack spacing={0}>
+                                            {(paymentStatuses || []).map((status) => {
+                                                const disabled = isWalkInCustomer && status !== 'Paid';
+                                                return (
+                                                    <FormControlLabel
+                                                        key={status}
+                                                        sx={{ mr: 0 }}
+                                                        control={(
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={data.payment_status === status}
+                                                                disabled={disabled}
+                                                                onChange={(event) => {
+                                                                    if (event.target.checked && !disabled) {
+                                                                        setData('payment_status', status);
+                                                                    }
+                                                                }}
+                                                            />
+                                                        )}
+                                                        label={__(status)}
+                                                    />
+                                                );
+                                            })}
+                                        </Stack>
+                                        {(errors.payment_status || isWalkInCustomer) && (
+                                            <Typography variant="caption" color={errors.payment_status ? 'error' : 'text.secondary'}>
+                                                {errors.payment_status || __('Partial and Due are only available after selecting a customer.')}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Stack>
+                            </Box>
 
-                                {errors.items && (
-                                    <Alert severity="error">{errors.items}</Alert>
-                                )}
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    {__('Payment Method')}
+                                </Typography>
+                                <ToggleButtonGroup
+                                    size="small"
+                                    exclusive
+                                    fullWidth
+                                    value={data.payment_method}
+                                    onChange={(e, next) => {
+                                        if (next) setData('payment_method', next);
+                                    }}
+                                >
+                                    {(paymentMethods || []).map((method) => (
+                                        <ToggleButton key={method} value={method} sx={{ flex: 1, textTransform: 'none' }}>
+                                            {__(method)}
+                                        </ToggleButton>
+                                    ))}
+                                </ToggleButtonGroup>
+                            </Box>
 
+                            {isCashPayment && (
+                                <Stack spacing={1}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        type="number"
+                                        label={__('Amount Received')}
+                                        value={data.amount_received}
+                                        onChange={(e) => setData('amount_received', e.target.value)}
+                                        error={!!errors.amount_received || (isPaidCashSale && cashShortageValue > 0)}
+                                        helperText={
+                                            errors.amount_received
+                                            || (isPaidCashSale && cashShortageValue > 0 ? `${__('Need')} ${currencySymbol}${cashShortageValue.toFixed(2)} ${__('more')}` : '')
+                                        }
+                                        InputProps={{
+                                            startAdornment: <Typography variant="caption" sx={{ mr: 0.5 }}>{currencySymbol}</Typography>,
+                                        }}
+                                        inputProps={{ min: 0, step: '0.01' }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        label={__('Change')}
+                                        value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Stack>
+                            )}
+
+                            {errors.items && (
+                                <Alert severity="error">{errors.items}</Alert>
+                            )}
+
+                            <Stack direction="row" spacing={1}>
                                 <Button
+                                    type="button"
+                                    variant="outlined"
+                                    fullWidth
+                                    onClick={() => setMobileStep('cart')}
+                                    disabled={processing}
+                                    sx={{ minHeight: 44, fontWeight: 800 }}
+                                >
+                                    {__('Back')}
+                                </Button>
+                                <Button
+                                    type="submit"
                                     variant="contained"
                                     startIcon={<CheckoutIcon />}
-                                    disabled={processing || (hasActiveSession && (cart.length === 0 || hasStockIssue))}
+                                    disabled={processing || cart.length === 0 || !hasActiveSession || hasStockIssue || (isPaidCashSale && cashShortageValue > 0)}
                                     fullWidth
-                                    onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
-                                    sx={{ minHeight: 46, fontWeight: 800, letterSpacing: '0.02em' }}
+                                    sx={{ minHeight: 44, fontWeight: 900 }}
                                 >
-                                    {hasActiveSession
-                                        ? `${__('Pay')} ${currencySymbol}${totals.grandTotal.toFixed(2)}`
-                                        : __('Start Shift')}
+                                    {__('Complete Sale')}
                                 </Button>
                             </Stack>
-                        </Box>
+                        </Stack>
                     </Paper>
                 </Box>
             </Box>
@@ -1661,6 +2205,104 @@ export default function PosIndex({
                                 </Stack>
                             </Box>
 
+                            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                            {__('Customer')}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                            {selectedCustomer?.name || __('Walk-in customer')}
+                                        </Typography>
+                                        {selectedCustomer && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                {[selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(' / ') || __('No contact')}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                    <Button type="button" size="small" onClick={() => setCustomerSectionExpanded((prev) => !prev)}>
+                                        {customerSectionExpanded ? __('Done') : __('Change')}
+                                    </Button>
+                                </Stack>
+                                {customerSectionExpanded && (
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start" sx={{ mt: 1 }}>
+                                        <Autocomplete
+                                            size="small"
+                                            fullWidth
+                                            options={customerOptions}
+                                            value={selectedCustomer}
+                                            onChange={(e, value) => setSelectedCustomer(value)}
+                                            inputValue={customerSearchInput}
+                                            onInputChange={(e, value) => setCustomerSearchInput(value || '')}
+                                            getOptionLabel={(option) => (option?.name ?? '') || ''}
+                                            renderOption={(props, option) => (
+                                                <li {...props} key={option.id}>
+                                                    <Stack>
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {[option.phone, option.email].filter(Boolean).join(' / ') || __('No contact')}
+                                                        </Typography>
+                                                    </Stack>
+                                                </li>
+                                            )}
+                                            loading={customerLoading}
+                                            isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    placeholder={__('Search by name, phone, or email...')}
+                                                    size="small"
+                                                />
+                                            )}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<PersonAddIcon />}
+                                            onClick={openNewCustomer}
+                                            sx={{ minWidth: 140 }}
+                                        >
+                                            {__('New customer')}
+                                        </Button>
+                                    </Stack>
+                                )}
+                                <Box sx={{ mt: 1.5 }}>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                        {__('Payment Status')}
+                                    </Typography>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 1.5 }}>
+                                        {(paymentStatuses || []).map((status) => {
+                                            const disabled = isWalkInCustomer && status !== 'Paid';
+                                            return (
+                                                <FormControlLabel
+                                                    key={status}
+                                                    sx={{ mr: 0 }}
+                                                    control={(
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={data.payment_status === status}
+                                                            disabled={disabled}
+                                                            onChange={(event) => {
+                                                                if (event.target.checked && !disabled) {
+                                                                    setData('payment_status', status);
+                                                                }
+                                                            }}
+                                                        />
+                                                    )}
+                                                    label={__(status)}
+                                                />
+                                            );
+                                        })}
+                                    </Stack>
+                                    {(errors.payment_status || isWalkInCustomer) && (
+                                        <Typography variant="caption" color={errors.payment_status ? 'error' : 'text.secondary'}>
+                                            {errors.payment_status || __('Partial and Due are only available after selecting a customer.')}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </Box>
+
                             <Box>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                                     {__('Payment Method')}
@@ -1710,31 +2352,6 @@ export default function PosIndex({
                                     />
                                 </Stack>
                             )}
-
-                            <Box>
-                                <Button size="small" onClick={() => setPaymentOptionsExpanded((prev) => !prev)}>
-                                    {paymentOptionsExpanded ? __('Hide options') : __('More options')}
-                                </Button>
-                                {paymentOptionsExpanded && (
-                                    <TextField
-                                        select
-                                        size="small"
-                                        fullWidth
-                                        label={__('Payment Status')}
-                                        value={data.payment_status}
-                                        onChange={(e) => setData('payment_status', e.target.value)}
-                                        error={!!errors.payment_status}
-                                        helperText={errors.payment_status}
-                                        sx={{ mt: 1 }}
-                                    >
-                                        {(paymentStatuses || []).map((status) => (
-                                            <MenuItem key={status} value={status}>
-                                                {__(status)}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            </Box>
 
                             {errors.items && (
                                 <Alert severity="error">{errors.items}</Alert>

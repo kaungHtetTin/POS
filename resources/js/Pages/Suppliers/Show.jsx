@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -12,6 +12,7 @@ import {
     Divider,
     IconButton,
     MenuItem,
+    Pagination,
     Paper,
     Stack,
     Table,
@@ -31,7 +32,7 @@ import {
     ReceiptLong as PurchaseIcon,
 } from '@mui/icons-material';
 
-export default function SupplierShow({ auth, supplier, purchases, duePurchases, payments }) {
+export default function SupplierShow({ auth, supplier, purchases, duePurchases, payments, statementSummary = {} }) {
     const { settings = {} } = usePage().props;
     const currencySymbol = settings.app?.currency_symbol || '$';
     const [paymentOpen, setPaymentOpen] = useState(false);
@@ -46,6 +47,8 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
         reference_number: '',
         notes: '',
     });
+    const purchaseRows = purchases?.data || purchases || [];
+    const paymentRows = payments?.data || payments || [];
 
     const money = (value) => `${currencySymbol}${Number(value || 0).toFixed(2)}`;
 
@@ -64,11 +67,11 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
 
     const totals = useMemo(() => {
         return {
-            totalPurchases: purchases.reduce((sum, purchase) => sum + Number(purchase.total_amount || 0), 0),
-            totalDue: purchases.reduce((sum, purchase) => sum + Number(purchase.due_amount || 0), 0),
-            totalPayments: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+            totalPurchases: Number(statementSummary.total_purchases || 0),
+            totalDue: Number(statementSummary.total_due || 0),
+            totalPayments: Number(statementSummary.total_payments || 0),
         };
-    }, [purchases, payments]);
+    }, [statementSummary]);
 
     const selectedPurchase = duePurchases.find((purchase) => purchase.id === data.purchase_id);
     const maxPaymentAmount = selectedPurchase ? Number(selectedPurchase.due_amount || 0) : Number(supplier.balance || 0);
@@ -102,6 +105,17 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
     };
 
     const statusColor = (status) => status === 'Paid' ? 'success' : status === 'Partial' ? 'warning' : 'error';
+    const goToPage = (pageName, page) => {
+        router.get(route('suppliers.show', { supplier: supplier.id }), {
+            purchases_page: purchases?.current_page,
+            payments_page: payments?.current_page,
+            [pageName]: page,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
 
     return (
         <MainLayout auth={auth} header="Supplier Statement">
@@ -199,7 +213,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {purchases.map((purchase) => (
+                                {purchaseRows.map((purchase) => (
                                     <TableRow key={purchase.id} hover>
                                         <TableCell>
                                             <Typography
@@ -236,7 +250,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {purchases.length === 0 && (
+                                {purchaseRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">No purchases found.</Typography>
@@ -246,6 +260,17 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(purchases?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={purchases.last_page}
+                                page={purchases.current_page}
+                                onChange={(event, page) => goToPage('purchases_page', page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                     <Divider sx={{ my: 1.5 }} />
                     <Stack alignItems="flex-end">
                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -271,7 +296,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {payments.map((payment) => (
+                                {paymentRows.map((payment) => (
                                     <TableRow key={payment.id} hover>
                                         <TableCell>{formatDate(payment.payment_date)}</TableCell>
                                         <TableCell>{payment.purchase?.invoice_number || '-'}</TableCell>
@@ -281,7 +306,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                         <TableCell align="right" sx={{ fontWeight: 700 }}>{money(payment.amount)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {payments.length === 0 && (
+                                {paymentRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">No payments recorded.</Typography>
@@ -291,6 +316,17 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(payments?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={payments.last_page}
+                                page={payments.current_page}
+                                onChange={(event, page) => goToPage('payments_page', page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

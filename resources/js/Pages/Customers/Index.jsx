@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -21,6 +21,7 @@ import {
     DialogActions,
     TextField,
     InputAdornment,
+    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -35,10 +36,13 @@ import {
 } from '@mui/icons-material';
 
 export default function CustomerIndex({ auth, customers, filters }) {
+    const { translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
+    const customerRows = customers?.data || customers || [];
 
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
@@ -78,8 +82,8 @@ export default function CustomerIndex({ auth, customers, filters }) {
         setEditingCustomer(null);
     };
 
-    const handleSearch = () => {
-        router.get(route('customers.index'), { search }, {
+    const handleSearch = (page = undefined) => {
+        router.get(route('customers.index'), { search: search || undefined, page }, {
             preserveState: true,
             replace: true,
         });
@@ -107,20 +111,20 @@ export default function CustomerIndex({ auth, customers, filters }) {
     return (
         <MainLayout
             auth={auth}
-            header="Customer Management"
+            header={__('Customer Management')}
         >
-            <Head title="Customers" />
+            <Head title={__('Customers')} />
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            CUSTOMER DIRECTORY
+                            {__('CUSTOMER DIRECTORY')}
                         </Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                             <TextField
                                 size="small"
-                                placeholder="Search name, phone, or email..."
+                                placeholder={__('Search name, phone, or email...')}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -133,7 +137,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 }}
                                 sx={{ minWidth: { sm: 260 } }}
                             />
-                            <Button variant="outlined" size="small" onClick={handleSearch}>Search</Button>
+                            <Button variant="outlined" size="small" onClick={handleSearch}>{__('Search')}</Button>
                             <Button
                                 variant="contained"
                                 size="small"
@@ -141,7 +145,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 onClick={() => handleOpen()}
                                 sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
-                                Add Customer
+                                {__('Add Customer')}
                             </Button>
                         </Stack>
                     </Stack>
@@ -151,20 +155,20 @@ export default function CustomerIndex({ auth, customers, filters }) {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Contact</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Customer')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Contact')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Actions')}</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {customers.map((customer) => (
+                                {customerRows.map((customer) => (
                                     <TableRow key={customer.id} hover>
                                         <TableCell sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <PersonIcon fontSize="small" color="primary" />
                                                 <Stack spacing={0.2}>
                                                     <Typography variant="body2" sx={{ fontWeight: 500 }}>{customer.name}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">{customer.address || 'No address provided'}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{customer.address || __('No address provided')}</Typography>
                                                 </Stack>
                                             </Stack>
                                         </TableCell>
@@ -172,11 +176,11 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                             <Stack spacing={0.6}>
                                                 <Stack direction="row" spacing={0.8} alignItems="center">
                                                     <PhoneIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
-                                                    <Typography variant="caption" color="text.secondary">{customer.phone || 'No phone'}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{customer.phone || __('No phone')}</Typography>
                                                 </Stack>
                                                 <Stack direction="row" spacing={0.8} alignItems="center">
                                                     <EmailIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
-                                                    <Typography variant="caption" color="text.secondary">{customer.email || 'No email'}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{customer.email || __('No email')}</Typography>
                                                 </Stack>
                                             </Stack>
                                         </TableCell>
@@ -208,11 +212,11 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {customers.length === 0 && (
+                                {customerRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                                                No customers found. Click "Add Customer" to create your first customer.
+                                                {__('No customers found. Click "Add Customer" to create your first customer.')}
                                             </Typography>
                                         </TableCell>
                                     </TableRow>
@@ -220,13 +224,24 @@ export default function CustomerIndex({ auth, customers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(customers?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={customers.last_page}
+                                page={customers.current_page}
+                                onChange={(event, page) => handleSearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {editMode ? 'Edit Customer' : 'Add Customer'}
+                        {editMode ? __('Edit Customer') : __('Add Customer')}
                         <IconButton size="small" onClick={handleClose}>
                             <CloseIcon />
                         </IconButton>
@@ -234,7 +249,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                     <DialogContent dividers>
                         <Stack spacing={2.5} sx={{ mt: 1 }}>
                             <TextField
-                                label="Customer Name"
+                                label={__('Customer Name')}
                                 fullWidth
                                 size="small"
                                 value={data.name}
@@ -245,7 +260,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                             />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                                 <TextField
-                                    label="Phone"
+                                    label={__('Phone')}
                                     fullWidth
                                     size="small"
                                     value={data.phone}
@@ -254,7 +269,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                     helperText={errors.phone}
                                 />
                                 <TextField
-                                    label="Email"
+                                    label={__('Email')}
                                     fullWidth
                                     size="small"
                                     type="email"
@@ -265,7 +280,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 />
                             </Stack>
                             <TextField
-                                label="Address"
+                                label={__('Address')}
                                 fullWidth
                                 size="small"
                                 multiline
@@ -278,14 +293,14 @@ export default function CustomerIndex({ auth, customers, filters }) {
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={handleClose} size="small">Cancel</Button>
+                        <Button onClick={handleClose} size="small">{__('Cancel')}</Button>
                         <Button
                             type="submit"
                             variant="contained"
                             size="small"
                             disabled={processing}
                         >
-                            {editMode ? 'Update Customer' : 'Create Customer'}
+                            {editMode ? __('Update Customer') : __('Create Customer')}
                         </Button>
                     </DialogActions>
                 </form>

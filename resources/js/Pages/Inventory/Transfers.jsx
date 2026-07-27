@@ -6,6 +6,7 @@ import {
     Button,
     Chip,
     InputAdornment,
+    Pagination,
     Paper,
     Stack,
     Table,
@@ -25,9 +26,10 @@ import {
 
 export default function StockTransfers({ auth, transfers, filters }) {
     const [search, setSearch] = useState(filters?.search || '');
+    const transferRows = transfers?.data || transfers || [];
 
-    const handleSearch = () => {
-        router.get(route('inventory.transfers.index'), { search }, { preserveState: true, replace: true });
+    const handleSearch = (page = undefined) => {
+        router.get(route('inventory.transfers.index'), { search: search || undefined, page }, { preserveState: true, replace: true });
     };
 
     const formatDate = (dateString) => {
@@ -102,7 +104,7 @@ export default function StockTransfers({ auth, transfers, filters }) {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {transfers.map((transfer) => (
+                                {transferRows.map((transfer) => (
                                     <TableRow key={transfer.id} hover>
                                         <TableCell sx={{ fontWeight: 800 }}>{transfer.reference_number}</TableCell>
                                         <TableCell>{transfer.from_branch?.name}</TableCell>
@@ -114,7 +116,7 @@ export default function StockTransfers({ auth, transfers, filters }) {
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {transfers.length === 0 && (
+                                {transferRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                             No transfer records found.
@@ -124,6 +126,17 @@ export default function StockTransfers({ auth, transfers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(transfers?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={transfers.last_page}
+                                page={transfers.current_page}
+                                onChange={(event, page) => handleSearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
         </MainLayout>

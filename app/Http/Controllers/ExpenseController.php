@@ -66,12 +66,20 @@ class ExpenseController extends Controller
             ->get();
 
         $categories = ExpenseCategory::select('id', 'name')->orderBy('name')->get();
+        $summary = (clone $query)
+            ->selectRaw('COUNT(*) as entries_count')
+            ->selectRaw('COALESCE(SUM(amount), 0) as total_amount')
+            ->first();
 
         return Inertia::render('Expenses/Index', [
-            'expenses' => $query->latest('expense_date')->latest()->get(),
+            'expenses' => $query->latest('expense_date')->latest()->paginate(15)->withQueryString(),
             'branches' => $branches,
             'categories' => $categories,
             'filters' => $request->only(['search', 'branch_id', 'expense_category_id', 'from_date', 'to_date']),
+            'summary' => [
+                'entries_count' => (int) ($summary->entries_count ?? 0),
+                'total_amount' => (float) ($summary->total_amount ?? 0),
+            ],
         ]);
     }
 

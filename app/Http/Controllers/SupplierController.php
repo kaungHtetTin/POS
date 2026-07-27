@@ -21,7 +21,7 @@ class SupplierController extends Controller
         }
 
         return Inertia::render('Suppliers/Index', [
-            'suppliers' => $query->latest()->get(),
+            'suppliers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
     }
@@ -34,21 +34,34 @@ class SupplierController extends Controller
             ->with(['branch:id,name'])
             ->withCount('items')
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'purchases_page')
+            ->withQueryString();
 
         $payments = $supplier->payments()
             ->with(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name'])
             ->latest('payment_date')
             ->latest()
+            ->paginate(10, ['*'], 'payments_page')
+            ->withQueryString();
+
+        $duePurchases = $supplier->purchases()
+            ->with(['branch:id,name'])
+            ->where('due_amount', '>', 0)
+            ->oldest('due_date')
             ->get();
+
+        $statementSummary = [
+            'total_purchases' => (float) $supplier->purchases()->sum('total_amount'),
+            'total_due' => (float) $supplier->purchases()->sum('due_amount'),
+            'total_payments' => (float) $supplier->payments()->sum('amount'),
+        ];
 
         return Inertia::render('Suppliers/Show', [
             'supplier' => $supplier,
             'purchases' => $purchases,
-            'duePurchases' => $purchases
-                ->where('due_amount', '>', 0)
-                ->values(),
+            'duePurchases' => $duePurchases,
             'payments' => $payments,
+            'statementSummary' => $statementSummary,
         ]);
     }
 

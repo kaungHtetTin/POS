@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -14,6 +14,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -35,7 +36,7 @@ import {
     Print as PrintIcon,
 } from '@mui/icons-material';
 
-export default function SalesIndex({ auth, sales, branches, salesStaff = [], filters }) {
+export default function SalesIndex({ auth, sales, summary = {}, branches, salesStaff = [], filters }) {
     const { settings = {}, ziggy = {}, translations = {}, errors = {} } = usePage().props;
     const __ = (key) => translations[key] || key;
     const appBase = ziggy?.base || '';
@@ -53,6 +54,7 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
     const [quickRange, setQuickRangeState] = useState(filters?.from_date === defaultFrom && filters?.to_date === defaultTo ? 'month' : '');
     const [voidingSale, setVoidingSale] = useState(null);
     const [voidReason, setVoidReason] = useState('');
+    const saleRows = sales?.data || sales || [];
 
     const setQuickRange = (range) => {
         setQuickRangeState(range);
@@ -101,18 +103,11 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
         );
     };
 
-    const totalGrand = useMemo(() => {
-        return (sales || []).reduce((sum, s) => {
-            if ((s.status || 'Completed') === 'Voided') return sum;
-            return sum + Number(s.grand_total || 0);
-        }, 0);
-    }, [sales]);
+    const totalGrand = Number(summary?.active_total || 0);
 
-    const voidedCount = useMemo(() => {
-        return (sales || []).filter((s) => (s.status || 'Completed') === 'Voided').length;
-    }, [sales]);
+    const voidedCount = Number(summary?.voided_count || 0);
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('sales.index'),
             {
@@ -121,6 +116,7 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
                 search: search || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -354,7 +350,7 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
                     <Divider sx={{ mb: 2 }} />
 
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                        <Chip size="small" variant="outlined" label={`Entries: ${(sales || []).length}`} />
+                        <Chip size="small" variant="outlined" label={`Entries: ${summary?.sales_count ?? sales?.total ?? saleRows.length}`} />
                         <Chip size="small" variant="outlined" label={`Active Total: ${money(totalGrand)}`} color="primary" />
                         {voidedCount > 0 && (
                             <Chip size="small" variant="outlined" label={`Voided: ${voidedCount}`} color="error" />
@@ -389,7 +385,7 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(sales || []).map((s) => (
+                                {saleRows.map((s) => (
                                     <TableRow key={s.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -473,7 +469,7 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
                                     </TableRow>
                                 ))}
 
-                                {(sales || []).length === 0 && (
+                                {saleRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={13} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -485,6 +481,17 @@ export default function SalesIndex({ auth, sales, branches, salesStaff = [], fil
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(sales?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={sales.last_page}
+                                page={sales.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

@@ -16,6 +16,7 @@ import {
     InputAdornment,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -51,6 +52,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
     const [typeFilter, setTypeFilter] = useState(filters?.type || '');
     const [statusFilter, setStatusFilter] = useState(filters?.status || '');
     const [branchFilter, setBranchFilter] = useState(filters?.branch_id || '');
+    const returnRows = returns?.data || returns || [];
 
     const defaultType = 'Customer';
     const defaultBranchId = auth.user?.current_branch_id || auth.user?.branch_id || branches?.[0]?.id || '';
@@ -82,13 +84,14 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
         return selectedItems.reduce((sum, i) => sum + Number(i.quantity || 0) * Number(i.refund_price || 0), 0);
     }, [selectedItems]);
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('returns.index'),
             {
                 type: typeFilter || undefined,
                 status: statusFilter || undefined,
                 branch_id: branchFilter || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -272,7 +275,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(returns || []).map((r) => (
+                                {returnRows.map((r) => (
                                     <TableRow key={r.id} hover>
                                         <TableCell>
                                             <Chip size="small" label={r.type} variant="outlined" />
@@ -332,7 +335,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                     </TableRow>
                                 ))}
 
-                                {(returns || []).length === 0 && (
+                                {returnRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -344,6 +347,17 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(returns?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={returns.last_page}
+                                page={returns.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

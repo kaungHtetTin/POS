@@ -1,0 +1,1 @@
+import{a as o}from"./app-f13c325e.js";import{a}from"./Box-73c6b625.js";const s=a(o("path",{d:"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z"}));export{s as A};

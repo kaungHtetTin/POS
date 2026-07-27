@@ -140,7 +140,7 @@ export default function MainLayout({ children, header }) {
         transfers: { text: 'Transfers', icon: 'arrows', href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'manage_inventory' },
 
         customers: { text: 'Customers', icon: 'users', href: route('customers.index'), routePattern: 'customers.*', permission: 'process_sale' },
-        returns: { text: 'Pending Returns', icon: 'rotate', href: route('returns.index'), routePattern: 'returns.*', permission: 'process_sale' },
+        amountReceivable: { text: 'Amount Receivable', icon: 'wallet', href: route('finance.amount-receivable'), routePattern: 'finance.amount-receivable.*', permission: 'view_financial_reports' },
 
         sales: { text: 'Sale History', icon: 'receipt', href: route('sales.index'), routePattern: 'sales.index', permission: 'view_financial_reports' },
         salesCustomerReport: { text: 'Sale Report', icon: 'chart', href: route('reports.sales-by-customers'), routePattern: 'reports.sales-by-customers', permission: 'view_financial_reports' },
@@ -151,8 +151,7 @@ export default function MainLayout({ children, header }) {
         cashSessionReport: { text: 'Cash Session Report', icon: 'wallet', href: route('reports.cash-sessions'), routePattern: 'reports.cash-sessions', permission: 'view_financial_reports' },
         expiryReport: { text: 'Expired Report', icon: 'history', href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'manage_inventory' },
 
-        staff: { text: 'Sale Persons', icon: 'users', href: route('staff.index'), routePattern: 'staff.*', permission: 'manage_users' },
-        salePersonReports: { text: 'Sales Person Reports', icon: 'chart', href: route('sale-person.reports'), routePattern: 'sale-person.reports', permission: 'view_financial_reports' },
+        salePersonReports: { text: 'Sale Representative', icon: 'chart', href: route('finance.sale-representative'), routePattern: 'finance.sale-representative', permission: 'view_financial_reports' },
         administration: { text: 'Administration', icon: 'settings', href: route('administration.index'), routePattern: 'administration.index', permission: 'manage_users' },
         roles: { text: 'Role Management', icon: 'id', href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
         branches: { text: 'Branch Management', icon: 'store', href: route('branches.index'), routePattern: 'branches.*', permission: 'manage_branches' },
@@ -167,8 +166,7 @@ export default function MainLayout({ children, header }) {
         { label: 'Stock', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'units', 'taxes'] },
         { label: 'Purchasing', keys: ['suppliers', 'purchases', 'purchasesReport'] },
         { label: 'Sales', keys: ['customers', 'sales', 'salesCustomerReport'] },
-        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'returns', 'pendingPayments', 'reports', 'cashSessionReport'] },
-        { label: 'Sale Person', keys: ['staff', 'salePersonReports'] },
+        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },
         { label: 'Administration', keys: ['administration', 'roles', 'branches', 'permissions', 'activityLogs', 'manual'] },
         { label: 'Setting', keys: ['settings'] },
     ];

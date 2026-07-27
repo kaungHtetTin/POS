@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -50,11 +50,13 @@ export default function ReportsIndex({
     balance_sheet = {},
     sales_trend,
     profit_trend,
+    financial_trends = {},
     expenses_by_category,
     branch_performance,
-    staff_performance,
     expiring_batches,
 }) {
+    const { translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const [branchId, setBranchId] = useState(filters?.branch_id || auth.user?.current_branch_id || '');
     // Default to current month
     const defaultFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -176,15 +178,6 @@ export default function ReportsIndex({
         }));
     }, [branch_performance]);
 
-    const staffPerformanceChartData = useMemo(() => {
-        return (staff_performance || []).slice(0, 12).map((row) => ({
-            name: row.staff_name,
-            grand_total: Number(row.grand_total || 0),
-            sales_count: Number(row.sales_count || 0),
-            average_sale: Number(row.average_sale || 0),
-        }));
-    }, [staff_performance]);
-
     const branchNameTick = useMemo(() => {
         return (value) => {
             const text = String(value ?? '');
@@ -200,24 +193,28 @@ export default function ReportsIndex({
         return 88;
     }, [branchPerformanceChartData]);
 
-    const staffYAxisWidth = useMemo(() => {
-        const maxLen = (staffPerformanceChartData || []).reduce((m, r) => Math.max(m, String(r.name ?? '').length), 0);
-        if (maxLen <= 10) return 64;
-        if (maxLen <= 14) return 76;
-        return 88;
-    }, [staffPerformanceChartData]);
+    const mapFinancialTrendRows = (rows = []) => rows.map((row) => ({
+        period: row.period,
+        sales: Number(row.sales || 0),
+        net_sales: Number(row.net_sales || 0),
+        customer_returns: Number(row.customer_returns || 0),
+        cogs: Number(row.cogs || 0),
+        expenses_total: Number(row.expenses_total || 0),
+        gross_profit: Number(row.gross_profit || 0),
+        net_profit: Number(row.net_profit || 0),
+    }));
 
     const profitTrendData = useMemo(() => {
-        return (profit_trend || []).map((row) => ({
-            period: row.period,
-            net_sales: Number(row.net_sales || 0),
-            customer_returns: Number(row.customer_returns || 0),
-            cogs: Number(row.cogs || 0),
-            expenses_total: Number(row.expenses_total || 0),
-            gross_profit: Number(row.gross_profit || 0),
-            net_profit: Number(row.net_profit || 0),
-        }));
+        return mapFinancialTrendRows(profit_trend || []);
     }, [profit_trend]);
+
+    const monthlyFinancialTrendData = useMemo(() => {
+        return mapFinancialTrendRows(financial_trends?.monthly || []);
+    }, [financial_trends?.monthly]);
+
+    const yearlyFinancialTrendData = useMemo(() => {
+        return mapFinancialTrendRows(financial_trends?.yearly || []);
+    }, [financial_trends?.yearly]);
 
     const balanceSheetRows = useMemo(() => ([
         { label: 'Inventory Asset', type: 'Asset', amount: Number(balance_sheet?.inventory_asset || 0) },
@@ -228,22 +225,23 @@ export default function ReportsIndex({
 
     const formatMoney = (value) => money(value);
 
-    const formatXAxis = (value) => {
+    const formatPeriod = (value, granularity = groupBy) => {
         if (!value) return '';
         try {
             const date = new Date(value);
-            if (groupBy === 'yearly') {
+            if (granularity === 'yearly') {
                 return date.getFullYear().toString();
             }
-            if (groupBy === 'monthly') {
-                return new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(date);
+            if (granularity === 'monthly') {
+                return new Intl.DateTimeFormat('en-GB', { month: 'short', year: '2-digit' }).format(date);
             }
-            // Daily
             return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short' }).format(date);
         } catch {
             return value;
         }
     };
+
+    const formatXAxis = (value) => formatPeriod(value, groupBy);
 
     const pieColors = ['#1976d2', '#6a1b9a', '#2e7d32', '#f57c00', '#0288d1', '#7b1fa2', '#388e3c', '#ef6c00', '#455a64', '#c2185b', '#5d4037', '#00796b'];
     const chartHeight = 220;
@@ -253,24 +251,24 @@ export default function ReportsIndex({
     const legendStyles = { fontSize: 11, lineHeight: '12px' };
 
     return (
-        <MainLayout auth={auth} header="Finance Report">
-            <Head title="Finance Report" />
+        <MainLayout auth={auth} header={__('Finance Report')}>
+            <Head title={__('Finance Report')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <ReportsIcon fontSize="small" color="primary" />
-                            FINANCE REPORT
+                            {__('FINANCE REPORT')}
                         </Typography>
                     </Stack>
 
                     <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                         <FormControl size="small" sx={{ flex: '1 1 240px', minWidth: { xs: '100%', sm: 240 } }}>
-                            <InputLabel>Branch</InputLabel>
-                            <Select value={branchId} label="Branch" onChange={(e) => setBranchId(e.target.value)}>
-                                <MenuItem value="">Current Branch</MenuItem>
-                                <MenuItem value="all">All Accessible</MenuItem>
+                            <InputLabel>{__('Branch')}</InputLabel>
+                            <Select value={branchId} label={__('Branch')} onChange={(e) => setBranchId(e.target.value)}>
+                                <MenuItem value="">{__('Current Branch')}</MenuItem>
+                                <MenuItem value="all">{__('All Accessible')}</MenuItem>
                                 {branches.map((b) => (
                                     <MenuItem key={b.id} value={b.id}>
                                         {b.name}
@@ -280,23 +278,23 @@ export default function ReportsIndex({
                         </FormControl>
 
                         <FormControl size="small" sx={{ flex: '1 1 150px', minWidth: { xs: '100%', sm: 150 } }}>
-                            <InputLabel>Quick Range</InputLabel>
+                            <InputLabel>{__('Quick Range')}</InputLabel>
                             <Select 
                                 value={quickRange} 
-                                label="Quick Range" 
+                                label={__('Quick Range')}
                                 onChange={(e) => setQuickRange(e.target.value)}
                             >
-                                <MenuItem value="today">Today</MenuItem>
-                                <MenuItem value="month">Current Month</MenuItem>
-                                <MenuItem value="year">Current Year</MenuItem>
-                                <MenuItem value="all">All Time</MenuItem>
+                                <MenuItem value="today">{__('Today')}</MenuItem>
+                                <MenuItem value="month">{__('Current Month')}</MenuItem>
+                                <MenuItem value="year">{__('Current Year')}</MenuItem>
+                                <MenuItem value="all">{__('All Time')}</MenuItem>
                             </Select>
                         </FormControl>
 
                         <TextField
                             size="small"
                             type="date"
-                            label="From"
+                            label={__('From')}
                             InputLabelProps={{ shrink: true }}
                             value={fromDate}
                             onChange={(e) => setFromDate(e.target.value)}
@@ -305,7 +303,7 @@ export default function ReportsIndex({
                         <TextField
                             size="small"
                             type="date"
-                            label="To"
+                            label={__('To')}
                             InputLabelProps={{ shrink: true }}
                             value={toDate}
                             onChange={(e) => setToDate(e.target.value)}
@@ -313,18 +311,18 @@ export default function ReportsIndex({
                         />
 
                         <FormControl size="small" sx={{ flex: '1 1 170px', minWidth: { xs: '100%', sm: 170 } }}>
-                            <InputLabel>Group By</InputLabel>
-                            <Select value={groupBy} label="Group By" onChange={(e) => setGroupBy(e.target.value)}>
-                                <MenuItem value="daily">Daily</MenuItem>
-                                <MenuItem value="monthly">Monthly</MenuItem>
-                                <MenuItem value="yearly">Yearly</MenuItem>
+                            <InputLabel>{__('Group By')}</InputLabel>
+                            <Select value={groupBy} label={__('Group By')} onChange={(e) => setGroupBy(e.target.value)}>
+                                <MenuItem value="daily">{__('Daily')}</MenuItem>
+                                <MenuItem value="monthly">{__('Monthly')}</MenuItem>
+                                <MenuItem value="yearly">{__('Yearly')}</MenuItem>
                             </Select>
                         </FormControl>
 
                         <TextField
                             size="small"
                             type="number"
-                            label="Expiry Days"
+                            label={__('Expiry Days')}
                             value={expiryDays}
                             onChange={(e) => setExpiryDays(e.target.value)}
                             inputProps={{ min: 1, max: 365, step: 1 }}
@@ -338,7 +336,7 @@ export default function ReportsIndex({
                             onClick={applyFilters}
                             sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
                         >
-                            Apply
+                            {__('Apply')}
                         </Button>
                         <Button
                             variant="outlined"
@@ -346,48 +344,48 @@ export default function ReportsIndex({
                             onClick={clearFilters}
                             sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
                         >
-                            Reset
+                            {__('Reset')}
                         </Button>
                     </Box>
 
                     <Divider sx={{ mb: 1.5 }} />
 
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-                        <Chip size="small" variant="outlined" label={`Sales: ${summary?.sales_count || 0}`} />
-                        <Chip size="small" variant="outlined" label={`Gross Total: ${money(summary?.grand_total)}`} color="primary" />
-                        <Chip size="small" variant="outlined" label={`Tax: ${money(summary?.tax)}`} />
-                        <Chip size="small" variant="outlined" label={`Discount: ${money(summary?.discount)}`} />
-                        <Chip size="small" variant="outlined" label={`Net Sales (ex tax): ${money(netSales)}`} />
-                        <Chip size="small" variant="outlined" label={`Customer Returns: ${money(summary?.customer_returns)}`} />
-                        <Chip size="small" variant="outlined" label={`COGS: ${money(summary?.cogs)}`} />
-                        <Chip size="small" variant="outlined" label={`Expenses: ${money(summary?.expenses_total)}`} />
-                        <Chip size="small" variant="outlined" label={`Gross Profit: ${money(summary?.gross_profit)}`} color="success" />
-                        <Chip size="small" variant="outlined" label={`Net Profit: ${money(summary?.net_profit)}`} color="success" />
+                        <Chip size="small" variant="outlined" label={`${__('Sales')}: ${summary?.sales_count || 0}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Gross Total')}: ${money(summary?.grand_total)}`} color="primary" />
+                        <Chip size="small" variant="outlined" label={`${__('Tax')}: ${money(summary?.tax)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Discount')}: ${money(summary?.discount)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Net Sales (ex tax)')}: ${money(netSales)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Customer Returns')}: ${money(summary?.customer_returns)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('COGS')}: ${money(summary?.cogs)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Expenses')}: ${money(summary?.expenses_total)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Gross Profit')}: ${money(summary?.gross_profit)}`} color="success" />
+                        <Chip size="small" variant="outlined" label={`${__('Net Profit')}: ${money(summary?.net_profit)}`} color="success" />
                     </Stack>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                         <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 100%' }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 1 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                    Balance Sheet Snapshot
+                                    {__('Balance Sheet Snapshot')}
                                 </Typography>
-                                <Chip size="small" variant="outlined" label={`As of ${balance_sheet?.as_of_date || toDate}`} />
+                                <Chip size="small" variant="outlined" label={`${__('As of')} ${balance_sheet?.as_of_date || toDate}`} />
                             </Stack>
 
                             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-                                <Chip size="small" variant="outlined" label={`Total Assets: ${money(balance_sheet?.total_assets)}`} color="primary" />
-                                <Chip size="small" variant="outlined" label={`Total Liabilities: ${money(balance_sheet?.total_liabilities)}`} color="warning" />
-                                <Chip size="small" variant="outlined" label={`Net Position: ${money(balance_sheet?.net_position)}`} color="success" />
+                                <Chip size="small" variant="outlined" label={`${__('Total Assets')}: ${money(balance_sheet?.total_assets)}`} color="primary" />
+                                <Chip size="small" variant="outlined" label={`${__('Total Liabilities')}: ${money(balance_sheet?.total_liabilities)}`} color="warning" />
+                                <Chip size="small" variant="outlined" label={`${__('Net Position')}: ${money(balance_sheet?.net_position)}`} color="success" />
                             </Stack>
 
                             <TableContainer>
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>Account</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>{__('Account')}</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>{__('Type')}</TableCell>
                                             <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Amount
+                                                {__('Amount')}
                                             </TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -396,10 +394,10 @@ export default function ReportsIndex({
                                             <TableRow key={row.label} hover>
                                                 <TableCell>
                                                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                                        {row.label}
+                                                        {__(row.label)}
                                                     </Typography>
                                                 </TableCell>
-                                                <TableCell>{row.type}</TableCell>
+                                                <TableCell>{__(row.type)}</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 800 }}>
                                                     {money(row.amount)}
                                                 </TableCell>
@@ -408,6 +406,48 @@ export default function ReportsIndex({
                                     </TableBody>
                                 </Table>
                             </TableContainer>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                                {__('Monthly Finance Chart')}
+                            </Typography>
+                            <Box sx={{ height: chartHeight }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={monthlyFinancialTrendData} margin={chartMargin}>
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis dataKey="period" tick={axisTick} tickFormatter={(value) => formatPeriod(value, 'monthly')} />
+                                        <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
+                                        <Tooltip labelFormatter={(value) => formatPeriod(value, 'monthly')} formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
+                                        <Line type="monotone" dataKey="sales" name={__('Sales')} stroke="#1976d2" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="gross_profit" name={__('Gross Profit')} stroke="#2e7d32" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="expenses_total" name={__('Expenses')} stroke="#f57c00" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="net_profit" name={__('Net Profit')} stroke="#6a1b9a" strokeWidth={1.75} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </Box>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                                {__('Yearly Finance Chart')}
+                            </Typography>
+                            <Box sx={{ height: chartHeight }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={yearlyFinancialTrendData} margin={chartMargin}>
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis dataKey="period" tick={axisTick} tickFormatter={(value) => formatPeriod(value, 'yearly')} />
+                                        <YAxis tickFormatter={formatMoney} tick={axisTick} width={64} />
+                                        <Tooltip labelFormatter={(value) => formatPeriod(value, 'yearly')} formatter={(v) => formatMoney(v)} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
+                                        <Line type="monotone" dataKey="sales" name={__('Sales')} stroke="#1976d2" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="gross_profit" name={__('Gross Profit')} stroke="#2e7d32" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="expenses_total" name={__('Expenses')} stroke="#f57c00" strokeWidth={1.75} dot={false} />
+                                        <Line type="monotone" dataKey="net_profit" name={__('Net Profit')} stroke="#6a1b9a" strokeWidth={1.75} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </Box>
                         </Paper>
 
                         <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
@@ -634,80 +674,6 @@ export default function ReportsIndex({
                                                 <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                                     <Typography variant="body2" color="text.secondary italic">
                                                         No branch data for selected range.
-                                                    </Typography>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        </Paper>
-
-                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                                Staff Sales Power
-                            </Typography>
-                            <Box sx={{ height: chartHeight, mb: 1 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={staffPerformanceChartData}
-                                        layout="vertical"
-                                        margin={{ top: 6, right: 12, bottom: 6, left: 0 }}
-                                        barSize={10}
-                                    >
-                                        <CartesianGrid strokeDasharray="2 2" />
-                                        <XAxis type="number" tickFormatter={formatMoney} tick={axisTick} />
-                                        <YAxis
-                                            type="category"
-                                            dataKey="name"
-                                            width={staffYAxisWidth}
-                                            tick={axisTick}
-                                            tickFormatter={branchNameTick}
-                                            tickLine={false}
-                                            axisLine={false}
-                                        />
-                                        <Tooltip formatter={(v, name) => (name === 'Orders' ? Number(v || 0) : formatMoney(v))} contentStyle={tooltipStyles} />
-                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
-                                        <Bar dataKey="grand_total" name="Total Sales" fill="#2e7d32" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </Box>
-                            <TableContainer sx={{ maxHeight: 210 }}>
-                                <Table size="small" stickyHeader>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>Staff</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Orders
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Average
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                Total
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {(staff_performance || []).map((row) => (
-                                            <TableRow key={row.staff_id || row.staff_name} hover>
-                                                <TableCell>
-                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                                        {row.staff_name}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell align="right">{row.sales_count}</TableCell>
-                                                <TableCell align="right">{money(row.average_sale)}</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 800 }}>
-                                                    {money(row.grand_total)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {(staff_performance || []).length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                                                    <Typography variant="body2" color="text.secondary italic">
-                                                        No staff sales data for selected range.
                                                     </Typography>
                                                 </TableCell>
                                             </TableRow>

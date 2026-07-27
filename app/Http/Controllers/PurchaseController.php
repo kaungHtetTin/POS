@@ -37,7 +37,7 @@ class PurchaseController extends Controller
         }
 
         return Inertia::render('Purchases/Index', [
-            'purchases' => $query->latest()->get(),
+            'purchases' => $query->latest()->paginate(15)->withQueryString(),
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
             'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level')
                 ->with([

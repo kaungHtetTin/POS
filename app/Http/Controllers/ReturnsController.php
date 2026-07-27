@@ -62,15 +62,16 @@ class ReturnsController extends Controller
                 $q->where('branch_id', $request->branch_id);
             });
 
-        $returns = $query->latest()->get();
+        $returns = $query->latest()->paginate(15)->withQueryString();
+        $returnRows = $returns->getCollection();
 
-        $saleIds = $returns->where('type', 'Customer')->pluck('reference_id')->unique()->values();
-        $purchaseIds = $returns->where('type', 'Supplier')->pluck('reference_id')->unique()->values();
+        $saleIds = $returnRows->where('type', 'Customer')->pluck('reference_id')->unique()->values();
+        $purchaseIds = $returnRows->where('type', 'Supplier')->pluck('reference_id')->unique()->values();
 
         $sales = Sale::whereIn('id', $saleIds)->pluck('invoice_number', 'id');
         $purchases = Purchase::whereIn('id', $purchaseIds)->pluck('invoice_number', 'id');
 
-        $returns = $returns->map(function ($r) use ($sales, $purchases) {
+        $returns->setCollection($returnRows->map(function ($r) use ($sales, $purchases) {
             $referenceNumber = null;
             if ($r->type === 'Customer') {
                 $referenceNumber = $sales[$r->reference_id] ?? null;
@@ -81,7 +82,7 @@ class ReturnsController extends Controller
 
             $r->reference_number = $referenceNumber;
             return $r;
-        });
+        }));
 
         $branches = Branch::select('id', 'name')
             ->whereIn('id', $accessibleBranchIds)

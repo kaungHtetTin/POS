@@ -9,6 +9,7 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -27,13 +28,14 @@ import {
     WarningAmber as WarnIcon,
 } from '@mui/icons-material';
 
-export default function ExpiryReport({ auth, branches = [], products = [], batches = [], filters = {} }) {
+export default function ExpiryReport({ auth, branches = [], products = [], batches = [], summary = {}, filters = {} }) {
     const [branchId, setBranchId] = useState(filters.branch_id ?? auth.user?.current_branch_id ?? '');
     const [productId, setProductId] = useState(filters.product_id ?? '');
     const [fromDate, setFromDate] = useState(filters.from_date ?? '');
     const [toDate, setToDate] = useState(filters.to_date ?? '');
+    const batchRows = batches?.data || batches || [];
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('reports.expiry'),
             {
@@ -41,6 +43,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                 product_id: productId || undefined,
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -53,13 +56,6 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
         setToDate('');
         router.get(route('reports.expiry'));
     };
-
-    const summary = useMemo(() => {
-        const total = batches.length;
-        const expired = batches.filter((b) => b.days_left < 0).length;
-        const near30 = batches.filter((b) => b.days_left >= 0 && b.days_left <= 30).length;
-        return { total, expired, near30 };
-    }, [batches]);
 
     const selectedProduct = useMemo(
         () => products.find((product) => product.id === productId) || null,
@@ -237,7 +233,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {batches.map((b) => (
+                                {batchRows.map((b) => (
                                     <TableRow key={b.id} hover>
                                         <TableCell>{b.batch_number}</TableCell>
                                         <TableCell>{b.product_name}</TableCell>
@@ -255,7 +251,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {batches.length === 0 && (
+                                {batchRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">
@@ -267,6 +263,17 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(batches?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={batches.last_page}
+                                page={batches.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
         </MainLayout>

@@ -14,6 +14,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    Pagination,
     Paper,
     Select,
     Stack,
@@ -35,7 +36,7 @@ import {
     Search as SearchIcon,
 } from '@mui/icons-material';
 
-export default function ExpenseIndex({ auth, expenses, branches, categories, filters }) {
+export default function ExpenseIndex({ auth, expenses, branches, categories, filters, summary = {} }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
@@ -45,6 +46,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
     const [categoryFilter, setCategoryFilter] = useState(filters?.expense_category_id || '');
     const [fromDate, setFromDate] = useState(filters?.from_date || '');
     const [toDate, setToDate] = useState(filters?.to_date || '');
+    const expenseRows = expenses?.data || expenses || [];
 
     const defaultBranchId = auth.user?.current_branch_id || auth.user?.branch_id || branches?.[0]?.id || '';
     const defaultCategoryId = categories?.[0]?.id || '';
@@ -59,10 +61,10 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
     });
 
     const totalAmount = useMemo(() => {
-        return (expenses || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    }, [expenses]);
+        return Number(summary.total_amount || 0);
+    }, [summary]);
 
-    const applyFilters = () => {
+    const applyFilters = (page = undefined) => {
         router.get(
             route('expenses.index'),
             {
@@ -71,6 +73,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                 expense_category_id: categoryFilter || undefined,
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
+                page,
             },
             { preserveState: true, replace: true }
         );
@@ -250,7 +253,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                         <Chip
                             size="small"
-                            label={`Entries: ${(expenses || []).length}`}
+                            label={`Entries: ${summary.entries_count ?? expenses?.total ?? expenseRows.length}`}
                             variant="outlined"
                         />
                         <Chip
@@ -277,7 +280,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(expenses || []).map((e) => (
+                                {expenseRows.map((e) => (
                                     <TableRow key={e.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -316,7 +319,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                                     </TableRow>
                                 ))}
 
-                                {(expenses || []).length === 0 && (
+                                {expenseRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -328,6 +331,17 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(expenses?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={expenses.last_page}
+                                page={expenses.current_page}
+                                onChange={(event, page) => applyFilters(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 

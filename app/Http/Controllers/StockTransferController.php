@@ -25,7 +25,7 @@ class StockTransferController extends Controller
         }
 
         return Inertia::render('Inventory/Transfers', [
-            'transfers' => $query->latest()->get(),
+            'transfers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
     }

@@ -58,6 +58,7 @@ class PosController extends Controller
         }
 
         $query = trim((string) $request->query('query', ''));
+        $categoryId = $request->query('category_id');
 
         if ($query === '') {
             return response()->json([]);
@@ -65,6 +66,9 @@ class PosController extends Controller
 
         $products = Product::query()
             ->where('status', 'Active')
+            ->when($categoryId, function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            })
             ->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
                     ->orWhere('barcode', 'like', "%{$query}%")
@@ -344,6 +348,12 @@ class PosController extends Controller
             'items.*.foc_unit_id' => 'nullable|exists:units,id',
             'items.*.price_type' => 'nullable|in:retail,wholesale',
         ]);
+
+        if (empty($validated['customer_id']) && ($validated['payment_status'] ?? 'Paid') !== 'Paid') {
+            return redirect()->back()->withErrors([
+                'payment_status' => 'Partial and due payments require a selected customer.',
+            ]);
+        }
 
         $branchId = $request->user()->currentBranchId();
         

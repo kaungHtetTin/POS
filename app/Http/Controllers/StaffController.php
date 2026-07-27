@@ -19,8 +19,10 @@ class StaffController extends Controller
         return User::query()->findOrFail($staff);
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim((string) $request->get('search', ''));
+
         return Inertia::render('Staff/Index', [
             'staff' => User::with([
                 'roles',
@@ -40,9 +42,22 @@ class StaffController extends Controller
             }], 'grand_total')
             ->whereHas('roles', function($q) {
                 $q->where('name', '!=', 'Root');
-            })->get(),
+            })
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->paginate(15)
+            ->withQueryString(),
             'roles' => Role::where('name', '!=', 'Root')->get(),
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
+            'filters' => [
+                'search' => $search,
+            ],
         ]);
     }
 

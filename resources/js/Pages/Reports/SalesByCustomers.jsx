@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -79,6 +79,8 @@ export default function SalesByCustomersReport({
     top_customers = [],
     top_products = [],
 }) {
+    const { translations = {} } = usePage().props;
+    const __ = (key) => translations[key] || key;
     const [branchId, setBranchId] = useState(filters.branch_id ?? auth.user?.current_branch_id ?? '');
     const [duration, setDuration] = useState(filters.duration ?? 'month');
     const [fromDate, setFromDate] = useState(filters.from_date ?? '');
@@ -176,22 +178,22 @@ export default function SalesByCustomersReport({
     })), [top_products, summary]);
 
     return (
-        <MainLayout auth={auth} header="Sale Report">
-            <Head title="Sale Report" />
+        <MainLayout auth={auth} header={__('Sale Report')}>
+            <Head title={__('Sale Report')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
                     <Box>
                         <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            Sales
+                            {__('Sales')}
                         </Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                            Sale Report
+                            {__('Sale Report')}
                         </Typography>
                     </Box>
                     <Chip
                         icon={<CalendarIcon fontSize="small" />}
-                        label={`${formatDate(filters.from_date)} to ${formatDate(filters.to_date)}`}
+                        label={`${formatDate(filters.from_date)} ${__('to')} ${formatDate(filters.to_date)}`}
                         variant="outlined"
                         sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
                     />
@@ -200,15 +202,15 @@ export default function SalesByCustomersReport({
                 <Paper sx={{ p: 2, mb: 2 }}>
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
                         <ReportIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>CUSTOMER SALES ANALYSIS</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('CUSTOMER SALES ANALYSIS')}</Typography>
                     </Stack>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}>
                         <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 210px' }, minWidth: 0 }}>
-                            <InputLabel>Branch</InputLabel>
-                            <Select value={branchId} label="Branch" onChange={(event) => setBranchId(event.target.value)}>
-                                <MenuItem value="">Current Branch</MenuItem>
-                                <MenuItem value="all">All Accessible</MenuItem>
+                            <InputLabel>{__('Branch')}</InputLabel>
+                            <Select value={branchId} label={__('Branch')} onChange={(event) => setBranchId(event.target.value)}>
+                                <MenuItem value="">{__('Current Branch')}</MenuItem>
+                                <MenuItem value="all">{__('All Accessible')}</MenuItem>
                                 {branches.map((branch) => (
                                     <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>
                                 ))}
@@ -216,19 +218,19 @@ export default function SalesByCustomersReport({
                         </FormControl>
 
                         <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '0 1 170px' }, minWidth: 0 }}>
-                            <InputLabel>Duration</InputLabel>
-                            <Select value={duration} label="Duration" onChange={(event) => handleDurationChange(event.target.value)}>
-                                <MenuItem value="week">This Week</MenuItem>
-                                <MenuItem value="month">This Month</MenuItem>
-                                <MenuItem value="year">This Year</MenuItem>
-                                <MenuItem value="custom">Custom</MenuItem>
+                            <InputLabel>{__('Duration')}</InputLabel>
+                            <Select value={duration} label={__('Duration')} onChange={(event) => handleDurationChange(event.target.value)}>
+                                <MenuItem value="week">{__('This Week')}</MenuItem>
+                                <MenuItem value="month">{__('This Month')}</MenuItem>
+                                <MenuItem value="year">{__('This Year')}</MenuItem>
+                                <MenuItem value="custom">{__('Custom')}</MenuItem>
                             </Select>
                         </FormControl>
 
                         <TextField
                             size="small"
                             type="date"
-                            label="From"
+                            label={__('From')}
                             value={fromDate}
                             onChange={handleManualDateChange(setFromDate)}
                             InputLabelProps={{ shrink: true }}
@@ -237,7 +239,7 @@ export default function SalesByCustomersReport({
                         <TextField
                             size="small"
                             type="date"
-                            label="To"
+                            label={__('To')}
                             value={toDate}
                             onChange={handleManualDateChange(setToDate)}
                             InputLabelProps={{ shrink: true }}
@@ -245,10 +247,10 @@ export default function SalesByCustomersReport({
                         />
 
                         <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={() => applyFilters()} sx={{ height: 40 }}>
-                            Apply
+                            {__('Apply')}
                         </Button>
                         <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters} sx={{ height: 40 }}>
-                            Reset
+                            {__('Reset')}
                         </Button>
                     </Box>
 
@@ -262,7 +264,7 @@ export default function SalesByCustomersReport({
                             ['Avg Sale', `$${money(summary.average_sale)}`],
                         ].map(([label, value]) => (
                             <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
                             </Paper>
                         ))}
@@ -271,7 +273,7 @@ export default function SalesByCustomersReport({
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 2, mb: 2 }}>
                     <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Sales Trend</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>{__('Sales Trend')}</Typography>
                         <Box sx={{ height: 250 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
@@ -280,8 +282,8 @@ export default function SalesByCustomersReport({
                                     <YAxis tick={{ fontSize: 11 }} />
                                     <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'total' ? `$${money(value)}` : value} />
                                     <Legend />
-                                    <Line type="monotone" dataKey="total" name="Sales Amount" stroke="#087f74" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="customers" name="Customers" stroke="#2874bc" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#087f74" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="customers" name={__('Customers')} stroke="#2874bc" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </Box>
@@ -289,8 +291,8 @@ export default function SalesByCustomersReport({
 
                     <Paper sx={{ p: 2 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Top Product Sale Rate</Typography>
-                            <Chip size="small" variant="outlined" label={`${topProductData.length} products`} />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('Top Product Sale Rate')}</Typography>
+                            <Chip size="small" variant="outlined" label={`${topProductData.length} ${__('products')}`} />
                         </Stack>
                         <Box sx={{ height: 250, mb: 1 }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -300,12 +302,12 @@ export default function SalesByCustomersReport({
                                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={126} />
                                     <ChartTooltip
                                         formatter={(value, name) => {
-                                            if (name === 'Share') return [`${Number(value || 0).toFixed(1)}%`, name];
-                                            return [`$${money(value)}`, name];
+                                            if (name === 'Share') return [`${Number(value || 0).toFixed(1)}%`, __(name)];
+                                            return [`$${money(value)}`, __(name)];
                                         }}
                                     />
                                     <Legend />
-                                    <Bar dataKey="total" name="Sale Amount" fill="#087f74" />
+                                    <Bar dataKey="total" name={__('Sale Amount')} fill="#087f74" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -313,11 +315,11 @@ export default function SalesByCustomersReport({
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Product</TableCell>
-                                        <TableCell align="right">Sales</TableCell>
-                                        <TableCell align="right">Qty</TableCell>
-                                        <TableCell align="right">Amount</TableCell>
-                                        <TableCell align="right">Rate</TableCell>
+                                        <TableCell>{__('Product')}</TableCell>
+                                        <TableCell align="right">{__('Sales')}</TableCell>
+                                        <TableCell align="right">{__('Qty')}</TableCell>
+                                        <TableCell align="right">{__('Amount')}</TableCell>
+                                        <TableCell align="right">{__('Rate')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -326,7 +328,7 @@ export default function SalesByCustomersReport({
                                             <TableCell>
                                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>{product.product_name}</Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    {product.generic_name || 'No generic name'}
+                                                    {product.generic_name || __('No generic name')}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right">{product.sale_count}</TableCell>
@@ -338,7 +340,7 @@ export default function SalesByCustomersReport({
                                     {(top_products || []).length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                                                <Typography variant="body2" color="text.secondary">No product sales found for this duration.</Typography>
+                                                <Typography variant="body2" color="text.secondary">{__('No product sales found for this duration.')}</Typography>
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -350,8 +352,8 @@ export default function SalesByCustomersReport({
 
                 <Paper sx={{ p: 2, mb: 2 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1} sx={{ mb: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Top Customers by Sale Amount</Typography>
-                        <Chip size="small" variant="outlined" label={`Known customer sales: ${percent(summary.known_customer_grand_total, summary.grand_total)}`} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('Top Customers by Sale Amount')}</Typography>
+                        <Chip size="small" variant="outlined" label={`${__('Known customer sales')}: ${percent(summary.known_customer_grand_total, summary.grand_total)}`} />
                     </Stack>
                     <Box sx={{ height: 280 }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -361,8 +363,8 @@ export default function SalesByCustomersReport({
                                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
                                 <ChartTooltip formatter={(value) => `$${money(value)}`} />
                                 <Legend />
-                                <Bar dataKey="total" name="Sale Amount" fill="#087f74" />
-                                <Bar dataKey="net" name="Net After Returns" fill="#2874bc" />
+                                <Bar dataKey="total" name={__('Sale Amount')} fill="#087f74" />
+                                <Bar dataKey="net" name={__('Net After Returns')} fill="#2874bc" />
                             </BarChart>
                         </ResponsiveContainer>
                     </Box>

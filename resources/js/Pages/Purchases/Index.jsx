@@ -14,6 +14,7 @@ import {
     IconButton,
     InputAdornment,
     MenuItem,
+    Pagination,
     Paper,
     Stack,
     Table,
@@ -78,6 +79,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
     const [paymentPurchase, setPaymentPurchase] = useState(null);
     const [editingPurchase, setEditingPurchase] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
+    const purchaseRows = purchases?.data || purchases || [];
     const defaultPurchaseDate = todayInputValue();
 
     const { data, setData, post, patch, delete: destroy, processing, errors, reset } = useForm({
@@ -291,8 +293,8 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         }
     };
 
-    const handleSearch = () => {
-        router.get(route('purchases.index'), { search }, { preserveState: true, replace: true });
+    const handleSearch = (page = undefined) => {
+        router.get(route('purchases.index'), { search: search || undefined, page }, { preserveState: true, replace: true });
     };
 
     const addItem = () => {
@@ -433,7 +435,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {purchases.map((purchase) => (
+                                {purchaseRows.map((purchase) => (
                                     <TableRow key={purchase.id} hover>
                                         <TableCell>
                                             <Stack direction="row" spacing={1} alignItems="center">
@@ -513,7 +515,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {purchases.length === 0 && (
+                                {purchaseRows.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
@@ -525,6 +527,17 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {Number(purchases?.last_page || 1) > 1 && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
+                            <Pagination
+                                size="small"
+                                count={purchases.last_page}
+                                page={purchases.current_page}
+                                onChange={(event, page) => handleSearch(page)}
+                                color="primary"
+                            />
+                        </Stack>
+                    )}
                 </Paper>
             </Box>
 
