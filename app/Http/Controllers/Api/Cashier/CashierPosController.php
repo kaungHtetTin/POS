@@ -261,7 +261,7 @@ class CashierPosController extends Controller
 
         $query = Sale::query()
             ->where('branch_id', $branchId)
-            ->with(['customer:id,name,phone', 'user:id,name', 'branch:id,name'])
+            ->with(['customer:id,name,phone', 'user:id,name', 'saleStaff:id,name', 'branch:id,name'])
             ->withCount('items');
 
         if (!empty($validated['search'])) {
@@ -326,6 +326,7 @@ class CashierPosController extends Controller
             'customer:id,name,phone,address',
             'branch:id,name,address,phone',
             'user:id,name',
+            'saleStaff:id,name',
             'cashSession:id,opened_at,closed_at',
             'items' => function ($q) {
                 $q->with([
@@ -473,10 +474,12 @@ class CashierPosController extends Controller
             $grandTotal = max($subTotal + $totalTax, 0);
             $amountReceived = (float) $validated['amount_received'];
             $changeDue = max($amountReceived - $grandTotal, 0);
+            $saleStaffId = $activeSession->user_id ?: $userId;
 
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $userId,
+                'sale_staff_id' => $saleStaffId,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'cash_session_id' => $activeSession->id,
                 'invoice_number' => 'S' . date('YmdHis') . rand(10, 99),
@@ -560,7 +563,7 @@ class CashierPosController extends Controller
                 $inventory->save();
             }
 
-            return $sale->load(['items.product:id,name', 'items.unit:id,name,short_name', 'items.focUnit:id,name,short_name', 'customer:id,name,phone']);
+            return $sale->load(['items.product:id,name', 'items.unit:id,name,short_name', 'items.focUnit:id,name,short_name', 'customer:id,name,phone', 'saleStaff:id,name']);
         });
 
         return response()->json([
@@ -673,6 +676,7 @@ class CashierPosController extends Controller
             'id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
             'sale_date' => $sale->sale_date?->toIso8601String(),
+            'status' => $sale->status ?? 'Completed',
             'total_amount' => $sale->total_amount,
             'discount' => $sale->discount,
             'tax' => $sale->tax,
@@ -694,6 +698,10 @@ class CashierPosController extends Controller
             'cashier' => $sale->user ? [
                 'id' => $sale->user->id,
                 'name' => $sale->user->name,
+            ] : null,
+            'sale_staff' => $sale->saleStaff ? [
+                'id' => $sale->saleStaff->id,
+                'name' => $sale->saleStaff->name,
             ] : null,
         ];
     }
@@ -768,9 +776,12 @@ class CashierPosController extends Controller
 
     private function buildSessionPayload(CashSession $session)
     {
-        $totalSales = Sale::where('cash_session_id', $session->id)->sum('grand_total');
+        $totalSales = Sale::where('cash_session_id', $session->id)
+            ->where('status', '!=', 'Voided')
+            ->sum('grand_total');
         $totalCash = Sale::where('cash_session_id', $session->id)
             ->where('payment_method', 'Cash')
+            ->where('status', '!=', 'Voided')
             ->sum('amount_received');
 
         return [

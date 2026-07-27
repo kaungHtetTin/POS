@@ -3,9 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Inventory;
+use App\Models\InventoryBatch;
+use App\Models\ReturnEntry;
 use App\Models\Sale;
+use App\Models\User;
+use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class SalesController extends Controller
@@ -94,16 +100,39 @@ class SalesController extends Controller
             ->orderBy('name')
             ->get();
 
+        $salesStaff = User::query()
+            ->select('id', 'name', 'branch_id')
+            ->with('branch:id,name')
+            ->whereHas('roles', function ($q) {
+                $q->where('name', '!=', 'Root');
+            })
+            ->where(function ($q) use ($accessibleBranchIds) {
+                $q->whereIn('branch_id', $accessibleBranchIds)
+                    ->orWhereHas('branches', function ($branchQuery) use ($accessibleBranchIds) {
+                        $branchQuery->whereIn('branches.id', $accessibleBranchIds);
+                    });
+            })
+            ->orderBy('name')
+            ->get();
+
         $query = Sale::query()
-            ->with(['branch:id,name', 'user:id,name', 'customer:id,name'])
+            ->with(['branch:id,name', 'user:id,name', 'saleStaff:id,name', 'voidedByUser:id,name', 'customer:id,name'])
             ->whereIn('sales.branch_id', $accessibleBranchIds)
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
                 $q->where('sales.branch_id', $branchScope['branch_id']);
             })
             ->whereBetween('sales.sale_date', [$fromDate, $toDate])
+            ->when($request->filled('sale_staff_id'), function ($q) use ($request) {
+                $q->where('sales.sale_staff_id', $request->get('sale_staff_id'));
+            })
             ->when($request->filled('search'), function ($q) use ($request) {
                 $search = trim((string) $request->search);
-                $q->where('sales.invoice_number', 'like', "%{$search}%");
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('sales.invoice_number', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                            $customerQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
             });
 
         $sales = $query->latest('sales.sale_date')->latest()->get();
@@ -111,13 +140,146 @@ class SalesController extends Controller
         return Inertia::render('Sales/Index', [
             'sales' => $sales,
             'branches' => $branches,
+            'salesStaff' => $salesStaff,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'sale_staff_id' => (string) $request->get('sale_staff_id', ''),
                 'from_date' => $fromDate->toDateString(),
                 'to_date' => $toDate->toDateString(),
                 'search' => (string) $request->get('search', ''),
             ],
         ]);
     }
-}
 
+    public function void(Request $request, string $locale, Sale $sale)
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|min:3|max:2000',
+        ]);
+
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+
+        if (!in_array($sale->branch_id, $accessibleBranchIds->toArray(), true)) {
+            abort(403);
+        }
+
+        if ($sale->status === 'Voided') {
+            return redirect()->back()->withErrors([
+                'void' => 'This sale has already been voided.',
+            ]);
+        }
+
+        $hasReturns = ReturnEntry::query()
+            ->where('type', 'Customer')
+            ->where('reference_id', $sale->id)
+            ->exists();
+
+        if ($hasReturns) {
+            return redirect()->back()->withErrors([
+                'void' => 'This sale has return records. Reject/delete those returns or use the return flow instead.',
+            ]);
+        }
+
+        DB::transaction(function () use ($sale, $user, $validated) {
+            $lockedSale = Sale::query()
+                ->whereKey($sale->id)
+                ->with('items')
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedSale->status === 'Voided') {
+                return;
+            }
+
+            foreach ($lockedSale->items as $item) {
+                $baseQuantity = (int) ($item->base_quantity ?? 0) + (int) ($item->foc_base_quantity ?? 0);
+
+                if ($baseQuantity <= 0) {
+                    continue;
+                }
+
+                $batch = InventoryBatch::query()
+                    ->whereKey($item->batch_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($batch) {
+                    $batch->update([
+                        'quantity' => (int) $batch->quantity + $baseQuantity,
+                    ]);
+                }
+
+                $inventory = Inventory::query()
+                    ->where('branch_id', $lockedSale->branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$inventory) {
+                    $inventory = Inventory::create([
+                        'branch_id' => $lockedSale->branch_id,
+                        'product_id' => $item->product_id,
+                        'quantity' => 0,
+                    ]);
+                }
+
+                $inventory->update([
+                    'quantity' => (int) $inventory->quantity + $baseQuantity,
+                ]);
+            }
+
+            $lockedSale->update([
+                'status' => 'Voided',
+                'voided_by_user_id' => $user->id,
+                'voided_at' => now(),
+                'void_reason' => $validated['reason'],
+            ]);
+
+            $this->recalculateCashSessionTotals($lockedSale);
+        });
+
+        ActivityLogger::log($request, 'void_sale', "Voided sale {$sale->invoice_number}", [
+            'sale_id' => $sale->id,
+            'invoice_number' => $sale->invoice_number,
+            'reason' => $validated['reason'],
+        ]);
+
+        return redirect()->back()->with('success', 'Sale voided and stock restored.');
+    }
+
+    protected function recalculateCashSessionTotals(Sale $sale): void
+    {
+        if (!$sale->cash_session_id) {
+            return;
+        }
+
+        $session = $sale->cashSession()->lockForUpdate()->first();
+
+        if (!$session) {
+            return;
+        }
+
+        $totals = Sale::query()
+            ->where('cash_session_id', $session->id)
+            ->where('payment_method', 'Cash')
+            ->where('status', '!=', 'Voided')
+            ->selectRaw('COALESCE(SUM(amount_received), 0) as cash_received_total')
+            ->selectRaw('COALESCE(SUM(change_due), 0) as change_given_total')
+            ->first();
+
+        $cashReceivedTotal = (float) ($totals?->cash_received_total ?? 0);
+        $changeGivenTotal = (float) ($totals?->change_given_total ?? 0);
+        $netCashSales = $cashReceivedTotal - $changeGivenTotal;
+        $expectedAmount = (float) $session->opening_amount + $netCashSales;
+        $countedAmount = $session->closing_counted_amount !== null ? (float) $session->closing_counted_amount : null;
+
+        $session->update([
+            'cash_received_total' => $cashReceivedTotal,
+            'change_given_total' => $changeGivenTotal,
+            'net_cash_sales' => $netCashSales,
+            'expected_amount' => $expectedAmount,
+            'difference' => $countedAmount !== null ? $countedAmount - $expectedAmount : $session->difference,
+        ]);
+    }
+}

@@ -63,6 +63,7 @@ class CashierSaleHistoryApiTest extends TestCase
         $sale = Sale::create([
             'branch_id' => $branch->id,
             'user_id' => $user->id,
+            'sale_staff_id' => $user->id,
             'customer_id' => $customer->id,
             'invoice_number' => 'S-HISTORY-001',
             'total_amount' => 190,
@@ -96,6 +97,7 @@ class CashierSaleHistoryApiTest extends TestCase
         Sale::create([
             'branch_id' => $otherBranch->id,
             'user_id' => $user->id,
+            'sale_staff_id' => $user->id,
             'invoice_number' => 'S-HIDDEN-001',
             'total_amount' => 20,
             'discount' => 0,
@@ -117,6 +119,7 @@ class CashierSaleHistoryApiTest extends TestCase
             ->assertJsonPath('data.0.id', $sale->id)
             ->assertJsonPath('data.0.invoice_number', 'S-HISTORY-001')
             ->assertJsonPath('data.0.items_count', 1)
+            ->assertJsonPath('data.0.sale_staff.name', $user->name)
             ->assertJsonMissing(['invoice_number' => 'S-HIDDEN-001']);
 
         $this->getJson("http://localhost/api/cashier/sales/{$sale->id}")

@@ -20,6 +20,7 @@ use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ActiveBranchController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ReturnsController;
 use App\Http\Controllers\ExpenseCategoryController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -68,6 +70,16 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         ->middleware(['auth', 'verified']);
 
     Route::middleware('auth')->group(function () {
+        $placeholderPage = function (string $title, string $section, string $description) {
+            return function () use ($title, $section, $description) {
+                return Inertia::render('Placeholder/Index', [
+                    'title' => $title,
+                    'section' => $section,
+                    'description' => $description,
+                ]);
+            };
+        };
+
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -129,6 +141,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index')->middleware('permission:manage_inventory');
         
         Route::get('/inventory/transfers', [StockTransferController::class, 'index'])->name('inventory.transfers.index')->middleware('permission:manage_inventory');
+        Route::get('/inventory/transfers/create', [StockTransferController::class, 'create'])->name('inventory.transfers.create')->middleware('permission:manage_inventory');
         Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store')->middleware('permission:manage_inventory');
         Route::get('/inventory/{product}', [InventoryController::class, 'show'])->name('inventory.show')->middleware('permission:manage_inventory');
 
@@ -143,10 +156,16 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
 
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index')->middleware('permission:view_financial_reports');
         Route::get('/reports/expiry', [ReportsController::class, 'expiry'])->name('reports.expiry')->middleware('permission:manage_inventory');
+        Route::get('/reports/low-balance', [ReportsController::class, 'lowBalance'])->name('reports.low-balance')->middleware('permission:manage_inventory');
+        Route::get('/reports/purchases', [ReportsController::class, 'purchases'])->name('reports.purchases')->middleware('permission:manage_inventory');
+        Route::get('/reports/purchases/suppliers/{supplier}', [ReportsController::class, 'purchaseSupplier'])->name('reports.purchases.supplier')->middleware('permission:manage_inventory');
+        Route::get('/reports/sales-by-customers', [ReportsController::class, 'salesByCustomers'])->name('reports.sales-by-customers')->middleware('permission:view_financial_reports');
         Route::get('/reports/cash-sessions', [ReportsController::class, 'cashSessions'])->name('reports.cash-sessions')->middleware('permission:view_financial_reports');
         Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
+        Route::post('/sales/{sale}/void', [SalesController::class, 'void'])->name('sales.void')->middleware('permission:view_financial_reports');
 
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('permission:process_sale');
+        Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show')->middleware('permission:process_sale');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store')->middleware('permission:process_sale');
         Route::patch('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update')->middleware('permission:process_sale');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('permission:process_sale');
@@ -156,6 +175,22 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::post('/returns/status/{return}', [ReturnsController::class, 'updateStatus'])->name('returns.status')->middleware('permission:approve_returns');
         Route::get('/returns/lookup/sale', [ReturnsController::class, 'lookupSale'])->name('returns.lookup.sale')->middleware('permission:process_sale');
         Route::get('/returns/lookup/purchase', [ReturnsController::class, 'lookupPurchase'])->name('returns.lookup.purchase')->middleware('permission:process_sale');
+
+        Route::get('/finance/outstanding-balance', [FinanceController::class, 'outstandingBalance'])->name('finance.outstanding-balance')->middleware('permission:view_financial_reports');
+        Route::get('/finance/pending-payments', function (string $locale) {
+            return redirect()->route('finance.outstanding-balance', array_merge(['locale' => $locale], request()->query()));
+        })->name('finance.pending-payments')->middleware('permission:view_financial_reports');
+        $financeReportRedirect = function (string $locale) {
+            return redirect()->route('reports.index', array_merge(['locale' => $locale], request()->query()));
+        };
+
+        Route::get('/finance/profit-report', $financeReportRedirect)->name('finance.profit-report')->middleware('permission:view_financial_reports');
+        Route::get('/finance/balance-sheet', $financeReportRedirect)->name('finance.balance-sheet')->middleware('permission:view_financial_reports');
+
+        Route::get('/sale-person/reports', $placeholderPage('Sales Person Reports', 'Sale Person', 'Compare sales volume, revenue, voids, and customer activity by sales staff.'))->name('sale-person.reports')->middleware('permission:view_financial_reports');
+        Route::get('/sale-person/bonus-calculation', $placeholderPage('Sales Person Bonus Calculation', 'Sale Person', 'Define and review bonus calculations based on sales-person performance.'))->name('sale-person.bonus-calculation')->middleware('permission:view_financial_reports');
+
+        Route::get('/administration', $placeholderPage('Administration', 'Administration', 'Central workspace for operational administration modules and controls.'))->name('administration.index')->middleware('permission:manage_users');
 
         Route::get('/pos', [PosController::class, 'index'])->name('pos.index')->middleware('permission:process_sale');
         Route::get('/pos/products', [PosController::class, 'products'])->name('pos.products')->middleware('permission:process_sale');

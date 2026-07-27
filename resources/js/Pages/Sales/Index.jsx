@@ -5,8 +5,13 @@ import {
     Box,
     Button,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Divider,
     FormControl,
+    IconButton,
     InputLabel,
     MenuItem,
     Paper,
@@ -19,17 +24,19 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import {
+    Block as VoidIcon,
     Search as SearchIcon,
     Receipt as SalesIcon,
     FilterAlt as FilterIcon,
     Print as PrintIcon,
 } from '@mui/icons-material';
 
-export default function SalesIndex({ auth, sales, branches, filters }) {
-    const { settings = {}, ziggy = {}, translations = {} } = usePage().props;
+export default function SalesIndex({ auth, sales, branches, salesStaff = [], filters }) {
+    const { settings = {}, ziggy = {}, translations = {}, errors = {} } = usePage().props;
     const __ = (key) => translations[key] || key;
     const appBase = ziggy?.base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -42,7 +49,10 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
     const [fromDate, setFromDate] = useState(filters?.from_date || defaultFrom);
     const [toDate, setToDate] = useState(filters?.to_date || defaultTo);
     const [search, setSearch] = useState(filters?.search || '');
+    const [saleStaffId, setSaleStaffId] = useState(filters?.sale_staff_id || '');
     const [quickRange, setQuickRangeState] = useState(filters?.from_date === defaultFrom && filters?.to_date === defaultTo ? 'month' : '');
+    const [voidingSale, setVoidingSale] = useState(null);
+    const [voidReason, setVoidReason] = useState('');
 
     const setQuickRange = (range) => {
         setQuickRangeState(range);
@@ -82,6 +92,7 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
             route('sales.index'),
             {
                 branch_id: branchId || undefined,
+                sale_staff_id: saleStaffId || undefined,
                 from_date: fromStr,
                 to_date: toStr,
                 search: search || undefined,
@@ -91,7 +102,14 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
     };
 
     const totalGrand = useMemo(() => {
-        return (sales || []).reduce((sum, s) => sum + Number(s.grand_total || 0), 0);
+        return (sales || []).reduce((sum, s) => {
+            if ((s.status || 'Completed') === 'Voided') return sum;
+            return sum + Number(s.grand_total || 0);
+        }, 0);
+    }, [sales]);
+
+    const voidedCount = useMemo(() => {
+        return (sales || []).filter((s) => (s.status || 'Completed') === 'Voided').length;
     }, [sales]);
 
     const applyFilters = () => {
@@ -99,6 +117,7 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
             route('sales.index'),
             {
                 branch_id: branchId || undefined,
+                sale_staff_id: saleStaffId || undefined,
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
                 search: search || undefined,
@@ -113,7 +132,31 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
         setFromDate(today);
         setToDate(today);
         setBranchId(auth.user?.current_branch_id || '');
+        setSaleStaffId('');
         router.get(route('sales.index'));
+    };
+
+    const openVoidDialog = (sale) => {
+        setVoidingSale(sale);
+        setVoidReason('');
+    };
+
+    const closeVoidDialog = () => {
+        setVoidingSale(null);
+        setVoidReason('');
+    };
+
+    const submitVoid = () => {
+        if (!voidingSale) return;
+
+        router.post(
+            route('sales.void', voidingSale.id),
+            { reason: voidReason },
+            {
+                preserveScroll: true,
+                onSuccess: () => closeVoidDialog(),
+            }
+        );
     };
 
     const money = (n) => Number(n || 0).toFixed(2);
@@ -180,9 +223,11 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                     </div>
                     <div class="line"></div>
                     <div class="row"><span class="label">${escapeHtml(__('Invoice'))}</span><span class="value">${escapeHtml(sale.invoice_number || '-')}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Status'))}</span><span class="value">${escapeHtml(sale.status || 'Completed')}</span></div>
                     <div class="row"><span class="label">${escapeHtml(__('Date'))}</span><span class="value">${escapeHtml(formatDateTime(sale.sale_date))}</span></div>
                     <div class="row"><span class="label">${escapeHtml(__('Branch'))}</span><span class="value">${escapeHtml(sale.branch?.name || '-')}</span></div>
                     <div class="row"><span class="label">${escapeHtml(__('Cashier'))}</span><span class="value">${escapeHtml(sale.user?.name || '-')}</span></div>
+                    <div class="row"><span class="label">${escapeHtml(__('Sale Staff'))}</span><span class="value">${escapeHtml(sale.sale_staff?.name || sale.user?.name || '-')}</span></div>
                     <div class="row"><span class="label">${escapeHtml(__('Customer'))}</span><span class="value">${escapeHtml(sale.customer?.name || '-')}</span></div>
                     <div class="line"></div>
                     <div class="row"><span class="label">${escapeHtml(__('Subtotal'))}</span><span class="value">${currencySymbol}${money(sale.total_amount)}</span></div>
@@ -203,22 +248,22 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
     };
 
     return (
-        <MainLayout auth={auth} header="Sales">
-            <Head title="Sales" />
+        <MainLayout auth={auth} header="Sale History">
+            <Head title="Sale History" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <SalesIcon fontSize="small" color="primary" />
-                            SALES LIST
+                            SALE HISTORY
                         </Typography>
                     </Stack>
 
                     <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                         <TextField
                             size="small"
-                            placeholder="Search invoice..."
+                            placeholder="Search invoice or customer..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
@@ -236,6 +281,18 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                 {branches.map((b) => (
                                     <MenuItem key={b.id} value={b.id}>
                                         {b.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        <FormControl size="small" sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 220 } }}>
+                            <InputLabel>Sale Staff</InputLabel>
+                            <Select value={saleStaffId} label="Sale Staff" onChange={(e) => setSaleStaffId(e.target.value)}>
+                                <MenuItem value="">All Staff</MenuItem>
+                                {salesStaff.map((member) => (
+                                    <MenuItem key={member.id} value={member.id}>
+                                        {member.name}
                                     </MenuItem>
                                 ))}
                             </Select>
@@ -298,7 +355,10 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
 
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
                         <Chip size="small" variant="outlined" label={`Entries: ${(sales || []).length}`} />
-                        <Chip size="small" variant="outlined" label={`Total: ${money(totalGrand)}`} color="primary" />
+                        <Chip size="small" variant="outlined" label={`Active Total: ${money(totalGrand)}`} color="primary" />
+                        {voidedCount > 0 && (
+                            <Chip size="small" variant="outlined" label={`Voided: ${voidedCount}`} color="error" />
+                        )}
                     </Stack>
 
                     <TableContainer>
@@ -307,8 +367,10 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
                                     <TableCell sx={{ fontWeight: 700 }}>Invoice</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>Sale Staff</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Cashier</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="right">
                                         Total
@@ -341,6 +403,11 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="caption" color="text.secondary">
+                                                {s.sale_staff?.name || s.user?.name || '-'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="caption" color="text.secondary">
                                                 {s.user?.name || '-'}
                                             </Typography>
                                         </TableCell>
@@ -348,6 +415,20 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                             <Typography variant="caption" color="text.secondary">
                                                 {s.customer?.name || '-'}
                                             </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                size="small"
+                                                color={(s.status || 'Completed') === 'Voided' ? 'error' : 'success'}
+                                                variant="outlined"
+                                                label={s.status || 'Completed'}
+                                                sx={{ height: 20, fontSize: 10 }}
+                                            />
+                                            {(s.status || 'Completed') === 'Voided' && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                    {s.voided_by_user?.name || ''}
+                                                </Typography>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="caption">{formatDateTime(s.sale_date)}</Typography>
@@ -364,21 +445,37 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                                             </Typography>
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                startIcon={<PrintIcon fontSize="small" />}
-                                                onClick={() => printInvoice(s)}
-                                            >
-                                                Print
-                                            </Button>
+                                            <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+                                                <Tooltip title="Print invoice">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        aria-label={`Print invoice ${s.invoice_number}`}
+                                                        onClick={() => printInvoice(s)}
+                                                    >
+                                                        <PrintIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                {(s.status || 'Completed') !== 'Voided' && (
+                                                    <Tooltip title="Void sale">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            aria-label={`Void sale ${s.invoice_number}`}
+                                                            onClick={() => openVoidDialog(s)}
+                                                        >
+                                                            <VoidIcon fontSize="inherit" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                            </Stack>
                                         </TableCell>
                                     </TableRow>
                                 ))}
 
                                 {(sales || []).length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={11} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={13} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No sales found for selected filters.
                                             </Typography>
@@ -390,7 +487,52 @@ export default function SalesIndex({ auth, sales, branches, filters }) {
                     </TableContainer>
                 </Paper>
             </Box>
+
+            <Dialog open={!!voidingSale} onClose={closeVoidDialog} maxWidth="xs" fullWidth>
+                <DialogTitle>Void Sale</DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={2} sx={{ mt: 0.5 }}>
+                        <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                {voidingSale?.invoice_number}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Stock will be restored and this sale will be excluded from sales totals.
+                            </Typography>
+                        </Box>
+                        {errors.void && (
+                            <Typography variant="body2" color="error">
+                                {errors.void}
+                            </Typography>
+                        )}
+                        <TextField
+                            label="Void reason"
+                            value={voidReason}
+                            onChange={(e) => setVoidReason(e.target.value)}
+                            multiline
+                            minRows={3}
+                            fullWidth
+                            required
+                            error={!!errors.reason}
+                            helperText={errors.reason}
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={closeVoidDialog} size="small">
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={submitVoid}
+                        size="small"
+                        variant="contained"
+                        color="error"
+                        disabled={voidReason.trim().length < 3}
+                    >
+                        Void Sale
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </MainLayout>
     );
 }
-

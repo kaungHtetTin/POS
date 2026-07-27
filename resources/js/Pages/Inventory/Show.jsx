@@ -53,7 +53,7 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
         <MainLayout auth={auth} header="Inventory Detail">
             <Head title={`${product.name} Inventory`} />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
                     <Button
                         component="a"

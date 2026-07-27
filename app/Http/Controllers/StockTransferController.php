@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Product;
@@ -25,9 +26,21 @@ class StockTransferController extends Controller
 
         return Inertia::render('Inventory/Transfers', [
             'transfers' => $query->latest()->get(),
-            'branches' => Branch::select('id', 'name')->get(),
-            'products' => Product::select('id', 'name')->where('status', 'Active')->get(),
             'filters' => $request->only(['search']),
+        ]);
+    }
+
+    public function create()
+    {
+        return Inertia::render('Inventory/Transfers/Create', [
+            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
+            'products' => Product::with('category:id,name')
+                ->with('inventories:id,product_id,branch_id,quantity')
+                ->select('id', 'category_id', 'name', 'generic_name', 'brand_name', 'barcode', 'image_path')
+                ->where('status', 'Active')
+                ->orderBy('name')
+                ->get(),
+            'categories' => Category::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -106,6 +119,6 @@ class StockTransferController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Stock transfer completed successfully.');
+        return redirect()->route('inventory.transfers.index')->with('success', 'Stock transfer completed successfully.');
     }
 }

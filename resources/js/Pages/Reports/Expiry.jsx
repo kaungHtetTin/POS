@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import MainLayout from '@/Layouts/MainLayout';
 import {
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -60,11 +61,31 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
         return { total, expired, near30 };
     }, [batches]);
 
+    const selectedProduct = useMemo(
+        () => products.find((product) => product.id === productId) || null,
+        [products, productId]
+    );
+
+    const filterProducts = (options, { inputValue }) => {
+        const query = inputValue.trim().toLowerCase();
+        if (!query) {
+            return options.slice(0, 50);
+        }
+
+        return options
+            .filter((product) => [
+                product.name,
+                product.generic_name,
+                product.barcode,
+            ].some((value) => String(value || '').toLowerCase().includes(query)))
+            .slice(0, 50);
+    };
+
     return (
         <MainLayout auth={auth} header="Expiry Report">
             <Head title="Expiry Report" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -73,8 +94,24 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        <FormControl size="small" sx={{ minWidth: 220, flex: '1 1 220px' }}>
+                    <Box
+                        sx={{
+                            mb: 2,
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 1,
+                            alignItems: 'center',
+                            minWidth: 0,
+                        }}
+                    >
+                        <FormControl
+                            size="small"
+                            sx={{
+                                flex: { xs: '1 1 100%', sm: '1 1 220px', lg: '1 1 210px' },
+                                minWidth: 0,
+                                maxWidth: { lg: 290 },
+                            }}
+                        >
                             <InputLabel>Branch</InputLabel>
                             <Select value={branchId} label="Branch" onChange={(e) => setBranchId(e.target.value)}>
                                 <MenuItem value="">Current Branch</MenuItem>
@@ -87,18 +124,6 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             </Select>
                         </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 260, flex: '1 1 260px' }}>
-                            <InputLabel>Product</InputLabel>
-                            <Select value={productId} label="Product" onChange={(e) => setProductId(e.target.value)}>
-                                <MenuItem value="">All Products</MenuItem>
-                                {products.map((p) => (
-                                    <MenuItem key={p.id} value={p.id}>
-                                        {p.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-
                         <TextField
                             size="small"
                             type="date"
@@ -106,7 +131,11 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             InputLabelProps={{ shrink: true }}
                             value={fromDate}
                             onChange={(e) => setFromDate(e.target.value)}
-                            sx={{ minWidth: 185 }}
+                            sx={{
+                                flex: { xs: '1 1 100%', sm: '1 1 180px', lg: '0 1 185px' },
+                                minWidth: 0,
+                                maxWidth: { lg: 220 },
+                            }}
                         />
 
                         <TextField
@@ -116,15 +145,77 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             InputLabelProps={{ shrink: true }}
                             value={toDate}
                             onChange={(e) => setToDate(e.target.value)}
-                            sx={{ minWidth: 185 }}
+                            sx={{
+                                flex: { xs: '1 1 100%', sm: '1 1 180px', lg: '0 1 185px' },
+                                minWidth: 0,
+                                maxWidth: { lg: 220 },
+                            }}
                         />
 
-                        <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={applyFilters}>
-                            Apply
-                        </Button>
-                        <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>
-                            Reset
-                        </Button>
+                        <Autocomplete
+                            size="small"
+                            options={products}
+                            value={selectedProduct}
+                            onChange={(event, value) => setProductId(value?.id || '')}
+                            isOptionEqualToValue={(option, value) => option.id === value.id}
+                            getOptionLabel={(option) => option?.name || ''}
+                            filterOptions={filterProducts}
+                            autoHighlight
+                            clearOnEscape
+                            noOptionsText="No matching products"
+                            ListboxProps={{ style: { maxHeight: 320 } }}
+                            sx={{
+                                flex: { xs: '1 1 100%', sm: '2 1 320px', lg: '2 1 300px' },
+                                minWidth: 0,
+                            }}
+                            renderOption={(props, option) => {
+                                const { key, ...optionProps } = props;
+
+                                return (
+                                    <Box component="li" key={key} {...optionProps}>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                                                {option.name}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" noWrap>
+                                                {[option.generic_name, option.barcode].filter(Boolean).join(' / ') || 'No barcode'}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                );
+                            }}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Product"
+                                    placeholder="Search name, generic, or barcode"
+                                />
+                            )}
+                        />
+
+                        <Stack
+                            direction="row"
+                            spacing={1}
+                            useFlexGap
+                            flexWrap="wrap"
+                            sx={{
+                                flex: { xs: '1 1 100%', sm: '0 0 auto' },
+                                justifyContent: { xs: 'stretch', sm: 'flex-end' },
+                                '& .MuiButton-root': {
+                                    height: 40,
+                                    px: 2,
+                                    minWidth: { xs: 0, sm: 104 },
+                                    flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' },
+                                },
+                            }}
+                        >
+                            <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={applyFilters}>
+                                Apply
+                            </Button>
+                            <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>
+                                Reset
+                            </Button>
+                        </Stack>
                     </Box>
 
                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>

@@ -80,6 +80,21 @@ class User extends Authenticatable
         return $this->hasMany(SupplierPayment::class);
     }
 
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
+
+    public function saleStaffSales()
+    {
+        return $this->hasMany(Sale::class, 'sale_staff_id');
+    }
+
+    public function cashSessions()
+    {
+        return $this->hasMany(CashSession::class);
+    }
+
     public function currentBranchId()
     {
         return $this->active_branch_id ?: $this->branch_id;

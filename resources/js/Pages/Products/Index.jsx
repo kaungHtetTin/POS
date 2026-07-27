@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import MergedTablePanel from '@/Components/MergedTablePanel';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
     Box,
@@ -45,6 +46,7 @@ import {
     FilterAlt as FilterIcon,
     Clear as ClearIcon,
     AddCircleOutline as AddUnitIcon,
+    CheckCircle as BaseUnitIcon,
     Print as PrintIcon,
 } from '@mui/icons-material';
 
@@ -272,72 +274,12 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             <Head title="Medicines" />
 
             <Box sx={{ flexGrow: 1 }}>
-                <Paper sx={{ p: 2, mb: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
-                        <TextField
-                            placeholder="Search by name, brand, generic, or barcode..."
-                            size="small"
-                            fullWidth
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            InputProps={{
-                                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-                            }}
-                        />
-                        <FormControl size="small" sx={{ minWidth: 150 }}>
-                            <InputLabel>Category</InputLabel>
-                            <Select
-                                value={selectedCategory}
-                                label="Category"
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                            >
-                                <MenuItem value="">All Categories</MenuItem>
-                                {categories.map(cat => (
-                                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <InputLabel>Status</InputLabel>
-                            <Select
-                                value={selectedStatus}
-                                label="Status"
-                                onChange={(e) => setSelectedStatus(e.target.value)}
-                            >
-                                <MenuItem value="">All Status</MenuItem>
-                                <MenuItem value="Active">Active</MenuItem>
-                                <MenuItem value="Inactive">Inactive</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <Stack direction="row" spacing={1}>
-                            <Button 
-                                variant="contained" 
-                                size="small" 
-                                onClick={handleSearch}
-                                startIcon={<FilterIcon />}
-                            >
-                                Filter
-                            </Button>
-                            <Button 
-                                variant="outlined" 
-                                size="small" 
-                                onClick={handleClearFilters}
-                                color="inherit"
-                                startIcon={<ClearIcon />}
-                            >
-                                Clear
-                            </Button>
-                        </Stack>
-                    </Stack>
-                </Paper>
-
-                <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                MEDICINE INVENTORY
-                            </Typography>
+                <MergedTablePanel
+                    eyebrow="Medicine Inventory"
+                    title="Medicines"
+                    icon={<ProductIcon color="primary" fontSize="small" />}
+                    meta={
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                             <Chip 
                                 icon={<BarcodeIcon sx={{ fontSize: '14px !important' }} />}
                                 label="Scanner Active" 
@@ -359,7 +301,9 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                 </Button>
                             )}
                         </Stack>
-                        <Button 
+                    }
+                    actions={
+                        <Button
                             variant="contained" 
                             size="small" 
                             startIcon={<AddIcon />}
@@ -368,9 +312,67 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         >
                             Add New Medicine
                         </Button>
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
-
+                    }
+                    filters={
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                            <TextField
+                                placeholder="Search by name, brand, generic, or barcode..."
+                                size="small"
+                                fullWidth
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                InputProps={{
+                                    startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                                }}
+                            />
+                            <FormControl size="small" sx={{ minWidth: 150 }}>
+                                <InputLabel>Category</InputLabel>
+                                <Select
+                                    value={selectedCategory}
+                                    label="Category"
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                >
+                                    <MenuItem value="">All Categories</MenuItem>
+                                    {categories.map(cat => (
+                                        <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                                <InputLabel>Status</InputLabel>
+                                <Select
+                                    value={selectedStatus}
+                                    label="Status"
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
+                                >
+                                    <MenuItem value="">All Status</MenuItem>
+                                    <MenuItem value="Active">Active</MenuItem>
+                                    <MenuItem value="Inactive">Inactive</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <Stack direction="row" spacing={1}>
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={handleSearch}
+                                    startIcon={<FilterIcon />}
+                                >
+                                    Filter
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={handleClearFilters}
+                                    color="inherit"
+                                    startIcon={<ClearIcon />}
+                                >
+                                    Clear
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    }
+                >
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -477,12 +479,14 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             />
                                         </TableCell>
                                         <TableCell align="right">
-                                            <IconButton size="small" color="primary" onClick={() => router.visit(route('products.edit', product.id))}>
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                            <IconButton size="small" color="error" onClick={() => handleDelete(product)}>
-                                                <DeleteIcon fontSize="inherit" />
-                                            </IconButton>
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
+                                                <IconButton size="small" color="primary" onClick={() => router.visit(route('products.edit', product.id))}>
+                                                    <EditIcon fontSize="inherit" />
+                                                </IconButton>
+                                                <IconButton size="small" color="error" onClick={() => handleDelete(product)}>
+                                                    <DeleteIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Stack>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -498,7 +502,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Paper>
+                </MergedTablePanel>
             </Box>
 
             {/* Add/Edit Product Dialog */}
@@ -887,28 +891,23 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             <TableCell sx={{ py: 1.5 }} align="right">
                                                 <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
                                                     <Tooltip title={unit.is_base_unit ? "Current Base Unit" : "Set as Base Unit"}>
-                                                        <Button 
-                                                            size="small" 
-                                                            variant={unit.is_base_unit ? "contained" : "outlined"}
+                                                        <IconButton
+                                                            size="small"
                                                             color={unit.is_base_unit ? "success" : "primary"}
+                                                            aria-label={unit.is_base_unit ? "Current base unit" : "Set as base unit"}
                                                             onClick={() => handleSetBaseUnit(index)}
-                                                            sx={{ 
-                                                                fontSize: '10px', 
-                                                                minWidth: '85px',
-                                                                height: '30px'
-                                                            }}
                                                         >
-                                                            {unit.is_base_unit ? "Base Unit" : "Set Base"}
-                                                        </Button>
+                                                            <BaseUnitIcon fontSize="inherit" />
+                                                        </IconButton>
                                                     </Tooltip>
                                                     {!unit.is_base_unit && (
                                                         <IconButton 
                                                             size="small" 
                                                             color="error" 
                                                             onClick={() => handleRemoveUnit(index)}
-                                                            sx={{ border: '1px solid', borderColor: 'error.light' }}
+                                                            aria-label="Remove unit"
                                                         >
-                                                            <DeleteIcon fontSize="small" />
+                                                            <DeleteIcon fontSize="inherit" />
                                                         </IconButton>
                                                     )}
                                                 </Stack>

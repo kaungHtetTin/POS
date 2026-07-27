@@ -17,6 +17,7 @@ class Purchase extends Model
         'invoice_number',
         'client_reference',
         'purchase_date',
+        'due_date',
         'total_amount',
         'paid_amount',
         'due_amount',
@@ -28,6 +29,7 @@ class Purchase extends Model
 
     protected $casts = [
         'purchase_date' => 'date',
+        'due_date' => 'date',
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',

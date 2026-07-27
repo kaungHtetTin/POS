@@ -180,6 +180,8 @@ class HandleInertiaRequests extends Middleware
                     ->whereColumn('inventories.quantity', '<=', 'products.min_stock_level')
                     ->count();
 
+                $counts['lowBalanceReport'] = $counts['inventory'];
+
                 $counts['expiryReport'] = InventoryBatch::query()
                     ->join('products', 'inventory_batches.product_id', '=', 'products.id')
                     ->whereIn('inventory_batches.branch_id', $branchIds)
@@ -208,6 +210,7 @@ class HandleInertiaRequests extends Middleware
             if ($permissions->contains('view_financial_reports')) {
                 $counts['sales'] = Sale::whereIn('branch_id', $branchIds)
                     ->where('payment_status', '!=', 'Paid')
+                    ->where('status', '!=', 'Voided')
                     ->count();
 
                 $counts['cashSessionReport'] = CashSession::whereIn('branch_id', $branchIds)

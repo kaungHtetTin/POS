@@ -87,8 +87,10 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                     sx={{
                         width: '45%',
                         maxWidth: 560,
-                        background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                        color: 'white',
+                        color: 'text.primary',
+                        bgcolor: 'background.paper',
+                        borderRight: '1px solid',
+                        borderColor: 'divider',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
@@ -96,27 +98,6 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                         py: 4,
                         position: 'relative',
                         overflow: 'hidden',
-                        // Decorative circles from sample
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: -80,
-                            right: -80,
-                            width: 280,
-                            height: 280,
-                            borderRadius: '50%',
-                            background: 'rgba(255,255,255,0.08)',
-                        },
-                        '&::after': {
-                            content: '""',
-                            position: 'absolute',
-                            bottom: -60,
-                            left: -60,
-                            width: 200,
-                            height: 200,
-                            borderRadius: '50%',
-                            background: 'rgba(255,255,255,0.06)',
-                        },
                     }}
                 >
                     {/* Logo + Brand */}
@@ -133,7 +114,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                         <Typography variant="h4" fontWeight={800} sx={{ mb: 1.5, lineHeight: 1.2 }}>
                             Manage Your Pharmacy{'\n'}With Confidence
                         </Typography>
-                        <Typography variant="body1" sx={{ mb: 5, opacity: 0.85, lineHeight: 1.7 }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ mb: 5, lineHeight: 1.7 }}>
                             Streamline sales, track every batch, and run operations with secure role-based access control.
                         </Typography>
 
@@ -145,7 +126,8 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                                         sx={{
                                             p: 1,
                                             borderRadius: 1.5,
-                                            bgcolor: 'rgba(255,255,255,0.15)',
+                                            bgcolor: 'primary.soft',
+                                            color: 'primary.main',
                                             display: 'flex',
                                             flexShrink: 0,
                                         }}
@@ -156,7 +138,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                                         <Typography variant="subtitle2" fontWeight={700}>
                                             {f.title}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                                        <Typography variant="body2" color="text.secondary">
                                             {f.desc}
                                         </Typography>
                                     </Box>

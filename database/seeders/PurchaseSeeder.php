@@ -37,6 +37,7 @@ class PurchaseSeeder extends Seeder
                         'branch_id' => $branch->id,
                         'invoice_number' => 'INV-' . strtoupper(bin2hex(random_bytes(4))),
                         'purchase_date' => $purchaseDate,
+                        'due_date' => $purchaseDate->copy()->addDays(7),
                         'payment_status' => collect(['Paid', 'Partial', 'Due'])->random(),
                         'total_amount' => 0, // Will update after items
                         'paid_amount' => 0,

@@ -510,9 +510,12 @@ class PosController extends Controller
 
         $createdSale = null;
         DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $saleDiscount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
+            $saleStaffId = $activeSession->user_id ?: $userId;
+
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $userId,
+                'sale_staff_id' => $saleStaffId,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'cash_session_id' => $activeSession->id,
                 'invoice_number' => $this->generateInvoiceNumber(),
@@ -814,6 +817,7 @@ class PosController extends Controller
         $totals = Sale::query()
             ->where('cash_session_id', $session->id)
             ->where('payment_method', 'Cash')
+            ->where('status', '!=', 'Voided')
             ->selectRaw('COALESCE(SUM(amount_received), 0) as cash_received_total')
             ->selectRaw('COALESCE(SUM(change_due), 0) as change_given_total')
             ->first();

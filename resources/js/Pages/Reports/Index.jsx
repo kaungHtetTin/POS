@@ -47,10 +47,12 @@ export default function ReportsIndex({
     branches,
     filters,
     summary,
+    balance_sheet = {},
     sales_trend,
     profit_trend,
     expenses_by_category,
     branch_performance,
+    staff_performance,
     expiring_batches,
 }) {
     const [branchId, setBranchId] = useState(filters?.branch_id || auth.user?.current_branch_id || '');
@@ -174,6 +176,15 @@ export default function ReportsIndex({
         }));
     }, [branch_performance]);
 
+    const staffPerformanceChartData = useMemo(() => {
+        return (staff_performance || []).slice(0, 12).map((row) => ({
+            name: row.staff_name,
+            grand_total: Number(row.grand_total || 0),
+            sales_count: Number(row.sales_count || 0),
+            average_sale: Number(row.average_sale || 0),
+        }));
+    }, [staff_performance]);
+
     const branchNameTick = useMemo(() => {
         return (value) => {
             const text = String(value ?? '');
@@ -189,6 +200,13 @@ export default function ReportsIndex({
         return 88;
     }, [branchPerformanceChartData]);
 
+    const staffYAxisWidth = useMemo(() => {
+        const maxLen = (staffPerformanceChartData || []).reduce((m, r) => Math.max(m, String(r.name ?? '').length), 0);
+        if (maxLen <= 10) return 64;
+        if (maxLen <= 14) return 76;
+        return 88;
+    }, [staffPerformanceChartData]);
+
     const profitTrendData = useMemo(() => {
         return (profit_trend || []).map((row) => ({
             period: row.period,
@@ -200,6 +218,13 @@ export default function ReportsIndex({
             net_profit: Number(row.net_profit || 0),
         }));
     }, [profit_trend]);
+
+    const balanceSheetRows = useMemo(() => ([
+        { label: 'Inventory Asset', type: 'Asset', amount: Number(balance_sheet?.inventory_asset || 0) },
+        { label: 'Customer Receivables', type: 'Asset', amount: Number(balance_sheet?.customer_receivables || 0) },
+        { label: 'Supplier Payables', type: 'Liability', amount: Number(balance_sheet?.supplier_payables || 0) },
+        { label: 'Period Net Profit', type: 'Equity', amount: Number(balance_sheet?.period_profit || 0) },
+    ]), [balance_sheet]);
 
     const formatMoney = (value) => money(value);
 
@@ -228,15 +253,15 @@ export default function ReportsIndex({
     const legendStyles = { fontSize: 11, lineHeight: '12px' };
 
     return (
-        <MainLayout auth={auth} header="Reports">
-            <Head title="Reports" />
+        <MainLayout auth={auth} header="Finance Report">
+            <Head title="Finance Report" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <ReportsIcon fontSize="small" color="primary" />
-                            REPORTING ENGINE
+                            FINANCE REPORT
                         </Typography>
                     </Stack>
 
@@ -341,6 +366,50 @@ export default function ReportsIndex({
                     </Stack>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 100%' }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 1 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                    Balance Sheet Snapshot
+                                </Typography>
+                                <Chip size="small" variant="outlined" label={`As of ${balance_sheet?.as_of_date || toDate}`} />
+                            </Stack>
+
+                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                                <Chip size="small" variant="outlined" label={`Total Assets: ${money(balance_sheet?.total_assets)}`} color="primary" />
+                                <Chip size="small" variant="outlined" label={`Total Liabilities: ${money(balance_sheet?.total_liabilities)}`} color="warning" />
+                                <Chip size="small" variant="outlined" label={`Net Position: ${money(balance_sheet?.net_position)}`} color="success" />
+                            </Stack>
+
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 700 }}>Account</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }} align="right">
+                                                Amount
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {balanceSheetRows.map((row) => (
+                                            <TableRow key={row.label} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                        {row.label}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>{row.type}</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 800 }}>
+                                                    {money(row.amount)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+
                         <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
                                 Sales Trend ({groupBy})
@@ -565,6 +634,80 @@ export default function ReportsIndex({
                                                 <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                                     <Typography variant="body2" color="text.secondary italic">
                                                         No branch data for selected range.
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+
+                        <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                                Staff Sales Power
+                            </Typography>
+                            <Box sx={{ height: chartHeight, mb: 1 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={staffPerformanceChartData}
+                                        layout="vertical"
+                                        margin={{ top: 6, right: 12, bottom: 6, left: 0 }}
+                                        barSize={10}
+                                    >
+                                        <CartesianGrid strokeDasharray="2 2" />
+                                        <XAxis type="number" tickFormatter={formatMoney} tick={axisTick} />
+                                        <YAxis
+                                            type="category"
+                                            dataKey="name"
+                                            width={staffYAxisWidth}
+                                            tick={axisTick}
+                                            tickFormatter={branchNameTick}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <Tooltip formatter={(v, name) => (name === 'Orders' ? Number(v || 0) : formatMoney(v))} contentStyle={tooltipStyles} />
+                                        <Legend iconSize={8} wrapperStyle={legendStyles} />
+                                        <Bar dataKey="grand_total" name="Total Sales" fill="#2e7d32" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </Box>
+                            <TableContainer sx={{ maxHeight: 210 }}>
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 700 }}>Staff</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }} align="right">
+                                                Orders
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }} align="right">
+                                                Average
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }} align="right">
+                                                Total
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {(staff_performance || []).map((row) => (
+                                            <TableRow key={row.staff_id || row.staff_name} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                        {row.staff_name}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">{row.sales_count}</TableCell>
+                                                <TableCell align="right">{money(row.average_sale)}</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 800 }}>
+                                                    {money(row.grand_total)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {(staff_performance || []).length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                                    <Typography variant="body2" color="text.secondary italic">
+                                                        No staff sales data for selected range.
                                                     </Typography>
                                                 </TableCell>
                                             </TableRow>

@@ -193,7 +193,10 @@ export default function PurchaseShow({ auth, purchase }) {
                         <Stack direction="row" spacing={1} alignItems="center">
                             <Chip size="small" label={purchase.payment_status} color={statusColor} variant="outlined" />
                             <Typography variant="body2" color="text.secondary">
-                                {formatDate(purchase.purchase_date)}
+                                Purchase: {formatDate(purchase.purchase_date)}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Due: {formatDate(purchase.due_date)}
                             </Typography>
                         </Stack>
                     </Stack>
@@ -322,6 +325,10 @@ export default function PurchaseShow({ auth, purchase }) {
                     <Stack alignItems="flex-end" sx={{ mt: 2.5 }}>
                         <Box sx={{ width: { xs: '100%', sm: 320 } }}>
                             <Stack direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
+                                <Typography variant="body2" color="text.secondary">Payment Due Date</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDate(purchase.due_date)}</Typography>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
                                 <Typography variant="body2" color="text.secondary">Total Amount</Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>{money(purchase.total_amount)}</Typography>
                             </Stack>
@@ -391,7 +398,7 @@ export default function PurchaseShow({ auth, purchase }) {
                                     {purchase.invoice_number}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                    Supplier: {purchase.supplier?.name || '-'} | Due: {money(purchase.due_amount)}
+                                    Supplier: {purchase.supplier?.name || '-'} | Due Date: {formatDate(purchase.due_date)} | Due: {money(purchase.due_amount)}
                                 </Typography>
                             </Paper>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

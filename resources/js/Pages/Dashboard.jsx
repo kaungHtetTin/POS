@@ -64,10 +64,10 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
             link: route('returns.index')
         },
         { 
-            title: "Pending Payments", 
+            title: "Outstanding Balance", 
             value: stats.pending_purchases || 0, 
             icon: <POSIcon color="warning" fontSize="small" />, 
-            link: route('purchases.index')
+            link: route('finance.outstanding-balance')
         },
     ];
 

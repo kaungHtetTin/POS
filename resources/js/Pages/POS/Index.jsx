@@ -886,7 +886,7 @@ export default function PosIndex({
         <PosLayout header={__(pageTitle)}>
             <Head title={pageTitle} />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 {displayError && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                         {displayError}

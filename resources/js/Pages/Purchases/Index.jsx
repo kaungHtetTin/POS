@@ -50,18 +50,42 @@ const emptyItem = {
     wholesale_price: 0,
 };
 
+const dateInputValue = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
+const todayInputValue = () => dateInputValue(new Date());
+
+const addDaysToInputDate = (dateString, days) => {
+    if (!dateString) {
+        return '';
+    }
+
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + days);
+
+    return dateInputValue(date);
+};
+
 export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters }) {
     const [open, setOpen] = useState(false);
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentPurchase, setPaymentPurchase] = useState(null);
     const [editingPurchase, setEditingPurchase] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
+    const defaultPurchaseDate = todayInputValue();
 
     const { data, setData, post, patch, delete: destroy, processing, errors, reset } = useForm({
         supplier_id: '',
         branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
         invoice_number: '',
-        purchase_date: new Date().toISOString().split('T')[0],
+        purchase_date: defaultPurchaseDate,
+        due_date: addDaysToInputDate(defaultPurchaseDate, 7),
         payment_status: 'Due',
         paid_amount: 0,
         items: [{ ...emptyItem }],
@@ -165,12 +189,14 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 purchase?.payment_status ?? '',
                 ['Paid', 'Partial', 'Due']
             ) || 'Due';
+            const purchaseDate = purchase.purchase_date?.split('T')[0] || '';
 
             setData({
                 supplier_id: supplierId,
                 branch_id: branchId,
                 invoice_number: purchase?.invoice_number || '',
-                purchase_date: purchase.purchase_date?.split('T')[0] || '',
+                purchase_date: purchaseDate,
+                due_date: purchase.due_date?.split('T')[0] || addDaysToInputDate(purchaseDate, 7),
                 payment_status: paymentStatus,
                 paid_amount: Number(purchase?.paid_amount || 0),
                 items: (purchase.items || []).map(item => {
@@ -206,11 +232,13 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         } else {
             setEditingPurchase(null);
             reset();
+            const purchaseDate = todayInputValue();
             setData({
                 supplier_id: '',
                 branch_id: auth.user?.branch_id || branches[0]?.id || '',
                 invoice_number: '',
-                purchase_date: new Date().toISOString().split('T')[0],
+                purchase_date: purchaseDate,
+                due_date: addDaysToInputDate(purchaseDate, 7),
                 payment_status: 'Due',
                 paid_amount: 0,
                 items: [{ ...emptyItem }],
@@ -395,6 +423,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                     <TableCell sx={{ fontWeight: 'bold' }}>Invoice</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Supplier & Branch</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Due Date</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Items</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Total</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Paid</TableCell>
@@ -429,6 +458,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                             <Typography variant="caption" color="text.secondary">{purchase.branch?.name}</Typography>
                                         </TableCell>
                                         <TableCell align="center">{formatPurchaseDate(purchase.purchase_date)}</TableCell>
+                                        <TableCell align="center">{formatPurchaseDate(purchase.due_date)}</TableCell>
                                         <TableCell align="center">{purchase.items_count}</TableCell>
                                         <TableCell align="right">${Number(purchase.total_amount || 0).toFixed(2)}</TableCell>
                                         <TableCell align="right">${Number(purchase.paid_amount || 0).toFixed(2)}</TableCell>
@@ -485,7 +515,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                 ))}
                                 {purchases.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No purchases found. Create a purchase order to receive stock.
                                             </Typography>
@@ -575,9 +605,28 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                     fullWidth
                                     size="small"
                                     value={data.purchase_date}
-                                    onChange={(event) => setData('purchase_date', event.target.value)}
+                                    onChange={(event) => {
+                                        const purchaseDate = event.target.value;
+                                        setData({
+                                            ...data,
+                                            purchase_date: purchaseDate,
+                                            due_date: addDaysToInputDate(purchaseDate, 7),
+                                        });
+                                    }}
                                     error={!!errors.purchase_date}
                                     helperText={errors.purchase_date}
+                                    InputLabelProps={{ shrink: true }}
+                                    required
+                                />
+                                <TextField
+                                    label="Payment Due Date"
+                                    type="date"
+                                    fullWidth
+                                    size="small"
+                                    value={data.due_date}
+                                    onChange={(event) => setData('due_date', event.target.value)}
+                                    error={!!errors.due_date}
+                                    helperText={errors.due_date || 'Defaults to 7 days after purchase date'}
                                     InputLabelProps={{ shrink: true }}
                                     required
                                 />

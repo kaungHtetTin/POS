@@ -13,6 +13,7 @@ class Sale extends Model
     protected $fillable = [
         'branch_id',
         'user_id',
+        'sale_staff_id',
         'customer_id',
         'cash_session_id',
         'invoice_number',
@@ -25,6 +26,10 @@ class Sale extends Model
         'change_due',
         'payment_method',
         'payment_status',
+        'status',
+        'voided_by_user_id',
+        'voided_at',
+        'void_reason',
         'sale_date',
         'is_synced',
         'synced_at',
@@ -38,6 +43,7 @@ class Sale extends Model
         'grand_total' => 'decimal:2',
         'amount_received' => 'decimal:2',
         'change_due' => 'decimal:2',
+        'voided_at' => 'datetime',
         'is_synced' => 'boolean',
         'synced_at' => 'datetime',
     ];
@@ -52,6 +58,11 @@ class Sale extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function saleStaff()
+    {
+        return $this->belongsTo(User::class, 'sale_staff_id');
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);
@@ -60,6 +71,11 @@ class Sale extends Model
     public function cashSession()
     {
         return $this->belongsTo(CashSession::class);
+    }
+
+    public function voidedByUser()
+    {
+        return $this->belongsTo(User::class, 'voided_by_user_id');
     }
 
     public function items()

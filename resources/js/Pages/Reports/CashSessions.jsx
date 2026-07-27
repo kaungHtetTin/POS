@@ -59,7 +59,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
         <MainLayout auth={auth} header="Cash Session Report">
             <Head title="Cash Session Report" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>

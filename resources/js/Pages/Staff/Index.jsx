@@ -44,6 +44,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
+    const money = (value) => Number(value || 0).toFixed(2);
 
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
@@ -161,6 +162,7 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Branch</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Contact</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Sales Power</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -209,6 +211,25 @@ export default function StaffIndex({ auth, staff, roles, branches }) {
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="body2">{member.phone || 'N/A'}</Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                                {money(member.sales_total)}
+                                            </Typography>
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {member.sales_count || 0} sales
+                                                </Typography>
+                                                {(member.open_pos_sessions_count || 0) > 0 && (
+                                                    <Chip
+                                                        size="small"
+                                                        color="success"
+                                                        label="POS open"
+                                                        variant="outlined"
+                                                        sx={{ height: 18, fontSize: 10 }}
+                                                    />
+                                                )}
+                                            </Stack>
                                         </TableCell>
                                         <TableCell align="right">
                                             <IconButton 

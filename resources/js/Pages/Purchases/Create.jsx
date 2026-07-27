@@ -53,6 +53,28 @@ const emptyItem = {
     wholesale_price: 0,
 };
 
+const dateInputValue = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
+const todayInputValue = () => dateInputValue(new Date());
+
+const addDaysToInputDate = (dateString, days) => {
+    if (!dateString) {
+        return '';
+    }
+
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + days);
+
+    return dateInputValue(date);
+};
+
 export default function PurchaseCreate({ auth, suppliers, products, categories = [], branches }) {
     const { settings = {}, ziggy = {} } = usePage().props;
     const currencySymbol = settings.app?.currency_symbol || '$';
@@ -63,12 +85,14 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
     const [productPage, setProductPage] = useState(1);
     const [stepErrors, setStepErrors] = useState([]);
     const productsPerPage = 8;
+    const defaultPurchaseDate = todayInputValue();
 
     const { data, setData, post, processing, errors, clearErrors } = useForm({
         supplier_id: '',
         branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
         invoice_number: '',
-        purchase_date: new Date().toISOString().split('T')[0],
+        purchase_date: defaultPurchaseDate,
+        due_date: addDaysToInputDate(defaultPurchaseDate, 7),
         payment_status: 'Due',
         paid_amount: 0,
         items: [],
@@ -87,7 +111,6 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
     const getProductStock = (product) => (product?.inventories || [])
         .filter((inventory) => String(inventory.branch_id) === String(data.branch_id))
         .reduce((sum, inventory) => sum + Number(inventory.quantity || 0), 0);
-
     const selectedSupplier = useMemo(
         () => suppliers.find((supplier) => supplier.id === data.supplier_id),
         [suppliers, data.supplier_id]
@@ -228,6 +251,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
             if (!data.branch_id) messages.push('Branch is required.');
             if (!data.invoice_number) messages.push('Invoice number is required.');
             if (!data.purchase_date) messages.push('Purchase date is required.');
+            if (!data.due_date) messages.push('Payment due date is required.');
+            if (data.purchase_date && data.due_date && data.due_date < data.purchase_date) {
+                messages.push('Payment due date cannot be before the purchase date.');
+            }
             if (data.payment_status === 'Partial' && Number(data.paid_amount || 0) < 0) {
                 messages.push('Paid amount cannot be negative.');
             }
@@ -400,9 +427,28 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                     fullWidth
                     size="small"
                     value={data.purchase_date}
-                    onChange={(event) => setData('purchase_date', event.target.value)}
+                    onChange={(event) => {
+                        const purchaseDate = event.target.value;
+                        setData({
+                            ...data,
+                            purchase_date: purchaseDate,
+                            due_date: addDaysToInputDate(purchaseDate, 7),
+                        });
+                    }}
                     error={!!errors.purchase_date}
                     helperText={errors.purchase_date}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                />
+                <TextField
+                    label="Payment Due Date"
+                    type="date"
+                    fullWidth
+                    size="small"
+                    value={data.due_date}
+                    onChange={(event) => setData('due_date', event.target.value)}
+                    error={!!errors.due_date}
+                    helperText={errors.due_date || 'Defaults to 7 days after purchase date'}
                     InputLabelProps={{ shrink: true }}
                     required
                 />
@@ -790,7 +836,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                 </Alert>
             )}
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(5, 1fr)' }, gap: 1.5 }}>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">Supplier</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800 }}>{selectedSupplier?.name || '-'}</Typography>
@@ -798,6 +844,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">Invoice</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 800 }}>{data.invoice_number || '-'}</Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">Payment Due Date</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{data.due_date || '-'}</Typography>
                 </Paper>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">Total</Typography>

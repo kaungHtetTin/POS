@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -102,6 +103,7 @@ class PurchaseController extends Controller
                 'branch_id' => $purchase->branch_id,
                 'invoice_number' => $purchase->invoice_number,
                 'purchase_date' => optional($purchase->purchase_date)->format('Y-m-d'),
+                'due_date' => optional($purchase->due_date)->format('Y-m-d'),
                 'payment_status' => $purchase->payment_status,
                 'total_amount' => (float) $purchase->total_amount,
                 'paid_amount' => (float) $purchase->paid_amount,
@@ -163,6 +165,7 @@ class PurchaseController extends Controller
             'branch_id' => 'required|exists:branches,id',
             'invoice_number' => 'required|string|max:255|unique:purchases,invoice_number',
             'purchase_date' => 'required|date',
+            'due_date' => 'nullable|date|after_or_equal:purchase_date',
             'payment_status' => 'required|in:Paid,Partial,Due',
             'paid_amount' => 'nullable|numeric|min:0|max:999999999999.99',
             'items' => 'required|array|min:1',
@@ -251,6 +254,7 @@ class PurchaseController extends Controller
         }
 
         $dueAmount = $totalAmount - $paidAmount;
+        $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
         $supplier = Supplier::findOrFail($validated['supplier_id']);
         $projectedBalance = (float) $supplier->balance + $dueAmount;
 
@@ -260,12 +264,13 @@ class PurchaseController extends Controller
             ])->with('error', 'Warning: This purchase exceeds supplier credit limit.')->withInput();
         }
 
-        DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $supplier) {
+        DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
                 'branch_id' => $validated['branch_id'],
                 'invoice_number' => $validated['invoice_number'],
                 'purchase_date' => $validated['purchase_date'],
+                'due_date' => $dueDate,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,
@@ -368,6 +373,7 @@ class PurchaseController extends Controller
             'branch_id' => 'required|exists:branches,id',
             'invoice_number' => 'required|string|max:255|unique:purchases,invoice_number,' . $purchase->id,
             'purchase_date' => 'required|date',
+            'due_date' => 'nullable|date|after_or_equal:purchase_date',
             'payment_status' => 'required|in:Paid,Partial,Due',
             'paid_amount' => 'nullable|numeric|min:0|max:999999999999.99',
             'items' => 'required|array|min:1',
@@ -448,6 +454,7 @@ class PurchaseController extends Controller
         }
 
         $dueAmount = $totalAmount - $paidAmount;
+        $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
         $supplier = Supplier::findOrFail($validated['supplier_id']);
 
         $existingDueForSelectedSupplier = $purchase->supplier_id === $validated['supplier_id']
@@ -458,7 +465,7 @@ class PurchaseController extends Controller
             return redirect()->back()->withErrors(['supplier_id' => 'Credit limit exceeded for selected supplier.'])->withInput();
         }
 
-        DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $supplier) {
+        DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
             // 1. Reverse old inventory and supplier balance
             $oldSupplier = $purchase->supplier;
             $oldSupplier->update(['balance' => (float) $oldSupplier->balance - (float) $purchase->due_amount]);
@@ -481,6 +488,7 @@ class PurchaseController extends Controller
                 'branch_id' => $validated['branch_id'],
                 'invoice_number' => $validated['invoice_number'],
                 'purchase_date' => $validated['purchase_date'],
+                'due_date' => $dueDate,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,
@@ -630,5 +638,14 @@ class PurchaseController extends Controller
         } while ($exists);
 
         return $candidate;
+    }
+
+    protected function paymentDueDate(string $purchaseDate, ?string $dueDate = null): string
+    {
+        if ($dueDate) {
+            return Carbon::parse($dueDate)->toDateString();
+        }
+
+        return Carbon::parse($purchaseDate)->addDays(7)->toDateString();
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -40,6 +41,7 @@ class PurchaseSyncService
             'branch_id' => 'required|exists:branches,id',
             'invoice_number' => 'required|string|max:255|unique:purchases,invoice_number',
             'purchase_date' => 'required|date',
+            'due_date' => 'nullable|date|after_or_equal:purchase_date',
             'payment_status' => 'required|in:Paid,Partial,Due',
             'paid_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:1000',
@@ -117,6 +119,9 @@ class PurchaseSyncService
             }
 
             $dueAmount = $totalAmount - $paidAmount;
+            $dueDate = Carbon::parse($validated['due_date'] ?? $validated['purchase_date'])
+                ->addDays(empty($validated['due_date']) ? 7 : 0)
+                ->toDateString();
             $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
             $projectedBalance = (float) $supplier->balance + $dueAmount;
 
@@ -133,6 +138,7 @@ class PurchaseSyncService
                 'invoice_number' => $validated['invoice_number'],
                 'client_reference' => $clientReference,
                 'purchase_date' => $validated['purchase_date'],
+                'due_date' => $dueDate,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,

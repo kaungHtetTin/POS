@@ -228,21 +228,45 @@ createInertiaApp({
             el.dataset.rendered = 'true';
 
             const Root = () => {
-                const [mode, setMode] = useState('light');
-                const [primaryColor, setPrimaryColor] = useState(
-                    props.initialPage.props?.settings?.app?.theme_primary_color || '#00796b',
-                );
+                const defaultPrimaryColor = props.initialPage.props?.settings?.app?.theme_primary_color || '#087f74';
+                const [mode, setMode] = useState(() => {
+                    const stored = window.localStorage.getItem('app.theme');
+                    return stored === 'dark' || stored === 'light' ? stored : 'light';
+                });
+                const [primaryColor, setPrimaryColor] = useState(() => {
+                    const stored = window.localStorage.getItem('app.brand');
+                    return /^#[0-9A-Fa-f]{6}$/.test(stored || '') ? stored.toUpperCase() : defaultPrimaryColor;
+                });
                 const colorMode = useMemo(
                     () => ({
+                        mode,
+                        primaryColor,
+                        setMode,
+                        setPrimaryColor: (nextColor) => {
+                            if (/^#[0-9A-Fa-f]{6}$/.test(nextColor || '')) {
+                                setPrimaryColor(nextColor.toUpperCase());
+                            }
+                        },
                         toggleColorMode: () => {
                             setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
                         },
                     }),
-                    [],
+                    [mode, primaryColor],
                 );
 
                 useEffect(() => {
+                    document.documentElement.dataset.theme = mode;
+                    document.documentElement.style.setProperty('--color-primary', primaryColor);
+                    window.localStorage.setItem('app.theme', mode);
+                    window.localStorage.setItem('app.brand', primaryColor);
+                }, [mode, primaryColor]);
+
+                useEffect(() => {
                     const removeListener = router.on('navigate', (event) => {
+                        if (window.localStorage.getItem('app.brand')) {
+                            return;
+                        }
+
                         const nextColor = event?.detail?.page?.props?.settings?.app?.theme_primary_color;
                         if (typeof nextColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(nextColor)) {
                             setPrimaryColor(nextColor.toUpperCase());

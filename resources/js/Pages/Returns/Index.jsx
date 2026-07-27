@@ -26,10 +26,13 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import {
     Add as AddIcon,
+    Block as RejectIcon,
+    CheckCircle as ApproveIcon,
     Close as CloseIcon,
     Refresh as LookupIcon,
     AssignmentReturn as ReturnIcon,
@@ -192,7 +195,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
         <MainLayout auth={auth} header="Returns & Refunds">
             <Head title="Returns" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -302,13 +305,27 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                         </TableCell>
                                         <TableCell align="right">
                                             {r.status === 'Pending' && canApproveReturns && (
-                                                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                    <Button size="small" variant="outlined" color="success" onClick={() => updateStatus(r, 'Approved')}>
-                                                        Approve
-                                                    </Button>
-                                                    <Button size="small" variant="outlined" color="error" onClick={() => updateStatus(r, 'Rejected')}>
-                                                        Reject
-                                                    </Button>
+                                                <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+                                                    <Tooltip title="Approve return">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="success"
+                                                            aria-label={`Approve return ${r.return_number}`}
+                                                            onClick={() => updateStatus(r, 'Approved')}
+                                                        >
+                                                            <ApproveIcon fontSize="inherit" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Reject return">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            aria-label={`Reject return ${r.return_number}`}
+                                                            onClick={() => updateStatus(r, 'Rejected')}
+                                                        >
+                                                            <RejectIcon fontSize="inherit" />
+                                                        </IconButton>
+                                                    </Tooltip>
                                                 </Stack>
                                             )}
                                         </TableCell>

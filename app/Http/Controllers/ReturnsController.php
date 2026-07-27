@@ -107,6 +107,7 @@ class ReturnsController extends Controller
         $sale = Sale::query()
             ->where('invoice_number', $validated['invoice_number'])
             ->whereIn('branch_id', $accessibleBranchIds)
+            ->where('status', '!=', 'Voided')
             ->with([
                 'branch:id,name',
                 'items' => function ($q) {
@@ -213,6 +214,7 @@ class ReturnsController extends Controller
         if ($validated['type'] === 'Customer') {
             $sale = Sale::where('id', $validated['reference_id'])
                 ->whereIn('branch_id', $accessibleBranchIds)
+                ->where('status', '!=', 'Voided')
                 ->firstOrFail();
 
             $referenceItems = SaleItem::where('sale_id', $sale->id)->get()->keyBy('id');

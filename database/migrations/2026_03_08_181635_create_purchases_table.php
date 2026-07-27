@@ -19,6 +19,7 @@ return new class extends Migration
             $table->uuid('branch_id');
             $table->string('invoice_number');
             $table->date('purchase_date');
+            $table->date('due_date')->nullable();
             $table->decimal('total_amount', 15, 2);
             $table->enum('payment_status', ['Paid', 'Partial', 'Due']);
             $table->timestamps();

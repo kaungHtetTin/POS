@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import MergedTablePanel from '@/Components/MergedTablePanel';
 import { Head, router } from '@inertiajs/react';
 import {
     Box,
-    Paper,
     Stack,
     Typography,
     TextField,
@@ -78,19 +78,23 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
         <MainLayout auth={auth} header="Inventory Stock Reports">
             <Head title="Inventory" />
 
-            <Box sx={{ p: 2 }}>
-                <Paper sx={{ p: 2, mb: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <StockIcon color="primary" />
-                            Stock Level Reports
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
+                <MergedTablePanel
+                    eyebrow="Stock Control"
+                    title="Stock Level Reports"
+                    icon={<StockIcon color="primary" fontSize="small" />}
+                    meta={
+                        <Typography variant="body2" color="text.secondary">
+                            {inventory.length} records
                         </Typography>
+                    }
+                    actions={
                         <IconButton size="small" onClick={handleReset} title="Reset Filters">
                             <ResetIcon fontSize="small" />
                         </IconButton>
-                    </Stack>
-
-                    <Stack spacing={2}>
+                    }
+                    filters={
+                        <Stack spacing={2}>
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
                             <TextField
                                 fullWidth
@@ -189,10 +193,9 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                             </TextField>
                         </Stack>
-                    </Stack>
-                </Paper>
-
-                <Paper sx={{ p: 2 }}>
+                        </Stack>
+                    }
+                >
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -264,7 +267,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Paper>
+                </MergedTablePanel>
             </Box>
         </MainLayout>
     );

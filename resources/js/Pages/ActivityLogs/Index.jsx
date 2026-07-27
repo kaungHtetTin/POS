@@ -62,7 +62,7 @@ export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs
         <MainLayout auth={auth} header="Activity Logs">
             <Head title="Activity Logs" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>

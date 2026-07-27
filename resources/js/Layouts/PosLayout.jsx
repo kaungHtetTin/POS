@@ -1,6 +1,7 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { ColorModeContext } from '@/contexts/ColorModeContext';
+import ThemeControl from '@/Components/ThemeControl';
+import SimpleIcon from '@/Components/SimpleIcon';
 import {
     Alert,
     AppBar,
@@ -20,26 +21,9 @@ import {
     Avatar,
     ListItemIcon,
     TextField,
-    useTheme,
 } from '@mui/material';
-import {
-    Brightness4 as DarkModeIcon,
-    Brightness7 as LightModeIcon,
-    Dashboard as DashboardIcon,
-    PointOfSale as SalesIcon,
-    Inventory as InventoryIcon,
-    ReceiptLong as PurchaseIcon,
-    Logout as LogoutIcon,
-    Person as PersonIcon,
-    ShoppingCart as PosIcon,
-    Language as LanguageIcon,
-    Settings as SettingsIcon,
-    MenuBook as ManualIcon,
-} from '@mui/icons-material';
 
 export default function PosLayout({ children, header = 'POS' }) {
-    const theme = useTheme();
-    const colorMode = useContext(ColorModeContext);
     const { auth, flash, translations = {}, locale, ziggy = {} } = usePage().props;
     const appBase = ziggy?.base || window.laravel_base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -129,12 +113,12 @@ export default function PosLayout({ children, header = 'POS' }) {
     const currentBranchId = auth.user?.current_branch_id || '';
 
     const navItems = [
-        { text: 'POS', href: route('pos.index'), icon: <PosIcon fontSize="small" />, active: isActiveRoute('pos.index', route('pos.index')) },
-        { text: 'Dashboard', href: route('dashboard'), icon: <DashboardIcon fontSize="small" />, active: isActiveRoute('dashboard', route('dashboard')) },
-        { text: 'Sales', href: route('sales.index'), icon: <SalesIcon fontSize="small" />, active: isActiveRoute('sales.*', route('sales.index')) },
+        { text: 'POS', href: route('pos.index'), icon: 'card', active: isActiveRoute('pos.index', route('pos.index')) },
+        { text: 'Dashboard', href: route('dashboard'), icon: 'grid', active: isActiveRoute('dashboard', route('dashboard')) },
+        { text: 'Sales', href: route('sales.index'), icon: 'receipt', active: isActiveRoute('sales.*', route('sales.index')) },
         ...(canManageInventory ? [
-            { text: 'Inventory', href: route('inventory.index'), icon: <InventoryIcon fontSize="small" />, active: isActiveRoute('inventory.index', route('inventory.index')) },
-            { text: 'Purchases', href: route('purchases.index'), icon: <PurchaseIcon fontSize="small" />, active: isActiveRoute('purchases.*', route('purchases.index')) },
+            { text: 'Inventory', href: route('inventory.index'), icon: 'box', active: isActiveRoute('inventory.index', route('inventory.index')) },
+            { text: 'Purchases', href: route('purchases.index'), icon: 'receipt', active: isActiveRoute('purchases.*', route('purchases.index')) },
         ] : []),
     ];
 
@@ -144,14 +128,13 @@ export default function PosLayout({ children, header = 'POS' }) {
             <AppBar
                 position="fixed"
                 sx={{
-                    bgcolor: 'transparent',
                     color: 'text.primary',
                     boxShadow: 'none',
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                 }}
             >
-                <Toolbar sx={{ minHeight: '56px !important', gap: 1 }}>
+                <Toolbar sx={{ minHeight: '54px !important', gap: 1, px: { xs: 1.5, sm: 2.5 } }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'primary.main', mr: 1 }}>
                         Pharmacy POS
                     </Typography>
@@ -163,24 +146,15 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 component="a"
                                 href={item.href}
                                 size="small"
-                                startIcon={item.icon}
+                                startIcon={<SimpleIcon name={item.icon} size={16} />}
                                 variant={item.active ? 'contained' : 'text'}
                                 sx={{
                                     textTransform: 'none',
                                     fontWeight: item.active ? 700 : 500,
-                                    borderRadius: 0.75,
+                                    borderRadius: 1,
                                     '& .MuiButton-startIcon': {
-                                        width: 18,
-                                        height: 18,
                                         mr: 0.75,
-                                        borderRadius: 0.75,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        border: '1px solid',
-                                        borderColor: item.active ? 'primary.main' : 'divider',
-                                        bgcolor: item.active ? 'primary.main' : 'action.hover',
-                                        color: item.active ? 'primary.contrastText' : 'text.secondary',
+                                        color: 'inherit',
                                     },
                                 }}
                             >
@@ -224,23 +198,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton
-                            onClick={colorMode.toggleColorMode}
-                            color="inherit"
-                            size="small"
-                            sx={{
-                                borderRadius: 0.75,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                bgcolor: 'background.paper',
-                                '&:hover': {
-                                    bgcolor: 'action.hover',
-                                    borderColor: 'primary.main',
-                                },
-                            }}
-                        >
-                            {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-                        </IconButton>
+                        <ThemeControl label={__('Theme')} />
 
                         <Tooltip title={__('Language')}>
                             <IconButton
@@ -248,17 +206,12 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 color="inherit"
                                 size="small"
                                 sx={{
-                                    borderRadius: 0.75,
                                     border: '1px solid',
                                     borderColor: 'divider',
                                     bgcolor: 'background.paper',
-                                    '&:hover': {
-                                        bgcolor: 'action.hover',
-                                        borderColor: 'primary.main',
-                                    },
                                 }}
                             >
-                                <LanguageIcon />
+                                <SimpleIcon name="globe" size={17} />
                             </IconButton>
                         </Tooltip>
                         <Menu
@@ -344,32 +297,32 @@ export default function PosLayout({ children, header = 'POS' }) {
                             </Box>
                             <Divider />
                             <MenuItem component="a" href={route('dashboard')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><DashboardIcon fontSize="small" /></ListItemIcon>
+                                <ListItemIcon><SimpleIcon name="grid" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Dashboard')}</Typography>
                             </MenuItem>
                             {permissions.includes('view_financial_reports') && (
                                 <MenuItem component="a" href={route('sales.index')} onClick={handleCloseUserMenu}>
-                                    <ListItemIcon><SalesIcon fontSize="small" /></ListItemIcon>
+                                    <ListItemIcon><SimpleIcon name="receipt" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('Sales')}</Typography>
                                 </MenuItem>
                             )}
                             <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
+                                <ListItemIcon><SimpleIcon name="user" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
                             {permissions.includes('manage_branches') && (
                                 <MenuItem component="a" href={route('settings.index')} onClick={handleCloseUserMenu}>
-                                    <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                                    <ListItemIcon><SimpleIcon name="settings" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('Settings')}</Typography>
                                 </MenuItem>
                             )}
                             <MenuItem component="a" href={route('manual.index')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><ManualIcon fontSize="small" /></ListItemIcon>
+                                <ListItemIcon><SimpleIcon name="book" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('SOP Manual')}</Typography>
                             </MenuItem>
                             <Divider />
                             <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }} sx={{ color: 'error.main' }}>
-                                <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+                                <ListItemIcon><SimpleIcon name="logout" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Logout')}</Typography>
                             </MenuItem>
                         </Menu>
@@ -377,7 +330,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                 </Toolbar>
             </AppBar>
 
-            <Toolbar sx={{ minHeight: '56px !important' }} />
+            <Toolbar sx={{ minHeight: '54px !important' }} />
 
             <Box sx={{ flex: 1 }}>
                 {children}

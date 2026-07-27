@@ -89,6 +89,7 @@ class OfflineSyncApiTest extends TestCase
             ->assertJsonPath('synced.0.status', 'synced');
 
         $this->assertSame(1, Sale::where('client_reference', 'android-sale-001')->count());
+        $this->assertSame($user->id, Sale::where('client_reference', 'android-sale-001')->value('sale_staff_id'));
         $this->assertSame(8, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertSame(8, InventoryBatch::where('product_id', $product->id)->first()->quantity);
 

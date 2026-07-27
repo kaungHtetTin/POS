@@ -32,6 +32,7 @@ class SupplierPaymentService
             }
 
             $purchases = $purchasesQuery
+                ->orderBy('due_date')
                 ->orderBy('purchase_date')
                 ->orderBy('created_at')
                 ->get();

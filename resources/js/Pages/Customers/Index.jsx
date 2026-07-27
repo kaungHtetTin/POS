@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import {
     Box,
     Paper,
@@ -14,7 +14,6 @@ import {
     TableRow,
     Button,
     IconButton,
-    Chip,
     Stack,
     Dialog,
     DialogTitle,
@@ -31,8 +30,8 @@ import {
     Close as CloseIcon,
     Phone as PhoneIcon,
     Email as EmailIcon,
-    ShoppingCart as PurchaseIcon,
     Search as SearchIcon,
+    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function CustomerIndex({ auth, customers, filters }) {
@@ -154,7 +153,6 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Contact</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Purchases</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -182,17 +180,16 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                                 </Stack>
                                             </Stack>
                                         </TableCell>
-                                        <TableCell align="center" sx={{ verticalAlign: 'top', pt: 1.5 }}>
-                                            <Chip
-                                                label={customer.sales_count ?? customer.purchase_history_count ?? 0}
-                                                size="small"
-                                                color={(customer.sales_count ?? customer.purchase_history_count ?? 0) > 0 ? 'primary' : 'default'}
-                                                variant="outlined"
-                                                icon={<PurchaseIcon />}
-                                                sx={{ fontSize: '11px', height: '22px' }}
-                                            />
-                                        </TableCell>
                                         <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <IconButton
+                                                component={Link}
+                                                href={route('customers.show', customer.id)}
+                                                size="small"
+                                                color="primary"
+                                                aria-label={`View ${customer.name}`}
+                                            >
+                                                <ViewIcon fontSize="inherit" />
+                                            </IconButton>
                                             <IconButton
                                                 size="small"
                                                 color="primary"
@@ -213,7 +210,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 ))}
                                 {customers.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary" fontStyle="italic">
                                                 No customers found. Click "Add Customer" to create your first customer.
                                             </Typography>

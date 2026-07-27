@@ -21,6 +21,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import {
@@ -219,15 +220,19 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                             <Chip size="small" label={purchase.payment_status} color={statusColor(purchase.payment_status)} variant="outlined" />
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                onClick={() => openPaymentDialog(purchase)}
-                                                disabled={Number(purchase.due_amount || 0) <= 0}
-                                                sx={{ height: 32, whiteSpace: 'nowrap' }}
-                                            >
-                                                Pay
-                                            </Button>
+                                            <Tooltip title={Number(purchase.due_amount || 0) <= 0 ? 'No due amount' : 'Record payment'}>
+                                                <span>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="success"
+                                                        aria-label={`Record payment for ${purchase.invoice_number}`}
+                                                        onClick={() => openPaymentDialog(purchase)}
+                                                        disabled={Number(purchase.due_amount || 0) <= 0}
+                                                    >
+                                                        <PaymentIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
                                         </TableCell>
                                     </TableRow>
                                 ))}

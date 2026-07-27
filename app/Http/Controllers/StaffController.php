@@ -26,7 +26,19 @@ class StaffController extends Controller
                 'roles',
                 'branch:id,name',
                 'branches:id,name',
-            ])->whereHas('roles', function($q) {
+            ])
+            ->withCount([
+                'saleStaffSales as sales_count' => function ($q) {
+                    $q->where('status', '!=', 'Voided');
+                },
+                'cashSessions as open_pos_sessions_count' => function ($q) {
+                    $q->where('status', 'open')->whereNull('closed_at');
+                },
+            ])
+            ->withSum(['saleStaffSales as sales_total' => function ($q) {
+                $q->where('status', '!=', 'Voided');
+            }], 'grand_total')
+            ->whereHas('roles', function($q) {
                 $q->where('name', '!=', 'Root');
             })->get(),
             'roles' => Role::where('name', '!=', 'Root')->get(),

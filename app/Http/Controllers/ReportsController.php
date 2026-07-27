@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\CashSession;
+use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\InventoryBatch;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\ReturnEntry;
 use App\Models\Sale;
+use App\Models\SaleItem;
+use App\Models\Supplier;
+use App\Models\SupplierPayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +124,7 @@ class ReportsController extends Controller
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
                 $q->where('sales.branch_id', $branchScope['branch_id']);
             })
+            ->where('sales.status', '!=', 'Voided')
             ->whereBetween('sales.sale_date', [$fromDate, $toDate]);
 
         $salesSummary = (clone $salesBase)->selectRaw('
@@ -295,6 +302,7 @@ class ReportsController extends Controller
 
         $branchPerformance = Sale::query()
             ->whereIn('sales.branch_id', $accessibleBranchIds)
+            ->where('sales.status', '!=', 'Voided')
             ->whereBetween('sales.sale_date', [$fromDate, $toDate])
             ->join('branches', 'sales.branch_id', '=', 'branches.id')
             ->selectRaw('branches.id as branch_id, branches.name as branch_name')
@@ -307,6 +315,23 @@ class ReportsController extends Controller
             ->orderByDesc('grand_total')
             ->get();
 
+        $staffPerformance = (clone $salesBase)
+            ->leftJoin('users as sale_staff', function ($join) {
+                $join->on('sale_staff.id', '=', DB::raw('COALESCE(sales.sale_staff_id, sales.user_id)'));
+            })
+            ->selectRaw('COALESCE(sale_staff.id, sales.sale_staff_id, sales.user_id) as staff_id')
+            ->selectRaw("COALESCE(sale_staff.name, 'Unassigned') as staff_name")
+            ->selectRaw('COUNT(*) as sales_count')
+            ->selectRaw('COALESCE(SUM(sales.total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(sales.discount), 0) as discount')
+            ->selectRaw('COALESCE(SUM(sales.tax), 0) as tax')
+            ->selectRaw('COALESCE(SUM(sales.grand_total), 0) as grand_total')
+            ->selectRaw('COALESCE(AVG(sales.grand_total), 0) as average_sale')
+            ->groupBy(DB::raw('COALESCE(sale_staff.id, sales.sale_staff_id, sales.user_id)'), DB::raw("COALESCE(sale_staff.name, 'Unassigned')"))
+            ->orderByDesc('grand_total')
+            ->limit(25)
+            ->get();
+
         $inventoryValuation = InventoryBatch::query()
             ->whereIn('inventory_batches.branch_id', $accessibleBranchIds)
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
@@ -315,6 +340,40 @@ class ReportsController extends Controller
             ->selectRaw('COALESCE(SUM(quantity * purchase_price), 0) as purchase_value')
             ->selectRaw('COALESCE(SUM(quantity * selling_price), 0) as selling_value')
             ->first();
+
+        $salesReceivable = Sale::query()
+            ->whereIn('sales.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('sales.branch_id', $branchScope['branch_id']);
+            })
+            ->where('sales.status', '!=', 'Voided')
+            ->whereDate('sales.sale_date', '<=', $toDate->toDateString())
+            ->selectRaw("
+                COALESCE(SUM(
+                    CASE
+                        WHEN sales.payment_status = 'Due' THEN sales.grand_total
+                        WHEN sales.payment_status = 'Partial' THEN sales.grand_total - CASE
+                            WHEN COALESCE(sales.amount_received, 0) > sales.grand_total THEN sales.grand_total
+                            ELSE COALESCE(sales.amount_received, 0)
+                        END
+                        ELSE 0
+                    END
+                ), 0) as receivable_total
+            ")
+            ->value('receivable_total');
+
+        $supplierPayable = Purchase::query()
+            ->whereIn('purchases.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('purchases.branch_id', $branchScope['branch_id']);
+            })
+            ->whereDate('purchases.purchase_date', '<=', $toDate->toDateString())
+            ->where('purchases.payment_status', '!=', 'Paid')
+            ->selectRaw('COALESCE(SUM(purchases.due_amount), 0) as payable_total')
+            ->value('payable_total');
+
+        $balanceAssets = (float) ($inventoryValuation->purchase_value ?? 0) + (float) $salesReceivable;
+        $balanceLiabilities = (float) $supplierPayable;
 
         $expiryCutoff = now()->addDays($expiryDays)->toDateString();
         $expiringBatches = InventoryBatch::query()
@@ -354,10 +413,21 @@ class ReportsController extends Controller
                 'inventory_purchase_value' => (float) ($inventoryValuation->purchase_value ?? 0),
                 'inventory_selling_value' => (float) ($inventoryValuation->selling_value ?? 0),
             ],
+            'balance_sheet' => [
+                'inventory_asset' => (float) ($inventoryValuation->purchase_value ?? 0),
+                'customer_receivables' => (float) $salesReceivable,
+                'total_assets' => (float) $balanceAssets,
+                'supplier_payables' => (float) $supplierPayable,
+                'total_liabilities' => (float) $balanceLiabilities,
+                'net_position' => (float) ($balanceAssets - $balanceLiabilities),
+                'period_profit' => (float) $netProfit,
+                'as_of_date' => $toDate->toDateString(),
+            ],
             'sales_trend' => $salesTrend,
             'profit_trend' => $profitTrend,
             'expenses_by_category' => $expensesByCategory,
             'branch_performance' => $branchPerformance,
+            'staff_performance' => $staffPerformance,
             'expiring_batches' => $expiringBatches,
         ]);
     }
@@ -405,7 +475,7 @@ class ReportsController extends Controller
             ->orderBy('name')
             ->get();
 
-        $products = Product::select('id', 'name')
+        $products = Product::select('id', 'name', 'generic_name', 'barcode')
             ->where('status', 'Active')
             ->orderBy('name')
             ->get();
@@ -453,6 +523,784 @@ class ReportsController extends Controller
                 'from_date' => $fromDate?->toDateString() ?? '',
                 'to_date' => $toDate?->toDateString() ?? '',
             ],
+        ]);
+    }
+
+    public function lowBalance(Request $request)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+
+        $search = trim((string) $request->get('search', ''));
+        $categoryId = (string) $request->get('category_id', '');
+        $productStatus = (string) $request->get('product_status', 'Active');
+        $stockStatus = (string) $request->get('stock_status', 'attention');
+
+        if (!in_array($productStatus, ['all', 'Active', 'Inactive'], true)) {
+            $productStatus = 'Active';
+        }
+
+        if (!in_array($stockStatus, ['attention', 'out', 'low', 'all'], true)) {
+            $stockStatus = 'attention';
+        }
+
+        if ($categoryId !== '' && !Category::where('id', $categoryId)->exists()) {
+            $categoryId = '';
+        }
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $categories = Category::select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        $branchLabel = $branchScope['mode'] === 'all'
+            ? 'All Accessible'
+            : ($branches->firstWhere('id', $branchScope['branch_id'])?->name ?? 'Current Branch');
+
+        $query = Product::query()
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->leftJoin('inventories', function ($join) use ($branchScope, $accessibleBranchIds) {
+                $join->on('inventories.product_id', '=', 'products.id');
+
+                if ($branchScope['mode'] === 'all') {
+                    $join->whereIn('inventories.branch_id', $accessibleBranchIds);
+                } else {
+                    $join->where('inventories.branch_id', $branchScope['branch_id']);
+                }
+            })
+            ->select([
+                'products.id',
+                'products.name',
+                'products.generic_name',
+                'products.barcode',
+                'products.min_stock_level',
+                'products.status',
+                'categories.name as category_name',
+            ])
+            ->selectRaw('COALESCE(SUM(inventories.quantity), 0) as current_quantity')
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('products.name', 'like', "%{$search}%")
+                        ->orWhere('products.generic_name', 'like', "%{$search}%")
+                        ->orWhere('products.barcode', 'like', "%{$search}%");
+                });
+            })
+            ->when($categoryId !== '', function ($q) use ($categoryId) {
+                $q->where('products.category_id', $categoryId);
+            })
+            ->when($productStatus !== 'all', function ($q) use ($productStatus) {
+                $q->where('products.status', $productStatus);
+            })
+            ->groupBy([
+                'products.id',
+                'products.name',
+                'products.generic_name',
+                'products.barcode',
+                'products.min_stock_level',
+                'products.status',
+                'categories.name',
+            ])
+            ->orderBy('products.name');
+
+        $rows = $query->get()
+            ->map(function ($product) use ($branchLabel) {
+                $currentQuantity = (int) $product->current_quantity;
+                $minLevel = (int) ($product->min_stock_level ?? 0);
+                $shortage = max($minLevel - $currentQuantity, 0);
+
+                if ($currentQuantity <= 0) {
+                    $status = 'Out of Stock';
+                } elseif ($currentQuantity <= $minLevel) {
+                    $status = 'Low Balance';
+                } else {
+                    $status = 'Healthy';
+                }
+
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'generic_name' => $product->generic_name,
+                    'barcode' => $product->barcode,
+                    'category_name' => $product->category_name ?? 'N/A',
+                    'branch_name' => $branchLabel,
+                    'current_quantity' => $currentQuantity,
+                    'min_stock_level' => $minLevel,
+                    'shortage' => $shortage,
+                    'product_status' => $product->status,
+                    'stock_status' => $status,
+                ];
+            })
+            ->filter(function ($row) use ($stockStatus) {
+                return match ($stockStatus) {
+                    'out' => $row['current_quantity'] <= 0,
+                    'low' => $row['current_quantity'] > 0 && $row['current_quantity'] <= $row['min_stock_level'],
+                    'all' => true,
+                    default => $row['current_quantity'] <= $row['min_stock_level'],
+                };
+            })
+            ->sort(function ($a, $b) {
+                $shortageComparison = $b['shortage'] <=> $a['shortage'];
+
+                return $shortageComparison !== 0
+                    ? $shortageComparison
+                    : strcasecmp($a['name'], $b['name']);
+            })
+            ->values();
+
+        $summary = [
+            'total' => $rows->count(),
+            'out' => $rows->where('stock_status', 'Out of Stock')->count(),
+            'low' => $rows->where('stock_status', 'Low Balance')->count(),
+            'shortage' => (int) $rows->sum('shortage'),
+        ];
+
+        return Inertia::render('Reports/LowBalance', [
+            'branches' => $branches,
+            'categories' => $categories,
+            'items' => $rows,
+            'summary' => $summary,
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'search' => $search,
+                'category_id' => $categoryId,
+                'product_status' => $productStatus,
+                'stock_status' => $stockStatus,
+            ],
+        ]);
+    }
+
+    protected function purchaseReportFilters(Request $request): array
+    {
+        $paymentStatus = (string) $request->get('payment_status', 'all');
+        if (!in_array($paymentStatus, ['all', 'Paid', 'Partial', 'Due'], true)) {
+            $paymentStatus = 'all';
+        }
+
+        return [
+            'payment_status' => $paymentStatus,
+            'search' => trim((string) $request->get('search', '')),
+        ];
+    }
+
+    protected function salesCustomerReportFilters(Request $request): array
+    {
+        $duration = (string) $request->get('duration', 'month');
+        if (!in_array($duration, ['week', 'month', 'year', 'custom'], true)) {
+            $duration = 'month';
+        }
+
+        return [
+            'duration' => $duration,
+        ];
+    }
+
+    protected function salesCustomerDateRange(Request $request, string $duration): array
+    {
+        $hasExplicitDates = $request->filled('from_date') || $request->filled('to_date');
+
+        if ($duration === 'custom' || $hasExplicitDates) {
+            return $this->parseDateRange($request);
+        }
+
+        return match ($duration) {
+            'week' => [now()->startOfWeek()->startOfDay(), now()->endOfWeek()->endOfDay()],
+            'year' => [now()->startOfYear()->startOfDay(), now()->endOfYear()->endOfDay()],
+            default => [now()->startOfMonth()->startOfDay(), now()->endOfMonth()->endOfDay()],
+        };
+    }
+
+    protected function applySalesCustomerReportScope($query, $accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate)
+    {
+        return $query
+            ->whereIn('sales.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('sales.branch_id', $branchScope['branch_id']);
+            })
+            ->where('sales.status', '!=', 'Voided')
+            ->whereBetween('sales.sale_date', [$fromDate, $toDate]);
+    }
+
+    protected function salesCustomerBaseQuery($accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate)
+    {
+        return $this->applySalesCustomerReportScope(
+            Sale::query(),
+            $accessibleBranchIds,
+            $branchScope,
+            $fromDate,
+            $toDate
+        );
+    }
+
+    protected function salesCustomerAggregateQuery($accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate, string $search = '')
+    {
+        $returnSubquery = ReturnEntry::query()
+            ->join('sales as return_sales', 'returns.reference_id', '=', 'return_sales.id')
+            ->where('returns.type', 'Customer')
+            ->where('returns.status', 'Approved')
+            ->whereIn('returns.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('returns.branch_id', $branchScope['branch_id']);
+            })
+            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->groupBy('return_sales.customer_id')
+            ->selectRaw('return_sales.customer_id')
+            ->selectRaw('COALESCE(SUM(returns.refund_amount), 0) as return_amount');
+
+        return Customer::query()
+            ->join('sales', function ($join) use ($accessibleBranchIds, $branchScope, $fromDate, $toDate) {
+                $join->on('sales.customer_id', '=', 'customers.id')
+                    ->whereIn('sales.branch_id', $accessibleBranchIds)
+                    ->where('sales.status', '!=', 'Voided')
+                    ->whereBetween('sales.sale_date', [$fromDate, $toDate]);
+
+                if ($branchScope['mode'] !== 'all') {
+                    $join->where('sales.branch_id', $branchScope['branch_id']);
+                }
+            })
+            ->leftJoinSub($returnSubquery, 'customer_returns', function ($join) {
+                $join->on('customer_returns.customer_id', '=', 'customers.id');
+            })
+            ->select([
+                'customers.id',
+                'customers.name',
+                'customers.phone',
+                'customers.email',
+                'customers.address',
+            ])
+            ->selectRaw('COUNT(sales.id) as sale_count')
+            ->selectRaw('COALESCE(SUM(sales.total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(sales.discount), 0) as discount')
+            ->selectRaw('COALESCE(SUM(sales.tax), 0) as tax')
+            ->selectRaw('COALESCE(SUM(sales.grand_total), 0) as grand_total')
+            ->selectRaw('COALESCE(AVG(sales.grand_total), 0) as average_sale')
+            ->selectRaw('MIN(sales.sale_date) as first_sale_date')
+            ->selectRaw('MAX(sales.sale_date) as last_sale_date')
+            ->selectRaw('COALESCE(MAX(customer_returns.return_amount), 0) as return_amount')
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('customers.name', 'like', "%{$search}%")
+                        ->orWhere('customers.phone', 'like', "%{$search}%")
+                        ->orWhere('customers.email', 'like', "%{$search}%");
+                });
+            })
+            ->groupBy([
+                'customers.id',
+                'customers.name',
+                'customers.phone',
+                'customers.email',
+                'customers.address',
+            ]);
+    }
+
+    public function salesByCustomers(Request $request)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+        $reportFilters = $this->salesCustomerReportFilters($request);
+        $duration = $reportFilters['duration'];
+        [$fromDate, $toDate] = $this->salesCustomerDateRange($request, $duration);
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $base = $this->salesCustomerBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate);
+
+        $summary = (clone $base)
+            ->selectRaw('COUNT(*) as sale_count')
+            ->selectRaw('COUNT(DISTINCT customer_id) as customer_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(discount), 0) as discount')
+            ->selectRaw('COALESCE(SUM(tax), 0) as tax')
+            ->selectRaw('COALESCE(SUM(grand_total), 0) as grand_total')
+            ->selectRaw('COALESCE(AVG(grand_total), 0) as average_sale')
+            ->first();
+
+        $knownCustomerSummary = (clone $base)
+            ->whereNotNull('customer_id')
+            ->selectRaw('COUNT(*) as sale_count')
+            ->selectRaw('COALESCE(SUM(grand_total), 0) as grand_total')
+            ->first();
+
+        $walkInSummary = (clone $base)
+            ->whereNull('customer_id')
+            ->selectRaw('COUNT(*) as sale_count')
+            ->selectRaw('COALESCE(SUM(grand_total), 0) as grand_total')
+            ->first();
+
+        $customerReturns = ReturnEntry::query()
+            ->join('sales', 'returns.reference_id', '=', 'sales.id')
+            ->where('returns.type', 'Customer')
+            ->where('returns.status', 'Approved')
+            ->whereIn('returns.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('returns.branch_id', $branchScope['branch_id']);
+            })
+            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->selectRaw('COALESCE(SUM(returns.refund_amount), 0) as return_total')
+            ->value('return_total');
+
+        $salesTrend = (clone $base)
+            ->selectRaw('DATE(sale_date) as period')
+            ->selectRaw('COUNT(*) as sale_count')
+            ->selectRaw('COUNT(DISTINCT customer_id) as customer_count')
+            ->selectRaw('COALESCE(SUM(grand_total), 0) as grand_total')
+            ->groupBy(DB::raw('DATE(sale_date)'))
+            ->orderBy(DB::raw('DATE(sale_date)'))
+            ->get();
+
+        $topProducts = SaleItem::query()
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
+            ->whereIn('sales.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('sales.branch_id', $branchScope['branch_id']);
+            })
+            ->where('sales.status', '!=', 'Voided')
+            ->whereBetween('sales.sale_date', [$fromDate, $toDate])
+            ->selectRaw('products.id as product_id')
+            ->selectRaw("COALESCE(products.name, 'Unknown Product') as product_name")
+            ->selectRaw('COALESCE(products.generic_name, "") as generic_name')
+            ->selectRaw('COUNT(DISTINCT sales.id) as sale_count')
+            ->selectRaw('COUNT(DISTINCT sales.customer_id) as customer_count')
+            ->selectRaw('COALESCE(SUM(sale_items.quantity), 0) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(sale_items.foc_quantity, 0)), 0) as foc_quantity')
+            ->selectRaw('COALESCE(SUM(sale_items.base_quantity + COALESCE(sale_items.foc_base_quantity, 0)), 0) as base_quantity')
+            ->selectRaw('COALESCE(SUM(sale_items.total_price), 0) as sale_amount')
+            ->groupBy('products.id', 'products.name', 'products.generic_name')
+            ->orderByDesc('sale_amount')
+            ->limit(10)
+            ->get();
+
+        $topCustomers = $this->salesCustomerAggregateQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate)
+            ->orderByDesc('grand_total')
+            ->orderBy('customers.name')
+            ->limit(8)
+            ->get()
+            ->map(function ($customer) {
+                return [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'phone' => $customer->phone,
+                    'email' => $customer->email,
+                    'sale_count' => (int) $customer->sale_count,
+                    'total_amount' => (float) $customer->total_amount,
+                    'discount' => (float) $customer->discount,
+                    'tax' => (float) $customer->tax,
+                    'grand_total' => (float) $customer->grand_total,
+                    'average_sale' => (float) $customer->average_sale,
+                    'return_amount' => (float) $customer->return_amount,
+                    'net_amount' => (float) $customer->grand_total - (float) $customer->return_amount,
+                    'first_sale_date' => $customer->first_sale_date,
+                    'last_sale_date' => $customer->last_sale_date,
+                ];
+            });
+
+        return Inertia::render('Reports/SalesByCustomers', [
+            'branches' => $branches,
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'duration' => $duration,
+                'from_date' => $fromDate->toDateString(),
+                'to_date' => $toDate->toDateString(),
+            ],
+            'summary' => [
+                'sale_count' => (int) ($summary->sale_count ?? 0),
+                'customer_count' => (int) ($summary->customer_count ?? 0),
+                'total_amount' => (float) ($summary->total_amount ?? 0),
+                'discount' => (float) ($summary->discount ?? 0),
+                'tax' => (float) ($summary->tax ?? 0),
+                'grand_total' => (float) ($summary->grand_total ?? 0),
+                'average_sale' => (float) ($summary->average_sale ?? 0),
+                'known_customer_sale_count' => (int) ($knownCustomerSummary->sale_count ?? 0),
+                'known_customer_grand_total' => (float) ($knownCustomerSummary->grand_total ?? 0),
+                'walk_in_sale_count' => (int) ($walkInSummary->sale_count ?? 0),
+                'walk_in_grand_total' => (float) ($walkInSummary->grand_total ?? 0),
+                'customer_returns' => (float) $customerReturns,
+                'net_amount' => (float) ($summary->grand_total ?? 0) - (float) $customerReturns,
+            ],
+            'sales_trend' => $salesTrend,
+            'top_customers' => $topCustomers,
+            'top_products' => $topProducts,
+        ]);
+    }
+
+    protected function applyPurchaseReportScope($query, $accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate, string $paymentStatus, ?string $supplierId = null)
+    {
+        return $query
+            ->whereIn('purchases.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('purchases.branch_id', $branchScope['branch_id']);
+            })
+            ->when($supplierId, function ($q) use ($supplierId) {
+                $q->where('purchases.supplier_id', $supplierId);
+            })
+            ->when($paymentStatus !== 'all', function ($q) use ($paymentStatus) {
+                $q->where('purchases.payment_status', $paymentStatus);
+            })
+            ->whereBetween('purchases.purchase_date', [$fromDate->toDateString(), $toDate->toDateString()]);
+    }
+
+    protected function purchaseBaseQuery($accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate, string $paymentStatus, ?string $supplierId = null)
+    {
+        return $this->applyPurchaseReportScope(
+            Purchase::query(),
+            $accessibleBranchIds,
+            $branchScope,
+            $fromDate,
+            $toDate,
+            $paymentStatus,
+            $supplierId
+        );
+    }
+
+    protected function purchaseItemBaseQuery($accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate, string $paymentStatus, ?string $supplierId = null)
+    {
+        return $this->applyPurchaseReportScope(
+            DB::table('purchase_items')->join('purchases', 'purchase_items.purchase_id', '=', 'purchases.id'),
+            $accessibleBranchIds,
+            $branchScope,
+            $fromDate,
+            $toDate,
+            $paymentStatus,
+            $supplierId
+        );
+    }
+
+    protected function purchaseSupplierAggregateQuery($accessibleBranchIds, array $branchScope, Carbon $fromDate, Carbon $toDate, string $paymentStatus, string $search = '')
+    {
+        return Supplier::query()
+            ->leftJoin('purchases', function ($join) use ($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus) {
+                $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                    ->whereIn('purchases.branch_id', $accessibleBranchIds)
+                    ->whereBetween('purchases.purchase_date', [$fromDate->toDateString(), $toDate->toDateString()]);
+
+                if ($branchScope['mode'] !== 'all') {
+                    $join->where('purchases.branch_id', $branchScope['branch_id']);
+                }
+
+                if ($paymentStatus !== 'all') {
+                    $join->where('purchases.payment_status', $paymentStatus);
+                }
+            })
+            ->select([
+                'suppliers.id',
+                'suppliers.name',
+                'suppliers.phone',
+                'suppliers.email',
+                'suppliers.payment_terms',
+                'suppliers.credit_limit',
+                'suppliers.balance',
+            ])
+            ->selectRaw('COUNT(purchases.id) as purchase_count')
+            ->selectRaw('COALESCE(SUM(purchases.total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(purchases.paid_amount), 0) as paid_amount')
+            ->selectRaw('COALESCE(SUM(purchases.due_amount), 0) as due_amount')
+            ->selectRaw('COALESCE(AVG(purchases.total_amount), 0) as average_purchase')
+            ->selectRaw('MAX(purchases.purchase_date) as last_purchase_date')
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('suppliers.name', 'like', "%{$search}%")
+                        ->orWhere('suppliers.phone', 'like', "%{$search}%")
+                        ->orWhere('suppliers.email', 'like', "%{$search}%");
+                });
+            })
+            ->groupBy([
+                'suppliers.id',
+                'suppliers.name',
+                'suppliers.phone',
+                'suppliers.email',
+                'suppliers.payment_terms',
+                'suppliers.credit_limit',
+                'suppliers.balance',
+            ])
+            ->havingRaw('COUNT(purchases.id) > 0');
+    }
+
+    public function purchases(Request $request)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+        [$fromDate, $toDate] = $this->parseDateRange($request);
+        $reportFilters = $this->purchaseReportFilters($request);
+        $paymentStatus = $reportFilters['payment_status'];
+        $search = $reportFilters['search'];
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $base = $this->purchaseBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus);
+
+        $summary = (clone $base)
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COUNT(DISTINCT supplier_id) as supplier_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(paid_amount), 0) as paid_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->selectRaw('COALESCE(AVG(total_amount), 0) as average_purchase')
+            ->first();
+
+        $itemSummary = $this->purchaseItemBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus)
+            ->selectRaw('COUNT(*) as line_count')
+            ->selectRaw('COALESCE(SUM(purchase_items.quantity), 0) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(purchase_items.foc_quantity, 0)), 0) as foc_quantity')
+            ->selectRaw('COALESCE(SUM(purchase_items.total_price), 0) as item_total')
+            ->first();
+
+        $statusBreakdown = (clone $base)
+            ->select('payment_status')
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->groupBy('payment_status')
+            ->orderBy('payment_status')
+            ->get();
+
+        $purchaseTrend = (clone $base)
+            ->selectRaw('DATE(purchase_date) as period')
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(paid_amount), 0) as paid_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->groupBy(DB::raw('DATE(purchase_date)'))
+            ->orderBy(DB::raw('DATE(purchase_date)'))
+            ->get();
+
+        $topSuppliers = $this->purchaseSupplierAggregateQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus)
+            ->orderByDesc('total_amount')
+            ->limit(8)
+            ->get();
+
+        $suppliers = $this->purchaseSupplierAggregateQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus, $search)
+            ->orderByDesc('total_amount')
+            ->orderBy('suppliers.name')
+            ->paginate(10)
+            ->withQueryString()
+            ->through(function ($supplier) {
+                return [
+                    'id' => $supplier->id,
+                    'name' => $supplier->name,
+                    'phone' => $supplier->phone,
+                    'email' => $supplier->email,
+                    'payment_terms' => $supplier->payment_terms,
+                    'credit_limit' => (float) $supplier->credit_limit,
+                    'balance' => (float) $supplier->balance,
+                    'purchase_count' => (int) $supplier->purchase_count,
+                    'total_amount' => (float) $supplier->total_amount,
+                    'paid_amount' => (float) $supplier->paid_amount,
+                    'due_amount' => (float) $supplier->due_amount,
+                    'average_purchase' => (float) $supplier->average_purchase,
+                    'last_purchase_date' => $supplier->last_purchase_date,
+                ];
+            });
+
+        return Inertia::render('Reports/Purchases', [
+            'branches' => $branches,
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'from_date' => $fromDate->toDateString(),
+                'to_date' => $toDate->toDateString(),
+                'payment_status' => $paymentStatus,
+                'search' => $search,
+            ],
+            'summary' => [
+                'purchase_count' => (int) ($summary->purchase_count ?? 0),
+                'supplier_count' => (int) ($summary->supplier_count ?? 0),
+                'total_amount' => (float) ($summary->total_amount ?? 0),
+                'paid_amount' => (float) ($summary->paid_amount ?? 0),
+                'due_amount' => (float) ($summary->due_amount ?? 0),
+                'average_purchase' => (float) ($summary->average_purchase ?? 0),
+                'line_count' => (int) ($itemSummary->line_count ?? 0),
+                'quantity' => (int) ($itemSummary->quantity ?? 0),
+                'foc_quantity' => (int) ($itemSummary->foc_quantity ?? 0),
+                'item_total' => (float) ($itemSummary->item_total ?? 0),
+            ],
+            'status_breakdown' => $statusBreakdown,
+            'purchase_trend' => $purchaseTrend,
+            'top_suppliers' => $topSuppliers,
+            'suppliers' => $suppliers,
+        ]);
+    }
+
+    public function purchaseSupplier(Request $request, string $locale, Supplier $supplier)
+    {
+        $user = $request->user();
+        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
+        [$fromDate, $toDate] = $this->parseDateRange($request);
+        $reportFilters = $this->purchaseReportFilters($request);
+        $paymentStatus = $reportFilters['payment_status'];
+
+        $branches = Branch::select('id', 'name')
+            ->whereIn('id', $accessibleBranchIds)
+            ->orderBy('name')
+            ->get();
+
+        $base = $this->purchaseBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus, $supplier->id);
+
+        $summary = (clone $base)
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(paid_amount), 0) as paid_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->selectRaw('COALESCE(AVG(total_amount), 0) as average_purchase')
+            ->selectRaw('MIN(purchase_date) as first_purchase_date')
+            ->selectRaw('MAX(purchase_date) as last_purchase_date')
+            ->first();
+
+        $itemSummary = $this->purchaseItemBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus, $supplier->id)
+            ->selectRaw('COUNT(*) as line_count')
+            ->selectRaw('COALESCE(SUM(purchase_items.quantity), 0) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(purchase_items.foc_quantity, 0)), 0) as foc_quantity')
+            ->selectRaw('COALESCE(SUM(purchase_items.total_price), 0) as item_total')
+            ->first();
+
+        $statusBreakdown = (clone $base)
+            ->select('payment_status')
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->groupBy('payment_status')
+            ->orderBy('payment_status')
+            ->get();
+
+        $purchaseTrend = (clone $base)
+            ->selectRaw('DATE(purchase_date) as period')
+            ->selectRaw('COUNT(*) as purchase_count')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(paid_amount), 0) as paid_amount')
+            ->selectRaw('COALESCE(SUM(due_amount), 0) as due_amount')
+            ->groupBy(DB::raw('DATE(purchase_date)'))
+            ->orderBy(DB::raw('DATE(purchase_date)'))
+            ->get();
+
+        $categorySummary = $this->purchaseItemBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus, $supplier->id)
+            ->leftJoin('products', 'purchase_items.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->selectRaw("COALESCE(categories.name, 'Uncategorized') as category_name")
+            ->selectRaw('COUNT(*) as line_count')
+            ->selectRaw('COALESCE(SUM(purchase_items.total_price), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(purchase_items.quantity + COALESCE(purchase_items.foc_quantity, 0)), 0) as received_quantity')
+            ->groupBy('category_name')
+            ->orderByDesc('total_amount')
+            ->limit(12)
+            ->get();
+
+        $productSummary = $this->purchaseItemBaseQuery($accessibleBranchIds, $branchScope, $fromDate, $toDate, $paymentStatus, $supplier->id)
+            ->leftJoin('products', 'purchase_items.product_id', '=', 'products.id')
+            ->selectRaw('products.id as product_id')
+            ->selectRaw("COALESCE(products.name, 'Unknown product') as product_name")
+            ->selectRaw('COUNT(DISTINCT purchases.id) as purchase_count')
+            ->selectRaw('COUNT(*) as line_count')
+            ->selectRaw('COALESCE(SUM(purchase_items.quantity + COALESCE(purchase_items.foc_quantity, 0)), 0) as received_quantity')
+            ->selectRaw('COALESCE(SUM(purchase_items.total_price), 0) as total_amount')
+            ->groupBy('products.id', 'products.name')
+            ->orderByDesc('total_amount')
+            ->limit(15)
+            ->get();
+
+        $paymentsBase = SupplierPayment::query()
+            ->where('supplier_id', $supplier->id)
+            ->whereIn('branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('branch_id', $branchScope['branch_id']);
+            })
+            ->whereBetween('payment_date', [$fromDate->toDateString(), $toDate->toDateString()]);
+
+        $paymentSummary = (clone $paymentsBase)
+            ->selectRaw('COUNT(*) as payment_count')
+            ->selectRaw('COALESCE(SUM(amount), 0) as payment_total')
+            ->first();
+
+        $payments = (clone $paymentsBase)
+            ->with(['branch:id,name', 'purchase:id,invoice_number', 'user:id,name'])
+            ->orderByDesc('payment_date')
+            ->limit(20)
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'payment_date' => optional($payment->payment_date)->toDateString(),
+                    'amount' => (float) $payment->amount,
+                    'payment_method' => $payment->payment_method,
+                    'reference_number' => $payment->reference_number,
+                    'branch_name' => $payment->branch?->name ?? '-',
+                    'invoice_number' => $payment->purchase?->invoice_number ?? '-',
+                    'user_name' => $payment->user?->name ?? '-',
+                ];
+            });
+
+        $purchases = (clone $base)
+            ->with(['branch:id,name', 'user:id,name'])
+            ->withCount('items')
+            ->orderByDesc('purchase_date')
+            ->orderByDesc('created_at')
+            ->paginate(12)
+            ->withQueryString()
+            ->through(function ($purchase) {
+                return [
+                    'id' => $purchase->id,
+                    'invoice_number' => $purchase->invoice_number,
+                    'purchase_date' => optional($purchase->purchase_date)->toDateString(),
+                    'branch_name' => $purchase->branch?->name ?? '-',
+                    'user_name' => $purchase->user?->name ?? '-',
+                    'payment_status' => $purchase->payment_status,
+                    'items_count' => (int) $purchase->items_count,
+                    'total_amount' => (float) $purchase->total_amount,
+                    'paid_amount' => (float) $purchase->paid_amount,
+                    'due_amount' => (float) $purchase->due_amount,
+                ];
+            });
+
+        return Inertia::render('Reports/PurchaseSupplier', [
+            'branches' => $branches,
+            'supplier' => [
+                'id' => $supplier->id,
+                'name' => $supplier->name,
+                'phone' => $supplier->phone,
+                'email' => $supplier->email,
+                'address' => $supplier->address,
+                'payment_terms' => $supplier->payment_terms,
+                'credit_limit' => (float) $supplier->credit_limit,
+                'balance' => (float) $supplier->balance,
+            ],
+            'filters' => [
+                'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
+                'from_date' => $fromDate->toDateString(),
+                'to_date' => $toDate->toDateString(),
+                'payment_status' => $paymentStatus,
+            ],
+            'summary' => [
+                'purchase_count' => (int) ($summary->purchase_count ?? 0),
+                'total_amount' => (float) ($summary->total_amount ?? 0),
+                'paid_amount' => (float) ($summary->paid_amount ?? 0),
+                'due_amount' => (float) ($summary->due_amount ?? 0),
+                'average_purchase' => (float) ($summary->average_purchase ?? 0),
+                'first_purchase_date' => $summary->first_purchase_date ?? null,
+                'last_purchase_date' => $summary->last_purchase_date ?? null,
+                'line_count' => (int) ($itemSummary->line_count ?? 0),
+                'quantity' => (int) ($itemSummary->quantity ?? 0),
+                'foc_quantity' => (int) ($itemSummary->foc_quantity ?? 0),
+                'item_total' => (float) ($itemSummary->item_total ?? 0),
+                'payment_count' => (int) ($paymentSummary->payment_count ?? 0),
+                'payment_total' => (float) ($paymentSummary->payment_total ?? 0),
+            ],
+            'status_breakdown' => $statusBreakdown,
+            'purchase_trend' => $purchaseTrend,
+            'category_summary' => $categorySummary,
+            'product_summary' => $productSummary,
+            'payments' => $payments,
+            'purchases' => $purchases,
         ]);
     }
 

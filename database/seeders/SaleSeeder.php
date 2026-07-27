@@ -57,6 +57,7 @@ class SaleSeeder extends Seeder
                     $sale = Sale::create([
                         'branch_id' => $branch->id,
                         'user_id' => $user->id,
+                        'sale_staff_id' => $user->id,
                         'customer_id' => $customer?->id,
                         'invoice_number' => 'SAL-' . strtoupper(bin2hex(random_bytes(4))),
                         'total_amount' => 0, // Will update

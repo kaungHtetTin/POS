@@ -153,7 +153,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
         <MainLayout auth={auth} header="Financials">
             <Head title="Expenses" />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
