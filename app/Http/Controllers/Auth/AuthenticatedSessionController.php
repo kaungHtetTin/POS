@@ -9,8 +9,8 @@ use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Inertia\Inertia;
-use Inertia\Response;
+use App\Support\Spa;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -19,7 +19,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('Auth/Login', [
+        return Spa::render('Auth/Login', [
             'status' => session('status'),
         ]);
     }
@@ -34,10 +34,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         ActivityLogger::log($request, 'auth.login', 'User logged in.');
 
-        // Redirect to locale-aware dashboard
-        $locale = app()->getLocale() ?: config('app.locale', 'en');
-
-        return redirect("/{$locale}/dashboard");
+        return redirect()->route('dashboard');
     }
 
     /**
@@ -45,8 +42,6 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $locale = app()->getLocale() ?: config('app.locale', 'en');
-
         ActivityLogger::log($request, 'auth.logout', 'User logged out.');
         Auth::guard('web')->logout();
 
@@ -54,6 +49,6 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect("/{$locale}");
+        return redirect()->route('login');
     }
 }

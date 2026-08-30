@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 class SupplierPaymentController extends Controller
 {
-    public function store(Request $request, string $locale, SupplierPaymentService $supplierPaymentService)
+    public function store(Request $request, SupplierPaymentService $supplierPaymentService)
     {
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import MergedTablePanel from '@/Components/MergedTablePanel';
-import { Head, useForm, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { compressImage } from '@/Utils/compressImage';
+import { Head, useForm, router, usePage } from '@/spa';
 import {
     Box,
     Paper,
@@ -113,10 +116,9 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     const processScan = (barcode) => {
         const existingProduct = products.data.find(p => p.barcode === barcode);
         if (existingProduct) {
-            handleOpen(existingProduct);
+            router.visit(route('products.edit', existingProduct.id));
         } else {
-            handleOpen();
-            setData('barcode', barcode);
+            router.visit(route('products.create', { barcode }));
         }
     };
 
@@ -182,7 +184,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         window.open(route('products.labels.print', { items: printData }), '_blank');
     };
 
-    const { data, setData, post, reset, errors, processing } = useForm({
+    const { data, setData, post, reset, errors, processing, setError, clearErrors } = useForm({
         category_id: '',
         tax_id: defaultTaxId || '',
         tax_ids: defaultTaxId ? [defaultTaxId] : [],
@@ -307,14 +309,26 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             variant="contained" 
                             size="small" 
                             startIcon={<AddIcon />}
-                            onClick={() => handleOpen()}
+                            onClick={() => router.visit(route('products.create'))}
                             sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Medicine
                         </Button>
                     }
                     filters={
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                        <ReportFilterToolbar
+                            ariaLabel="Medicine filters"
+                            fieldKinds={['search', 'select', 'select']}
+                            onSubmit={handleSearch}
+                            sx={{ mb: 0 }}
+                            actions={(
+                                <>
+                                    <Button variant="contained" size="small" type="submit" startIcon={<FilterIcon />}>Filter</Button>
+                                    <Button variant="outlined" size="small" onClick={handleClearFilters} color="inherit" startIcon={<ClearIcon />}>Clear</Button>
+                                    <CsvExportButton source={products} dataKey="products" filename="medicines.csv" />
+                                </>
+                            )}
+                        >
                             <TextField
                                 placeholder="Search by name, brand, generic, or barcode..."
                                 size="small"
@@ -351,26 +365,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                     <MenuItem value="Inactive">Inactive</MenuItem>
                                 </Select>
                             </FormControl>
-                            <Stack direction="row" spacing={1}>
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    onClick={handleSearch}
-                                    startIcon={<FilterIcon />}
-                                >
-                                    Filter
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={handleClearFilters}
-                                    color="inherit"
-                                    startIcon={<ClearIcon />}
-                                >
-                                    Clear
-                                </Button>
-                            </Stack>
-                        </Stack>
+                        </ReportFilterToolbar>
                     }
                 >
                     <TableContainer>
@@ -506,7 +501,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             </Box>
 
             {/* Add/Edit Product Dialog */}
-            <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
+            <Dialog open={false} onClose={handleClose} maxWidth="lg" fullWidth>
                 <form onSubmit={submit}>
                     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         Add New Medicine
@@ -564,7 +559,10 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                                 type="file"
                                                 hidden
                                                 accept="image/*"
-                                                onChange={(e) => setData('image', e.target.files[0])}
+                                                onChange={async (e) => {
+                                                    try { setData('image', await compressImage(e.target.files[0])); clearErrors('image'); }
+                                                    catch (error) { setError('image', error.message); }
+                                                }}
                                             />
                                         </Button>
                                         {errors.image && <Typography variant="caption" color="error">{errors.image}</Typography>}

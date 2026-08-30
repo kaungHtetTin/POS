@@ -12,7 +12,7 @@ use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class SalesController extends Controller
 {
@@ -147,7 +147,7 @@ class SalesController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('Sales/Index', [
+        return Spa::render('Sales/Index', [
             'sales' => $sales,
             'summary' => [
                 'sales_count' => (int) ($summary->sales_count ?? 0),
@@ -166,7 +166,58 @@ class SalesController extends Controller
         ]);
     }
 
-    public function void(Request $request, string $locale, Sale $sale)
+    public function show(Request $request, Sale $sale)
+    {
+        $accessibleBranchIds = $this->accessibleBranchIds($request->user());
+
+        if (!in_array($sale->branch_id, $accessibleBranchIds->toArray(), true)) {
+            abort(403);
+        }
+
+        $sale->load([
+            'branch:id,name,address,phone,email',
+            'user:id,name,email',
+            'saleStaff:id,name,email',
+            'customer:id,name,phone,email,address',
+            'cashSession:id,status,opened_at,closed_at',
+            'voidedByUser:id,name',
+            'items.product:id,name,generic_name,barcode',
+            'items.unit:id,name,short_name',
+            'items.focUnit:id,name,short_name',
+            'items.batch:id,batch_number,expiry_date',
+        ]);
+
+        $returns = ReturnEntry::query()
+            ->where('type', 'Customer')
+            ->where('reference_id', $sale->id)
+            ->with([
+                'branch:id,name',
+                'items.product:id,name',
+                'items.unit:id,name,short_name',
+            ])
+            ->latest()
+            ->get();
+
+        $costTotal = (float) $sale->items->sum('cost_total');
+        $refundTotal = (float) $returns->where('status', 'Approved')->sum('refund_amount');
+        $netRevenue = (float) $sale->grand_total - (float) $sale->tax;
+
+        return Spa::render('Sales/Show', [
+            'sale' => $sale,
+            'returns' => $returns,
+            'summary' => [
+                'items_count' => $sale->items->count(),
+                'quantity' => (float) $sale->items->sum('quantity'),
+                'cost_total' => $costTotal,
+                'net_revenue' => $netRevenue,
+                'gross_profit' => $netRevenue - $costTotal,
+                'approved_refunds' => $refundTotal,
+                'net_after_refunds' => (float) $sale->grand_total - $refundTotal,
+            ],
+        ]);
+    }
+
+    public function void(Request $request, Sale $sale)
     {
         $validated = $request->validate([
             'reason' => 'required|string|min:3|max:2000',
@@ -220,8 +271,16 @@ class SalesController extends Controller
                     ->first();
 
                 if ($batch) {
+                    $existingQuantity = (int) $batch->quantity;
+                    $newQuantity = $existingQuantity + $baseQuantity;
+                    $restoredCost = (float) $item->base_unit_cost;
+                    $restoredAverageCost = $newQuantity > 0
+                        ? (($existingQuantity * (float) $batch->purchase_price) + ($baseQuantity * $restoredCost)) / $newQuantity
+                        : $restoredCost;
+
                     $batch->update([
-                        'quantity' => (int) $batch->quantity + $baseQuantity,
+                        'quantity' => $newQuantity,
+                        'purchase_price' => $restoredAverageCost,
                     ]);
                 }
 

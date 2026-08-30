@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router } from '@/spa';
 import {
     Box,
     Button,
@@ -142,7 +144,18 @@ export default function PurchaseSupplierReport({
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>SUPPLIER PURCHASE ANALYSIS</Typography>
                     </Stack>
 
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Supplier purchase filters"
+                        fieldKinds={['wide', 'date', 'date', 'select']}
+                        onSubmit={() => applyFilters()}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon />} type="submit">Apply</Button>
+                                <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>Reset</Button>
+                                <CsvExportButton source={purchases} dataKey="purchases" filename="supplier-purchases.csv" />
+                            </>
+                        )}
+                    >
                         <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 220px' }, minWidth: 0 }}>
                             <InputLabel>Branch</InputLabel>
                             <Select value={branchId} label="Branch" onChange={(event) => setBranchId(event.target.value)}>
@@ -180,13 +193,7 @@ export default function PurchaseSupplierReport({
                                 <MenuItem value="Due">Due</MenuItem>
                             </Select>
                         </FormControl>
-                        <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={() => applyFilters()} sx={{ height: 40 }}>
-                            Apply
-                        </Button>
-                        <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters} sx={{ height: 40 }}>
-                            Reset
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(6, 1fr)' }, gap: 1.2 }}>
                         {[

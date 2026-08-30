@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
@@ -103,6 +104,8 @@ export default function BranchIndex({ auth, branches }) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             PHARMACY BRANCH DIRECTORY
                         </Typography>
+                        <Stack direction="row" spacing={1}>
+                        <CsvExportButton source={branches} filename="branches.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
@@ -112,6 +115,7 @@ export default function BranchIndex({ auth, branches }) {
                         >
                             Add New Branch
                         </Button>
+                        </Stack>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
 

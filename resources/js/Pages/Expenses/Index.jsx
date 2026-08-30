@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm, router } from '@/spa';
 import {
     Box,
     Button,
@@ -174,7 +176,18 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                         </Button>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Expense filters"
+                        fieldKinds={['search', 'wide', 'wide', 'date', 'date']}
+                        onSubmit={() => applyFilters()}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" type="submit">Filter</Button>
+                                <Button variant="outlined" size="small" onClick={clearFilters}>Clear</Button>
+                                <CsvExportButton source={expenses} dataKey="expenses" filename="expenses.csv" />
+                            </>
+                        )}
+                    >
                         <TextField
                             size="small"
                             placeholder="Search title..."
@@ -230,23 +243,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                             sx={{ flex: '1 1 160px', minWidth: { xs: '100%', sm: 160 } }}
                         />
 
-                        <Button
-                            variant="contained"
-                            size="small"
-                            onClick={applyFilters}
-                            sx={{ minWidth: 110, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Filter
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={clearFilters}
-                            sx={{ minWidth: 110, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Clear
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Divider sx={{ mb: 2 }} />
 

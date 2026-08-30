@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, useForm, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -273,7 +274,8 @@ export default function PurchaseShow({ auth, purchase }) {
                         </Paper>
                     </Box>
 
-                    <TableContainer sx={{ mt: 2.5 }}>
+                    <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2.5 }}><CsvExportButton source={purchase.items || []} filename="purchase-items.csv" /></Stack>
+                    <TableContainer sx={{ mt: 1 }}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255,255,255,0.05)' }}>
@@ -346,9 +348,7 @@ export default function PurchaseShow({ auth, purchase }) {
 
                     <Divider sx={{ my: 2.5 }} />
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5 }}>
-                        Supplier Payments
-                    </Typography>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Supplier Payments</Typography><CsvExportButton source={purchase.payments || []} filename="purchase-payments.csv" /></Stack>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>

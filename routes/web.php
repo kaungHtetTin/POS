@@ -31,7 +31,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,12 +45,12 @@ use Inertia\Inertia;
 */
 
 Route::get('/', function () {
-    return redirect()->route('dashboard', ['locale' => config('app.locale')]);
+    return redirect()->route('dashboard');
 });
 
-Route::get('/language/{lang}', [LanguageController::class, 'switch'])->name('language.switch');
+Route::post('/language', [LanguageController::class, 'switch'])->name('language.switch');
 
-// Login / Logout routes WITHOUT locale prefix (auth pages don't need locale)
+// Authentication and application routes share one locale-independent URL space.
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
@@ -60,19 +60,14 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });
 
-Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], function () {
-    
-    Route::get('/', [DashboardController::class, 'index'])
-        ->middleware(['auth', 'verified'])
-        ->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
-    Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->middleware(['auth', 'verified']);
-
-    Route::middleware('auth')->group(function () {
+Route::middleware('auth')->group(function () {
         $placeholderPage = function (string $title, string $section, string $description, array $actions = []) {
             return function () use ($title, $section, $description, $actions) {
-                return Inertia::render('Placeholder/Index', [
+                return Spa::render('Placeholder/Index', [
                     'title' => $title,
                     'section' => $section,
                     'description' => $description,
@@ -117,6 +112,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::delete('/taxes/{tax}', [TaxController::class, 'destroy'])->name('taxes.destroy')->middleware('permission:manage_inventory');
 
         Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:manage_inventory');
+        Route::get('/products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:manage_inventory');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:manage_inventory');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:manage_inventory');
         Route::post('/products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:manage_inventory');
@@ -164,6 +160,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/reports/cash-sessions', [ReportsController::class, 'cashSessions'])->name('reports.cash-sessions')->middleware('permission:view_financial_reports');
         Route::get('/finance/sale-representative', [ReportsController::class, 'saleRepresentatives'])->name('finance.sale-representative')->middleware('permission:view_financial_reports');
         Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware('permission:view_financial_reports');
+        Route::get('/sales/{sale}', [SalesController::class, 'show'])->name('sales.show')->middleware('permission:view_financial_reports');
         Route::post('/sales/{sale}/void', [SalesController::class, 'void'])->name('sales.void')->middleware('permission:view_financial_reports');
 
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('permission:process_sale');
@@ -181,18 +178,18 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/finance/amount-receivable', [FinanceController::class, 'amountReceivable'])->name('finance.amount-receivable')->middleware('permission:view_financial_reports');
         Route::post('/finance/amount-receivable/{sale}/receive', [FinanceController::class, 'receiveReceivablePayment'])->name('finance.amount-receivable.receive')->middleware('permission:view_financial_reports');
         Route::get('/finance/outstanding-balance', [FinanceController::class, 'outstandingBalance'])->name('finance.outstanding-balance')->middleware('permission:view_financial_reports');
-        Route::get('/finance/pending-payments', function (string $locale) {
-            return redirect()->route('finance.outstanding-balance', array_merge(['locale' => $locale], request()->query()));
+        Route::get('/finance/pending-payments', function () {
+            return redirect()->route('finance.outstanding-balance', request()->query());
         })->name('finance.pending-payments')->middleware('permission:view_financial_reports');
-        $financeReportRedirect = function (string $locale) {
-            return redirect()->route('reports.index', array_merge(['locale' => $locale], request()->query()));
+        $financeReportRedirect = function () {
+            return redirect()->route('reports.index', request()->query());
         };
 
         Route::get('/finance/profit-report', $financeReportRedirect)->name('finance.profit-report')->middleware('permission:view_financial_reports');
         Route::get('/finance/balance-sheet', $financeReportRedirect)->name('finance.balance-sheet')->middleware('permission:view_financial_reports');
 
-        Route::get('/sale-person/reports', function (string $locale) {
-            return redirect()->route('finance.sale-representative', array_merge(['locale' => $locale], request()->query()));
+        Route::get('/sale-person/reports', function () {
+            return redirect()->route('finance.sale-representative', request()->query());
         })->name('sale-person.reports')->middleware('permission:view_financial_reports');
         Route::get('/sale-person/bonus-calculation', $placeholderPage('Sales Person Bonus Calculation', 'Sale Person', 'Define and review bonus calculations based on sales-person performance.'))->name('sale-person.bonus-calculation')->middleware('permission:view_financial_reports');
 
@@ -214,7 +211,10 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:manage_branches');
         Route::get('/manual', [ManualController::class, 'index'])->name('manual.index');
         Route::patch('/settings/pos-behavior', [SettingsController::class, 'updatePosBehavior'])->name('settings.pos-behavior.update')->middleware('permission:manage_branches');
+        Route::patch('/settings/branch-preferences', [SettingsController::class, 'updateBranchPreferences'])->name('settings.branch-preferences.update')->middleware('permission:manage_branches');
         Route::post('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general.update')->middleware('permission:manage_branches');
+        Route::post('/settings/business-profile', [SettingsController::class, 'updateBusinessProfile'])->name('settings.business-profile.update')->middleware('permission:manage_branches');
+        Route::patch('/settings/appearance', [SettingsController::class, 'updateAppearance'])->name('settings.appearance.update')->middleware('permission:manage_branches');
         Route::patch('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update')->middleware('permission:manage_branches');
         Route::patch('/settings/localization', [SettingsController::class, 'updateLocalization'])->name('settings.localization.update')->middleware('permission:manage_branches');
         Route::patch('/settings/labels', [SettingsController::class, 'updateLabels'])->name('settings.labels.update')->middleware('permission:manage_branches');
@@ -222,5 +222,4 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|my']], functio
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index')->middleware('permission:manage_users');
 
         Route::get('/products/labels/print', [ProductController::class, 'printLabels'])->name('products.labels.print')->middleware('permission:manage_inventory');
-    });
 });

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -203,7 +205,18 @@ export default function CustomerShow({
                             <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{__('CUSTOMER SALES REPORT')}</Typography>
                         </Stack>
 
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}>
+                        <ReportFilterToolbar
+                            ariaLabel={__('Customer sales filters')}
+                            fieldKinds={['wide', 'date', 'date']}
+                            onSubmit={applyFilters}
+                            actions={(
+                                <>
+                                    <Button variant="contained" size="small" startIcon={<FilterIcon />} type="submit">{__('Apply')}</Button>
+                                    <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>{__('Reset')}</Button>
+                                    <CsvExportButton source={sales} dataKey="sales" filename="customer-sales.csv" />
+                                </>
+                            )}
+                        >
                             <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 220px' }, minWidth: 0 }}>
                                 <InputLabel>{__('Branch')}</InputLabel>
                                 <Select value={branchId} label={__('Branch')} onChange={(event) => setBranchId(event.target.value)}>
@@ -231,13 +244,7 @@ export default function CustomerShow({
                                 InputLabelProps={{ shrink: true }}
                                 sx={{ flex: { xs: '1 1 100%', sm: '0 1 170px' } }}
                             />
-                            <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={applyFilters} sx={{ height: 40 }}>
-                                {__('Apply')}
-                            </Button>
-                            <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters} sx={{ height: 40 }}>
-                                {__('Reset')}
-                            </Button>
-                        </Box>
+                        </ReportFilterToolbar>
 
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 1.2 }}>
                             {[

@@ -4,30 +4,37 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class SettingsController extends Controller
 {
     public function index()
     {
+        $branchId = request()->user()->currentBranchId();
+        abort_unless($branchId, 422, 'Select an active branch before editing settings.');
+        $branchKey = fn (string $suffix) => Setting::branchKey($branchId, $suffix);
+
         $posBehavior = [
             'default_view' => Setting::get('pos.default_view', 'table'),
             'default_payment_method' => Setting::get('pos.default_payment_method', 'Cash'),
-            'auto_print_receipt' => Setting::get('pos.auto_print_receipt', '0') === '1',
             'barcode_focus' => Setting::get('pos.barcode_focus', '1') === '1',
             'show_generic_first' => Setting::get('pos.show_generic_first', '0') === '1',
-            'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
-            'silent_print' => Setting::get('pos.silent_print', '0') === '1',
-            'silent_printer_name' => Setting::get('pos.silent_printer_name', ''),
+        ];
+
+        $branchPreferences = [
+            'receipt_width' => (int) Setting::get($branchKey('pos.receipt_width'), Setting::get('pos.receipt_width', '80')),
+            'auto_print_receipt' => Setting::get($branchKey('pos.auto_print_receipt'), Setting::get('pos.auto_print_receipt', '0')) === '1',
+            'silent_print' => Setting::get($branchKey('pos.silent_print'), Setting::get('pos.silent_print', '0')) === '1',
+            'silent_printer_name' => Setting::get($branchKey('pos.silent_printer_name'), Setting::get('pos.silent_printer_name', '')),
+            'low_stock_sound' => Setting::get($branchKey('inventory.low_stock_sound'), Setting::get('inventory.low_stock_sound', '1')) === '1',
         ];
 
         $notifications = [
             'expiry_alert_days' => (int) Setting::get('inventory.expiry_alert_days', '90'),
-            'low_stock_sound' => Setting::get('inventory.low_stock_sound', '1') === '1',
         ];
 
         $localization = [
-            // Keep selector aligned with current app-bar locale (URL locale).
+            // Keep selector aligned with the current session locale.
             'locale' => app()->getLocale(),
             'date_format' => Setting::get('app.date_format', 'Y-m-d'),
             'time_format' => Setting::get('app.time_format', 'H:i:s'),
@@ -63,8 +70,11 @@ class SettingsController extends Controller
             'symbology' => Setting::get('label.symbology', 'CODE_128'),
         ];
 
-        return Inertia::render('Settings/Index', [
+        return Spa::render('Settings/Index', [
             'pos_behavior' => $posBehavior,
+            'branch_preferences' => $branchPreferences,
+            'active_branch' => request()->user()->activeBranch()->select('id', 'name')->first()
+                ?? request()->user()->branch()->select('id', 'name')->first(),
             'notifications' => $notifications,
             'localization' => $localization,
             'invoice' => $invoice,
@@ -113,7 +123,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'pharmacy_name' => 'required|string|max:255',
-            'logo' => 'nullable|image|max:2048',
+            'logo' => 'nullable|image|max:250',
             'default_tax_id' => 'nullable|exists:taxes,id',
             'receipt_header' => 'nullable|string|max:1000',
             'receipt_footer' => 'nullable|string|max:1000',
@@ -142,35 +152,48 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'default_view' => 'required|in:table,grid',
             'default_payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
-            'auto_print_receipt' => 'required|boolean',
             'barcode_focus' => 'required|boolean',
             'show_generic_first' => 'required|boolean',
-            'receipt_width' => 'required|in:58,80',
-            'silent_print' => 'required|boolean',
-            'silent_printer_name' => 'nullable|string|max:255',
         ]);
 
         Setting::set('pos.default_view', $validated['default_view']);
         Setting::set('pos.default_payment_method', $validated['default_payment_method']);
-        Setting::set('pos.auto_print_receipt', $validated['auto_print_receipt'] ? '1' : '0');
         Setting::set('pos.barcode_focus', $validated['barcode_focus'] ? '1' : '0');
         Setting::set('pos.show_generic_first', $validated['show_generic_first'] ? '1' : '0');
-        Setting::set('pos.receipt_width', (string) $validated['receipt_width']);
-        Setting::set('pos.silent_print', $validated['silent_print'] ? '1' : '0');
-        Setting::set('pos.silent_printer_name', trim((string) ($validated['silent_printer_name'] ?? '')));
 
         return redirect()->back()->with('success', 'POS behavior settings updated successfully.');
+    }
+
+    public function updateBranchPreferences(Request $request)
+    {
+        $validated = $request->validate([
+            'auto_print_receipt' => 'required|boolean',
+            'receipt_width' => 'required|in:58,80',
+            'silent_print' => 'required|boolean',
+            'silent_printer_name' => 'nullable|string|max:255',
+            'low_stock_sound' => 'required|boolean',
+        ]);
+
+        $branchId = $request->user()->currentBranchId();
+        abort_unless($branchId, 422, 'Select an active branch before editing settings.');
+        $key = fn (string $suffix) => Setting::branchKey($branchId, $suffix);
+
+        Setting::set($key('pos.auto_print_receipt'), $validated['auto_print_receipt'] ? '1' : '0');
+        Setting::set($key('pos.receipt_width'), (string) $validated['receipt_width']);
+        Setting::set($key('pos.silent_print'), $validated['silent_print'] ? '1' : '0');
+        Setting::set($key('pos.silent_printer_name'), trim((string) ($validated['silent_printer_name'] ?? '')));
+        Setting::set($key('inventory.low_stock_sound'), $validated['low_stock_sound'] ? '1' : '0');
+
+        return redirect()->back()->with('success', 'Branch device and notification settings updated successfully.');
     }
 
     public function updateNotifications(Request $request)
     {
         $validated = $request->validate([
             'expiry_alert_days' => 'required|integer|min:1|max:365',
-            'low_stock_sound' => 'required|boolean',
         ]);
 
         Setting::set('inventory.expiry_alert_days', (string) $validated['expiry_alert_days']);
-        Setting::set('inventory.low_stock_sound', $validated['low_stock_sound'] ? '1' : '0');
 
         return redirect()->back()->with('success', 'Notification settings updated successfully.');
     }
@@ -181,7 +204,7 @@ class SettingsController extends Controller
             'expiry_alert_days' => 'required|integer|min:1|max:365',
             'low_stock_sound' => 'required|boolean',
             'pharmacy_name' => 'required|string|max:255',
-            'logo' => 'nullable|image|max:2048',
+            'logo' => 'nullable|image|max:250',
             'theme_primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
@@ -198,6 +221,32 @@ class SettingsController extends Controller
         return redirect()->back()->with('success', 'General settings updated successfully.');
     }
 
+    public function updateBusinessProfile(Request $request)
+    {
+        $validated = $request->validate([
+            'pharmacy_name' => 'required|string|max:255',
+            'logo' => 'nullable|image|max:250',
+        ]);
+
+        Setting::set('invoice.pharmacy_name', $validated['pharmacy_name']);
+        if ($request->hasFile('logo')) {
+            Setting::set('invoice.logo_path', $request->file('logo')->store('settings', 'public'));
+        }
+
+        return redirect()->back()->with('success', 'Business profile updated successfully.');
+    }
+
+    public function updateAppearance(Request $request)
+    {
+        $validated = $request->validate([
+            'theme_primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ]);
+
+        Setting::set('app.theme_primary_color', strtoupper($validated['theme_primary_color']));
+
+        return redirect()->back()->with('success', 'Appearance settings updated successfully.');
+    }
+
     public function updateLocalization(Request $request)
     {
         $validated = $request->validate([
@@ -212,6 +261,7 @@ class SettingsController extends Controller
         ]);
 
         Setting::set('app.locale', $validated['locale']);
+        $request->session()->put('locale', $validated['locale']);
         Setting::set('app.date_format', $validated['date_format']);
         Setting::set('app.time_format', $validated['time_format']);
         Setting::set('app.timezone', $validated['timezone']);
@@ -221,7 +271,7 @@ class SettingsController extends Controller
         Setting::set('app.week_start', (string) $validated['week_start']);
 
         return redirect()
-            ->route('settings.index', ['locale' => $validated['locale']])
+            ->route('settings.index')
             ->with('success', 'Localization settings updated successfully.');
     }
 }

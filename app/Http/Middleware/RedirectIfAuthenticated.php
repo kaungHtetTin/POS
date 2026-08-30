@@ -23,9 +23,7 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                // Redirect to locale-aware dashboard
-                $locale = app()->getLocale() ?: config('app.locale', 'en');
-                return redirect("/{$locale}/dashboard");
+                return redirect()->route('dashboard');
             }
         }
 

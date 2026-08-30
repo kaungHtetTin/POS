@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import AuthSplitLayout from '@/Layouts/AuthSplitLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/spa';
 import { Box, Typography, TextField, Button, Checkbox as MuiCheckbox, FormControlLabel, Alert, Stack } from '@mui/material';
 
 export default function Login({ status }) {
@@ -23,8 +23,7 @@ export default function Login({ status }) {
     const submit = (e) => {
         e.preventDefault();
 
-        // The login route is now locale-aware (/en/login or /my/login).
-        // Inertia + Ziggy will automatically use the current locale from the rendered page.
+        // Language is session state; authentication URLs never include a locale.
         post(route('login'));
     };
 

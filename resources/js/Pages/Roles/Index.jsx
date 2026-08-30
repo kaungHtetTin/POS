@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
@@ -115,6 +116,8 @@ export default function RolesIndex({ auth, roles, permissions }) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             AVAILABLE SYSTEM ROLES
                         </Typography>
+                        <Stack direction="row" spacing={1}>
+                        <CsvExportButton source={roles} filename="roles.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
@@ -124,6 +127,7 @@ export default function RolesIndex({ auth, roles, permissions }) {
                         >
                             Add New Role
                         </Button>
+                        </Stack>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
 

@@ -9,7 +9,7 @@ use App\Models\InventoryBatch;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class InventoryAdjustmentController extends Controller
 {
@@ -23,7 +23,7 @@ class InventoryAdjustmentController extends Controller
             });
         }
 
-        return Inertia::render('Inventory/Adjustments', [
+        return Spa::render('Inventory/Adjustments', [
             'adjustments' => $query->latest()->paginate(15)->withQueryString(),
             'products' => Product::select('id', 'name')->where('status', 'Active')->orderBy('name')->get(),
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
@@ -72,7 +72,7 @@ class InventoryAdjustmentController extends Controller
         return redirect()->back()->with('success', 'Inventory adjustment recorded successfully.');
     }
 
-    public function getBatches(string $locale, string $product, string $branch)
+    public function getBatches(string $product, string $branch)
     {
         $batches = InventoryBatch::where('product_id', $product)
             ->where('branch_id', $branch)

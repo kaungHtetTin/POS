@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { compressImage } from '@/Utils/compressImage';
+import { Head, router, useForm, usePage } from '@/spa';
 import {
     Box,
     Paper,
@@ -52,7 +55,7 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
     const [search, setSearch] = useState(filters.search || '');
     const staffRows = staff?.data || staff || [];
 
-    const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
+    const { data, setData, post, patch, delete: destroy, reset, errors, processing, setError, clearErrors } = useForm({
         name: '',
         email: '',
         phone: '',
@@ -116,7 +119,7 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
     const submit = (e) => {
         e.preventDefault();
         if (editMode) {
-            // Inertia patch doesn't support multipart/form-data directly with files easily in some versions, 
+            // Laravel parses multipart file updates through POST method spoofing.
             // but we can use post with _method: 'PATCH'
             post(route('staff.update', editingStaff.id), {
                 forceFormData: true,
@@ -151,40 +154,26 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             {__('SYSTEM STAFF DIRECTORY')}
                         </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <TextField
-                                size="small"
-                                placeholder={__('Search staff...')}
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                onKeyDown={(event) => event.key === 'Enter' && applySearch()}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ minWidth: { sm: 240 } }}
-                            />
-                            <Button variant="outlined" size="small" onClick={() => applySearch()}>
-                                {__('Search')}
-                            </Button>
-                            <Button
-                                variant="contained"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => handleOpen()}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                {__('Add New Staff')}
-                            </Button>
-                        </Stack>
+                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>{__('Add New Staff')}</Button>
                     </Stack>
+                    <ReportFilterToolbar
+                        ariaLabel={__('Staff filters')}
+                        fieldKinds={['search']}
+                        onSubmit={() => applySearch()}
+                        actions={<><Button variant="outlined" size="small" type="submit">{__('Search')}</Button><CsvExportButton source={staff} dataKey="staff" filename="staff.csv" /></>}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder={__('Search staff...')}
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
+                        />
+                    </ReportFilterToolbar>
                     <Divider sx={{ mb: 2 }} />
 
                     <TableContainer>
@@ -309,7 +298,10 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                                         type="file"
                                         hidden
                                         accept="image/*"
-                                        onChange={(e) => setData('image', e.target.files[0])}
+                                        onChange={async (e) => {
+                                            try { setData('image', await compressImage(e.target.files[0])); clearErrors('image'); }
+                                            catch (error) { setError('image', error.message); }
+                                        }}
                                     />
                                 </Button>
                                 {errors.image && (

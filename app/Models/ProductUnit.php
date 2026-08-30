@@ -17,6 +17,7 @@ class ProductUnit extends Model
         'selling_price',
         'wholesale_price',
         'is_base_unit',
+        'is_default_selling_unit',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class ProductUnit extends Model
         'selling_price' => 'decimal:2',
         'wholesale_price' => 'decimal:2',
         'is_base_unit' => 'boolean',
+        'is_default_selling_unit' => 'boolean',
     ];
 
     public function product()

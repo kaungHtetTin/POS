@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import MergedTablePanel from '@/Components/MergedTablePanel';
-import { Head, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router } from '@/spa';
 import {
     Box,
     Stack,
@@ -54,14 +56,6 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
 
     const handleSearch = () => applyFilters();
 
-    const handleFilterChange = (field, value) => {
-        if (field === 'branch_id') setBranchId(value);
-        if (field === 'category_id') setCategoryId(value);
-        if (field === 'product_status') setProductStatus(value);
-        if (field === 'stock_status') setStockStatus(value);
-        applyFilters({ [field]: value });
-    };
-
     const handleReset = () => {
         setSearch('');
         setBranchId('');
@@ -90,14 +84,20 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                             {inventory?.total ?? inventoryRows.length} records
                         </Typography>
                     }
-                    actions={
-                        <IconButton size="small" onClick={handleReset} title="Reset Filters">
-                            <ResetIcon fontSize="small" />
-                        </IconButton>
-                    }
                     filters={
-                        <Stack spacing={2}>
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                        <ReportFilterToolbar
+                            ariaLabel="Inventory filters"
+                            fieldKinds={['search', 'wide', 'wide', 'select', 'select']}
+                            onSubmit={handleSearch}
+                            sx={{ mb: 0 }}
+                            actions={(
+                                <>
+                                    <Button variant="contained" type="submit" startIcon={<FilterIcon />}>Apply</Button>
+                                    <Button variant="outlined" onClick={handleReset} startIcon={<ResetIcon />}>Reset</Button>
+                                    <CsvExportButton source={inventory} dataKey="inventory" filename="inventory.csv" />
+                                </>
+                            )}
+                        >
                             <TextField
                                 fullWidth
                                 size="small"
@@ -113,18 +113,12 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                     ),
                                 }}
                             />
-                            <Button variant="contained" onClick={handleSearch} startIcon={<FilterIcon />} sx={{ minWidth: 120 }}>
-                                Search
-                            </Button>
-                        </Stack>
-
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                             <TextField
                                 select
                                 size="small"
                                 label="Branch"
                                 value={branchId}
-                                onChange={(e) => handleFilterChange('branch_id', e.target.value)}
+                                onChange={(e) => setBranchId(e.target.value)}
                                 sx={{ minWidth: 180, flex: 1 }}
                                 InputProps={{
                                     startAdornment: (
@@ -145,7 +139,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 size="small"
                                 label="Category"
                                 value={categoryId}
-                                onChange={(e) => handleFilterChange('category_id', e.target.value)}
+                                onChange={(e) => setCategoryId(e.target.value)}
                                 sx={{ minWidth: 180, flex: 1 }}
                                 InputProps={{
                                     startAdornment: (
@@ -166,7 +160,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 size="small"
                                 label="Product Status"
                                 value={productStatus}
-                                onChange={(e) => handleFilterChange('product_status', e.target.value)}
+                                onChange={(e) => setProductStatus(e.target.value)}
                                 sx={{ minWidth: 160, flex: 1 }}
                                 InputProps={{
                                     startAdornment: (
@@ -186,7 +180,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 size="small"
                                 label="Stock Level"
                                 value={stockStatus}
-                                onChange={(e) => handleFilterChange('stock_status', e.target.value)}
+                                onChange={(e) => setStockStatus(e.target.value)}
                                 sx={{ minWidth: 160, flex: 1 }}
                             >
                                 <MenuItem value="">Any Stock Level</MenuItem>
@@ -194,8 +188,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                 <MenuItem value="Low Stock">Low Stock</MenuItem>
                                 <MenuItem value="Out of Stock">Out of Stock</MenuItem>
                             </TextField>
-                        </Stack>
-                        </Stack>
+                        </ReportFilterToolbar>
                     }
                 >
                     <TableContainer>
@@ -250,7 +243,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                         </TableCell>
                                         <TableCell align="center">
                                             <Tooltip title="View batch details">
-                                                <IconButton size="small" component="a" href={detailUrl(item.id)}>
+                                                <IconButton size="small" component={Link} href={detailUrl(item.id)}>
                                                     <ViewIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>

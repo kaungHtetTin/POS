@@ -1,6 +1,6 @@
 import React from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@/spa';
 import {
     Box,
     Typography,

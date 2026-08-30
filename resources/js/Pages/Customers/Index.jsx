@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, useForm, router, usePage } from '@/spa';
 import {
     Box,
     Paper,
@@ -117,38 +119,28 @@ export default function CustomerIndex({ auth, customers, filters }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             {__('CUSTOMER DIRECTORY')}
                         </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <TextField
-                                size="small"
-                                placeholder={__('Search name, phone, or email...')}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ minWidth: { sm: 260 } }}
-                            />
-                            <Button variant="outlined" size="small" onClick={handleSearch}>{__('Search')}</Button>
-                            <Button
-                                variant="contained"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => handleOpen()}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                {__('Add Customer')}
-                            </Button>
-                        </Stack>
+                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+                            {__('Add Customer')}
+                        </Button>
                     </Stack>
+                    <ReportFilterToolbar
+                        ariaLabel={__('Customer filters')}
+                        fieldKinds={['search']}
+                        onSubmit={() => handleSearch()}
+                        actions={<><Button variant="outlined" size="small" type="submit">{__('Search')}</Button><CsvExportButton source={customers} dataKey="customers" filename="customers.csv" /></>}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder={__('Search name, phone, or email...')}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
+                        />
+                    </ReportFilterToolbar>
                     <Divider sx={{ mb: 2 }} />
 
                     <TableContainer>
@@ -185,7 +177,13 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                             </Stack>
                                         </TableCell>
                                         <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
-                                            <IconButton
+                                            <Stack
+                                                direction="row"
+                                                spacing={0}
+                                                justifyContent="flex-end"
+                                                sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}
+                                            >
+                                                <IconButton
                                                 component={Link}
                                                 href={route('customers.show', customer.id)}
                                                 size="small"
@@ -194,21 +192,22 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                             >
                                                 <ViewIcon fontSize="inherit" />
                                             </IconButton>
-                                            <IconButton
+                                                <IconButton
                                                 size="small"
                                                 color="primary"
                                                 onClick={() => handleOpen(customer)}
                                             >
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
-                                            <IconButton
+                                                <IconButton
                                                 size="small"
                                                 color="error"
                                                 onClick={() => handleDelete(customer)}
                                                 disabled={(customer.sales_count ?? customer.purchase_history_count ?? 0) > 0}
                                             >
                                                 <DeleteIcon fontSize="inherit" />
-                                            </IconButton>
+                                                </IconButton>
+                                            </Stack>
                                         </TableCell>
                                     </TableRow>
                                 ))}

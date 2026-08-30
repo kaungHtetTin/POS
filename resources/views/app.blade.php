@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ config('app.name', 'Laravel') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -16,18 +16,11 @@
             window.laravel_base = "{{ url('/') }}";
         </script>
         @routes
-        <script>
-            if (typeof Ziggy !== 'undefined') {
-                Ziggy.defaults = Object.assign({}, Ziggy.defaults || {}, {
-                    locale: "{{ app()->getLocale() }}",
-                });
-            }
-        </script>
         @viteReactRefresh
-        @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
-        @inertiaHead
+        @vite('resources/js/app.jsx')
     </head>
     <body class="font-sans antialiased">
-        @inertia
+        <div id="app"></div>
+        <script id="spa-page" type="application/json">{!! json_encode($page, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
     </body>
 </html>

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, router } from '@/spa';
 import {
     Box,
     Button,
@@ -74,7 +76,18 @@ export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Activity log filters"
+                        fieldKinds={['date', 'date', 'wide', 'select', 'search']}
+                        onSubmit={applyFilters}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon fontSize="small" />} type="submit">Apply</Button>
+                                <Button variant="outlined" size="small" onClick={resetFilters}>Reset</Button>
+                                <CsvExportButton source={logs} dataKey="logs" filename="activity-logs.csv" />
+                            </>
+                        )}
+                    >
                         <TextField
                             size="small"
                             type="date"
@@ -126,24 +139,7 @@ export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs
                             sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 220 } }}
                         />
 
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<FilterIcon fontSize="small" />}
-                            onClick={applyFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Apply
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={resetFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Reset
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <TableContainer sx={{ maxHeight: '68vh' }}>
                         <Table size="small" stickyHeader>

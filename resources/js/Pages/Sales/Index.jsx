@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -34,6 +36,7 @@ import {
     Receipt as SalesIcon,
     FilterAlt as FilterIcon,
     Print as PrintIcon,
+    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function SalesIndex({ auth, sales, summary = {}, branches, salesStaff = [], filters }) {
@@ -256,7 +259,18 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Sale history filters"
+                        fieldKinds={['search', 'wide', 'wide', 'select', 'date', 'date']}
+                        onSubmit={() => applyFilters()}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon fontSize="small" />} type="submit">Apply</Button>
+                                <Button variant="outlined" size="small" onClick={clearFilters}>Reset</Button>
+                                <CsvExportButton source={sales} dataKey="sales" filename="sales.csv" />
+                            </>
+                        )}
+                    >
                         <TextField
                             size="small"
                             placeholder="Search invoice or customer..."
@@ -328,24 +342,7 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                             sx={{ flex: '1 1 170px', minWidth: { xs: '100%', sm: 170 } }}
                         />
 
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<FilterIcon fontSize="small" />}
-                            onClick={applyFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Apply
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={clearFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Reset
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Divider sx={{ mb: 2 }} />
 
@@ -441,7 +438,18 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                                             </Typography>
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+                                            <Stack direction="row" spacing={0} justifyContent="flex-end" sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}>
+                                                <Tooltip title="View sale details">
+                                                    <IconButton
+                                                        component={Link}
+                                                        href={route('sales.show', { sale: s.id })}
+                                                        size="small"
+                                                        color="info"
+                                                        aria-label={`View sale ${s.invoice_number}`}
+                                                    >
+                                                        <ViewIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </Tooltip>
                                                 <Tooltip title="Print invoice">
                                                     <IconButton
                                                         size="small"

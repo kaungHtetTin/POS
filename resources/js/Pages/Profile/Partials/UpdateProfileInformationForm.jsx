@@ -1,4 +1,4 @@
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@/spa';
 import { Transition } from '@headlessui/react';
 import { 
     TextField, 
@@ -14,29 +14,38 @@ import {
 } from '@mui/material';
 import { PhotoCamera as PhotoCameraIcon } from '@mui/icons-material';
 import { useRef, useState } from 'react';
+import { compressImage } from '@/Utils/compressImage';
 
 export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
     const user = usePage().props.auth.user;
     const fileInputRef = useRef();
     const [imagePreview, setImagePreview] = useState(user.image_path ? `/storage/${user.image_path}` : null);
 
-    const { data, setData, post, errors, processing, recentlySuccessful } = useForm({
+    const { data, setData, post, errors, processing, recentlySuccessful, setError, clearErrors } = useForm({
         name: user.name,
         email: user.email,
         phone: user.phone || '',
         image: null,
-        _method: 'PATCH', // Required for file uploads with multipart/form-data in Laravel via Inertia
+        _method: 'PATCH', // Required for multipart file updates in Laravel.
     });
 
-    const handleImageChange = (e) => {
+    const handleImageChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            setData('image', file);
+            let compressed;
+            try {
+                compressed = await compressImage(file);
+                setData('image', compressed);
+                clearErrors('image');
+            } catch (error) {
+                setError('image', error.message);
+                return;
+            }
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImagePreview(reader.result);
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(compressed);
         }
     };
 

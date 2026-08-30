@@ -15,7 +15,7 @@ class Authenticate extends Middleware
     protected function redirectTo($request)
     {
         if (! $request->expectsJson()) {
-            // Login page is now outside the locale group
+            // Authentication uses the same locale-independent route space.
             return '/login';
         }
     }

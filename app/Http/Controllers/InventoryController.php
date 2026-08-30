@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Models\InventoryBatch;
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class InventoryController extends Controller
 {
@@ -94,7 +94,7 @@ class InventoryController extends Controller
             ];
         });
 
-        return Inertia::render('Inventory/Index', [
+        return Spa::render('Inventory/Index', [
             'inventory' => $products,
             'branches' => Branch::select('id', 'name')->get(),
             'categories' => Category::select('id', 'name')->orderBy('name')->get(),
@@ -102,7 +102,7 @@ class InventoryController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $locale, Product $product)
+    public function show(Request $request, Product $product)
     {
         $validated = $request->validate([
             'branch_id' => ['nullable', 'exists:branches,id'],
@@ -151,7 +151,7 @@ class InventoryController extends Controller
 
         $batchQuantity = (int) $batches->sum('quantity');
 
-        return Inertia::render('Inventory/Show', [
+        return Spa::render('Inventory/Show', [
             'product' => [
                 'id' => $product->id,
                 'name' => $product->name,

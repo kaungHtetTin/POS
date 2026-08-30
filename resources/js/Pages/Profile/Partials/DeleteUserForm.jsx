@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm } from '@/spa';
 import { 
     Button, 
     Typography, 

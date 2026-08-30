@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, router } from '@/spa';
 import {
     Box,
     Button,
@@ -71,7 +73,18 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Cash session report filters"
+                        fieldKinds={['wide', 'date', 'date', 'select']}
+                        onSubmit={applyFilters}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon fontSize="small" />} type="submit">Apply</Button>
+                                <Button variant="outlined" size="small" onClick={resetFilters}>Reset</Button>
+                                <CsvExportButton source={sessions} dataKey="sessions" filename="cash-sessions.csv" />
+                            </>
+                        )}
+                    >
                         <FormControl size="small" sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 220 } }}>
                             <InputLabel>Branch</InputLabel>
                             <Select value={branchId} label="Branch" onChange={(e) => setBranchId(e.target.value)}>
@@ -113,24 +126,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                             </Select>
                         </FormControl>
 
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<FilterIcon fontSize="small" />}
-                            onClick={applyFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Apply
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={resetFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            Reset
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
                         <Chip size="small" variant="outlined" label={`Sessions: ${summary.sessions_count || 0}`} />

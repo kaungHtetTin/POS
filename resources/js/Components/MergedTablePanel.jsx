@@ -24,7 +24,7 @@ export default function MergedTablePanel({
             sx={{
                 border: 1,
                 borderColor: 'divider',
-                borderRadius: 2,
+                borderRadius: 1.5,
                 overflow: 'hidden',
                 ...sx,
             }}

@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Unit;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class UnitController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Units/Index', [
+        return Spa::render('Units/Index', [
             'units' => Unit::withCount('product_units')->get(),
         ]);
     }
@@ -27,7 +27,7 @@ class UnitController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, string $locale, Unit $unit)
+    public function update(Request $request, Unit $unit)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:units,name,' . $unit->id,
@@ -39,7 +39,7 @@ class UnitController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(string $locale, Unit $unit)
+    public function destroy(Unit $unit)
     {
         if ($unit->product_units()->exists()) {
             abort(403, 'Unit cannot be deleted because it is associated with products.');

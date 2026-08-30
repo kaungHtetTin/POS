@@ -10,7 +10,7 @@ use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class CustomerController extends Controller
 {
@@ -95,13 +95,13 @@ class CustomerController extends Controller
             });
         }
 
-        return Inertia::render('Customers/Index', [
+        return Spa::render('Customers/Index', [
             'customers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
     }
 
-    public function show(Request $request, string $locale, Customer $customer)
+    public function show(Request $request, Customer $customer)
     {
         $user = $request->user();
         $accessibleBranchIds = $this->accessibleBranchIds($user);
@@ -217,7 +217,7 @@ class CustomerController extends Controller
                 ];
             });
 
-        return Inertia::render('Customers/Show', [
+        return Spa::render('Customers/Show', [
             'customer' => [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -264,7 +264,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer created successfully.');
     }
 
-    public function update(Request $request, string $locale, Customer $customer)
+    public function update(Request $request, Customer $customer)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -278,7 +278,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Customer updated successfully.');
     }
 
-    public function destroy(string $locale, Customer $customer)
+    public function destroy(Customer $customer)
     {
         if ($customer->sales()->exists()) {
             return redirect()->back()->with('error', 'Customer cannot be deleted because they have related sales.');

@@ -6,7 +6,7 @@ use App\Models\Branch;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class ExpenseController extends Controller
 {
@@ -71,7 +71,7 @@ class ExpenseController extends Controller
             ->selectRaw('COALESCE(SUM(amount), 0) as total_amount')
             ->first();
 
-        return Inertia::render('Expenses/Index', [
+        return Spa::render('Expenses/Index', [
             'expenses' => $query->latest('expense_date')->latest()->paginate(15)->withQueryString(),
             'branches' => $branches,
             'categories' => $categories,
@@ -103,7 +103,7 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Expense created successfully.');
     }
 
-    public function update(Request $request, string $locale, Expense $expense)
+    public function update(Request $request, Expense $expense)
     {
         $validated = $request->validate([
             'branch_id' => 'required|exists:branches,id',
@@ -123,7 +123,7 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Expense updated successfully.');
     }
 
-    public function destroy(string $locale, Expense $expense)
+    public function destroy(Expense $expense)
     {
         if (!$this->canAccessAllBranches(request()->user()) && !request()->user()->canAccessBranch($expense->branch_id)) {
             abort(403);

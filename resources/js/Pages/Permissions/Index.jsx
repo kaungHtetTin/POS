@@ -1,6 +1,7 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head } from '@/spa';
 import {
     Box,
     Paper,
@@ -47,6 +48,7 @@ export default function PermissionsIndex(props) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             SYSTEM PERMISSIONS (READ-ONLY)
                         </Typography>
+                        <CsvExportButton source={permissions} filename="permissions.csv" />
                     </Box>
                     <Divider sx={{ mb: 2 }} />
 

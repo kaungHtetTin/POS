@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PosLayout from '@/Layouts/PosLayout';
-import { usePage, Head, useForm, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import { usePage, Head, useForm, router } from '@/spa';
 import {
     Alert,
     Autocomplete,
@@ -435,7 +436,7 @@ export default function PosIndex({
         }
 
         const units = product?.units || [];
-        const preferredUnit = units.find((u) => u.is_base_unit) || units[0];
+        const preferredUnit = units.find((u) => u.is_default_selling_unit) || units.find((u) => u.is_base_unit) || units[0];
 
         if (!preferredUnit) {
             setScanError(__('Selected product has no units configured.'));
@@ -1019,7 +1020,16 @@ export default function PosIndex({
                             </ToggleButtonGroup>
                         </Stack>
 
-                        <Stack direction="row" spacing={1}>
+                        <ReportFilterToolbar
+                            ariaLabel={__('Product filters')}
+                            fieldKinds={['search']}
+                            sx={{ mb: 1.25 }}
+                            actions={(
+                                <Button variant="contained" size="small" type="button" onClick={() => fetchSearch()} disabled={searchLoading || catalogLoading}>
+                                    {__('Search')}
+                                </Button>
+                            )}
+                        >
                             <TextField
                                 fullWidth
                                 size="small"
@@ -1041,16 +1051,7 @@ export default function PosIndex({
                                     ),
                                 }}
                             />
-                            <Button
-                                variant="contained"
-                                size="small"
-                                onClick={() => fetchSearch()}
-                                disabled={searchLoading || catalogLoading}
-                                sx={{ minWidth: 110 }}
-                            >
-                                {__('Search')}
-                            </Button>
-                        </Stack>
+                        </ReportFilterToolbar>
 
                         <Stack
                             direction="row"
@@ -1323,7 +1324,7 @@ export default function PosIndex({
                                 {searchResults.map((p) => {
                                     const outOfStock = isOutOfStock(p);
                                     const units = p.units || [];
-                                    const preferred = units.find((u) => u.is_base_unit) || units[0];
+                                    const preferred = units.find((u) => u.is_default_selling_unit) || units.find((u) => u.is_base_unit) || units[0];
                                     const price = resolveUnitPrice(preferred, salePriceType);
                                     const discountPercentage = Number(p.discount_percentage || 0);
                                     const discountedPrice = Math.max(price - (price * (discountPercentage / 100)), 0);

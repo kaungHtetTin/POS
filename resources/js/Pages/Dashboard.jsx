@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import { Head } from '@/spa';
 import { 
     Grid, 
     Paper, 
@@ -36,10 +38,11 @@ import {
     ArrowForward as ViewIcon,
     AssignmentReturn as ReturnIcon
 } from '@mui/icons-material';
-import { router, Link } from '@inertiajs/react';
+import { router, Link } from '@/spa';
 
 export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, branches, filters }) {
-    
+    const [branchId, setBranchId] = useState(filters.branch_id || '');
+
     const handleBranchFilter = (branchId) => {
         router.get(route('dashboard'), { branch_id: branchId }, { preserveState: true, preserveScroll: true });
     };
@@ -78,22 +81,19 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
             <Box sx={{ flexGrow: 1 }}>
                 {/* Branch Filter */}
                 {branches && branches.length > 1 && (
-                    <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Filter by Branch:</Typography>
-                        <TextField
-                            select
-                            size="small"
-                            value={filters.branch_id || ''}
-                            onChange={(e) => handleBranchFilter(e.target.value)}
-                            sx={{ minWidth: 200 }}
+                    <Paper sx={{ p: 1.5, mb: 2 }}>
+                        <ReportFilterToolbar
+                            ariaLabel="Dashboard filters"
+                            fieldKinds={['wide']}
+                            onSubmit={() => handleBranchFilter(branchId)}
+                            sx={{ mb: 0 }}
+                            actions={<Button variant="contained" size="small" type="submit">Apply</Button>}
                         >
-                            <MenuItem value="">All Accessible Branches</MenuItem>
-                            {branches.map((branch) => (
-                                <MenuItem key={branch.id} value={branch.id}>
-                                    {branch.name}
-                                </MenuItem>
-                            ))}
-                        </TextField>
+                            <TextField select size="small" label="Branch" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                                <MenuItem value="">All Accessible Branches</MenuItem>
+                                {branches.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}
+                            </TextField>
+                        </ReportFilterToolbar>
                     </Paper>
                 )}
 
@@ -142,7 +142,7 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                                     <LowStockIcon color="warning" fontSize="small" />
                                     LOW STOCK ALERTS
                                 </Typography>
-                                <Chip label={`${lowStockAlerts.length} Items`} size="small" color="warning" variant="outlined" />
+                                <Stack direction="row" spacing={1} alignItems="center"><Chip label={`${lowStockAlerts.length} Items`} size="small" color="warning" variant="outlined" /><CsvExportButton source={lowStockAlerts} filename="low-stock-alerts.csv" /></Stack>
                             </Stack>
                             <Divider sx={{ mb: 2 }} />
                             
@@ -196,7 +196,7 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                                     <ExpiryAlertIcon color="error" fontSize="small" />
                                     NEAR EXPIRY ALERTS
                                 </Typography>
-                                <Chip label={`${expiryAlerts.length} Batches`} size="small" color="error" variant="outlined" />
+                                <Stack direction="row" spacing={1} alignItems="center"><Chip label={`${expiryAlerts.length} Batches`} size="small" color="error" variant="outlined" /><CsvExportButton source={expiryAlerts} filename="expiry-alerts.csv" /></Stack>
                             </Stack>
                             <Divider sx={{ mb: 2 }} />
 

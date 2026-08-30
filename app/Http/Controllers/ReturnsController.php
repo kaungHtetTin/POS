@@ -13,7 +13,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class ReturnsController extends Controller
 {
@@ -89,7 +89,7 @@ class ReturnsController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Returns/Index', [
+        return Spa::render('Returns/Index', [
             'returns' => $returns,
             'branches' => $branches,
             'filters' => $request->only(['type', 'status', 'branch_id']),
@@ -121,6 +121,13 @@ class ReturnsController extends Controller
             return response()->json(null, 404);
         }
 
+        $returnedBaseQuantities = ReturnItem::query()
+            ->whereIn('source_sale_item_id', $sale->items->pluck('id'))
+            ->whereHas('returnEntry', fn ($query) => $query->where('status', '!=', 'Rejected'))
+            ->selectRaw('source_sale_item_id, COALESCE(SUM(base_quantity), 0) as returned_base_quantity')
+            ->groupBy('source_sale_item_id')
+            ->pluck('returned_base_quantity', 'source_sale_item_id');
+
         return response()->json([
             'id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
@@ -128,7 +135,13 @@ class ReturnsController extends Controller
             'branch_name' => $sale->branch?->name,
             'sale_date' => $sale->sale_date?->format('Y-m-d H:i:s'),
             'grand_total' => (float) $sale->grand_total,
-            'items' => $sale->items->map(function ($item) {
+            'items' => $sale->items->map(function ($item) use ($returnedBaseQuantities) {
+                $conversionFactor = (int) round(((int) $item->base_quantity) / ((float) $item->quantity ?: 1));
+                $returnableBaseQuantity = max(
+                    (int) $item->base_quantity - (int) ($returnedBaseQuantities[$item->id] ?? 0),
+                    0
+                );
+
                 return [
                     'id' => $item->id,
                     'product_id' => $item->product_id,
@@ -138,8 +151,9 @@ class ReturnsController extends Controller
                     'batch_id' => $item->batch_id,
                     'batch_number' => $item->batch?->batch_number,
                     'expiry_date' => $item->batch?->expiry_date?->format('Y-m-d'),
-                    'quantity' => (float) $item->quantity,
+                    'quantity' => $conversionFactor > 0 ? $returnableBaseQuantity / $conversionFactor : 0,
                     'base_quantity' => (int) $item->base_quantity,
+                    'returnable_base_quantity' => $returnableBaseQuantity,
                     'unit_price' => (float) $item->unit_price,
                 ];
             })->values(),
@@ -220,7 +234,14 @@ class ReturnsController extends Controller
 
             $referenceItems = SaleItem::where('sale_id', $sale->id)->get()->keyBy('id');
 
-            $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems) {
+            $previouslyReturned = ReturnItem::query()
+                ->whereIn('source_sale_item_id', $referenceItems->keys())
+                ->whereHas('returnEntry', fn ($query) => $query->where('status', '!=', 'Rejected'))
+                ->selectRaw('source_sale_item_id, COALESCE(SUM(base_quantity), 0) as returned_base_quantity')
+                ->groupBy('source_sale_item_id')
+                ->pluck('returned_base_quantity', 'source_sale_item_id');
+
+            $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems, $previouslyReturned) {
                 $ref = $referenceItems->get($item['reference_item_id']);
                 if (!$ref) {
                     abort(422);
@@ -237,13 +258,25 @@ class ReturnsController extends Controller
                     abort(422);
                 }
 
+                $returnableBaseQuantity = (int) $ref->base_quantity
+                    - (int) ($previouslyReturned[$ref->id] ?? 0);
+
+                if ($baseQuantity > $returnableBaseQuantity) {
+                    abort(422, 'Return quantity exceeds the quantity remaining on the original sale item.');
+                }
+
+                $baseUnitCost = (float) $ref->base_unit_cost;
+
                 return [
+                    'source_sale_item_id' => $ref->id,
                     'product_id' => $ref->product_id,
                     'batch_id' => $ref->batch_id,
                     'unit_id' => $ref->unit_id,
                     'quantity' => (float) $item['quantity'],
                     'base_quantity' => $baseQuantity,
-                    'refund_price' => (float) $item['refund_price'],
+                    'refund_price' => (float) $ref->unit_price,
+                    'base_unit_cost' => $baseUnitCost,
+                    'cost_total' => round($baseQuantity * $baseUnitCost, 2),
                 ];
             });
 
@@ -264,11 +297,14 @@ class ReturnsController extends Controller
                 foreach ($preparedItems as $item) {
                     ReturnItem::create([
                         'return_id' => $return->id,
+                        'source_sale_item_id' => $item['source_sale_item_id'],
                         'product_id' => $item['product_id'],
                         'batch_id' => $item['batch_id'],
                         'unit_id' => $item['unit_id'],
                         'quantity' => $item['quantity'],
                         'base_quantity' => $item['base_quantity'],
+                        'base_unit_cost' => $item['base_unit_cost'],
+                        'cost_total' => $item['cost_total'],
                         'refund_price' => $item['refund_price'],
                         'created_at' => now(),
                     ]);
@@ -330,6 +366,8 @@ class ReturnsController extends Controller
                 'quantity' => (float) $item['quantity'],
                 'base_quantity' => $baseQuantity,
                 'refund_price' => (float) $item['refund_price'],
+                'base_unit_cost' => (float) $batch->purchase_price,
+                'cost_total' => round($baseQuantity * (float) $batch->purchase_price, 2),
             ];
         });
 
@@ -355,6 +393,8 @@ class ReturnsController extends Controller
                     'unit_id' => $item['unit_id'],
                     'quantity' => $item['quantity'],
                     'base_quantity' => $item['base_quantity'],
+                    'base_unit_cost' => $item['base_unit_cost'],
+                    'cost_total' => $item['cost_total'],
                     'refund_price' => $item['refund_price'],
                     'created_at' => now(),
                 ]);
@@ -364,7 +404,7 @@ class ReturnsController extends Controller
         return redirect()->back()->with('success', 'Return created.');
     }
 
-    public function updateStatus(Request $request, string $locale, ReturnEntry $return)
+    public function updateStatus(Request $request, ReturnEntry $return)
     {
         $validated = $request->validate([
             'status' => 'required|in:Pending,Approved,Rejected',
@@ -404,7 +444,17 @@ class ReturnsController extends Controller
 
                     if ($return->type === 'Customer') {
                         if ($batch) {
-                            $batch->update(['quantity' => (int) $batch->quantity + $baseQty]);
+                            $existingQuantity = (int) $batch->quantity;
+                            $newQuantity = $existingQuantity + $baseQty;
+                            $returnCost = (float) $item->base_unit_cost;
+                            $restoredAverageCost = $newQuantity > 0
+                                ? (($existingQuantity * (float) $batch->purchase_price) + ($baseQty * $returnCost)) / $newQuantity
+                                : $returnCost;
+
+                            $batch->update([
+                                'quantity' => $newQuantity,
+                                'purchase_price' => $restoredAverageCost,
+                            ]);
                         }
                         $inventory->update(['quantity' => (int) $inventory->quantity + $baseQty]);
                     } else {

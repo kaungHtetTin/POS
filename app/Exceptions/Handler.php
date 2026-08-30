@@ -3,7 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Inertia\Inertia;
+use App\Support\Spa;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -54,19 +54,17 @@ class Handler extends ExceptionHandler
         $response = parent::render($request, $e);
 
         if ($response->status() === 403) {
-            return Inertia::render('Error', [
+            return Spa::render('Error', [
                 'status' => 403,
                 'message' => $e->getMessage(),
             ])
-            ->toResponse($request)
             ->setStatusCode(403);
         }
 
         if (!app()->environment(['local', 'testing']) && in_array($response->status(), [500, 503, 404, 403])) {
-            return Inertia::render('Error', [
+            return Spa::render('Error', [
                 'status' => $response->status(),
             ])
-            ->toResponse($request)
             ->setStatusCode($response->status());
         }
 

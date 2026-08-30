@@ -12,6 +12,10 @@ class SettingsController extends Controller
     public function invoice(Request $request)
     {
         $logoPath = Setting::get('invoice.logo_path', '');
+        $branchId = $request->user()?->currentBranchId();
+        $branchSetting = fn (string $suffix, string $legacy, string $default) => $branchId
+            ? Setting::get(Setting::branchKey($branchId, $suffix), Setting::get($legacy, $default))
+            : Setting::get($legacy, $default);
 
         return response()->json([
             'pharmacy_name' => Setting::get('invoice.pharmacy_name', config('app.name')),
@@ -26,10 +30,10 @@ class SettingsController extends Controller
             'currency_symbol' => Setting::get('app.currency_symbol', '$'),
             'date_format' => Setting::get('app.date_format', 'Y-m-d'),
             'time_format' => Setting::get('app.time_format', 'H:i:s'),
-            'receipt_width' => (int) Setting::get('pos.receipt_width', '80'),
-            'auto_print_receipt' => Setting::get('pos.auto_print_receipt', '0') === '1',
-            'silent_print' => Setting::get('pos.silent_print', '0') === '1',
-            'silent_printer_name' => Setting::get('pos.silent_printer_name', ''),
+            'receipt_width' => (int) $branchSetting('pos.receipt_width', 'pos.receipt_width', '80'),
+            'auto_print_receipt' => $branchSetting('pos.auto_print_receipt', 'pos.auto_print_receipt', '0') === '1',
+            'silent_print' => $branchSetting('pos.silent_print', 'pos.silent_print', '0') === '1',
+            'silent_printer_name' => $branchSetting('pos.silent_printer_name', 'pos.silent_printer_name', ''),
             'default_tax' => $this->defaultTax(),
         ]);
     }

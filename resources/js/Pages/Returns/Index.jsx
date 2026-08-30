@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm, router } from '@/spa';
 import {
     Alert,
     Box,
@@ -216,7 +218,18 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                         </Button>
                     </Stack>
 
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ mb: 2 }}>
+                    <ReportFilterToolbar
+                        ariaLabel="Return filters"
+                        fieldKinds={['select', 'select', 'wide']}
+                        onSubmit={() => applyFilters()}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" type="submit">Filter</Button>
+                                <Button variant="outlined" size="small" onClick={clearFilters}>Clear</Button>
+                                <CsvExportButton source={returns} dataKey="returns" filename="returns.csv" />
+                            </>
+                        )}
+                    >
                         <FormControl size="small" sx={{ minWidth: 170 }}>
                             <InputLabel>Type</InputLabel>
                             <Select value={typeFilter} label="Type" onChange={(e) => setTypeFilter(e.target.value)}>
@@ -249,13 +262,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                             </Select>
                         </FormControl>
 
-                        <Button variant="contained" size="small" onClick={applyFilters} sx={{ minWidth: 110 }}>
-                            Filter
-                        </Button>
-                        <Button variant="outlined" size="small" onClick={clearFilters} sx={{ minWidth: 110 }}>
-                            Clear
-                        </Button>
-                    </Stack>
+                    </ReportFilterToolbar>
 
                     <Divider sx={{ mb: 2 }} />
 
@@ -520,6 +527,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                                                 size="small"
                                                                 type="number"
                                                                 value={price}
+                                                                disabled={data.type === 'Customer'}
                                                                 onChange={(e) =>
                                                                     setLineEdits((prev) => ({
                                                                         ...prev,

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, router } from '@/spa';
 import {
     Box,
     Button,
@@ -58,38 +60,23 @@ export default function StockTransfers({ auth, transfers, filters }) {
                             <TransferIcon color="primary" />
                             Branch-to-Branch Transfers
                         </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <TextField
-                                size="small"
-                                placeholder="Search reference..."
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                            <Button
-                                variant="outlined"
-                                onClick={handleSearch}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                Search
-                            </Button>
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit(route('inventory.transfers.create'))}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                New Transfer
-                            </Button>
-                        </Stack>
+                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => router.visit(route('inventory.transfers.create'))}>New Transfer</Button>
                     </Stack>
+
+                    <ReportFilterToolbar
+                        ariaLabel="Stock transfer filters"
+                        fieldKinds={['search']}
+                        onSubmit={() => handleSearch()}
+                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={transfers} dataKey="transfers" filename="stock-transfers.csv" /></>}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder="Search reference..."
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+                        />
+                    </ReportFilterToolbar>
 
                     <TableContainer>
                         <Table size="small">

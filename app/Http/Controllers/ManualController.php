@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
+use App\Support\Spa;
 use Illuminate\Http\Request;
 
 class ManualController extends Controller
@@ -12,7 +12,7 @@ class ManualController extends Controller
      */
     public function index()
     {
-        return Inertia::render('Manual/Index', [
+        return Spa::render('Manual/Index', [
             'appName' => config('app.name', 'Pharmacy POS'),
         ]);
     }

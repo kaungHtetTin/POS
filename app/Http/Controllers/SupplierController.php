@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class SupplierController extends Controller
 {
@@ -20,13 +20,13 @@ class SupplierController extends Controller
             });
         }
 
-        return Inertia::render('Suppliers/Index', [
+        return Spa::render('Suppliers/Index', [
             'suppliers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
     }
 
-    public function show(string $locale, Supplier $supplier)
+    public function show(Supplier $supplier)
     {
         $supplier->loadCount('purchases');
 
@@ -56,7 +56,7 @@ class SupplierController extends Controller
             'total_payments' => (float) $supplier->payments()->sum('amount'),
         ];
 
-        return Inertia::render('Suppliers/Show', [
+        return Spa::render('Suppliers/Show', [
             'supplier' => $supplier,
             'purchases' => $purchases,
             'duePurchases' => $duePurchases,
@@ -69,7 +69,7 @@ class SupplierController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20|unique:suppliers,phone',
+            'phone' => 'nullable|string|max:20|unique:suppliers,phone',
             'email' => 'nullable|email|max:255|unique:suppliers,email',
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
@@ -81,11 +81,11 @@ class SupplierController extends Controller
         return redirect()->back()->with('success', 'Supplier created successfully.');
     }
 
-    public function update(Request $request, string $locale, Supplier $supplier)
+    public function update(Request $request, Supplier $supplier)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20|unique:suppliers,phone,' . $supplier->id,
+            'phone' => 'nullable|string|max:20|unique:suppliers,phone,' . $supplier->id,
             'email' => 'nullable|email|max:255|unique:suppliers,email,' . $supplier->id,
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
@@ -97,7 +97,7 @@ class SupplierController extends Controller
         return redirect()->back()->with('success', 'Supplier updated successfully.');
     }
 
-    public function destroy(string $locale, Supplier $supplier)
+    public function destroy(Supplier $supplier)
     {
         if ($supplier->purchases()->exists()) {
             return redirect()->back()->with('error', 'Supplier cannot be deleted because it has related purchases.');

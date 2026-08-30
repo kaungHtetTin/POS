@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Branch;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -23,7 +23,7 @@ class StaffController extends Controller
     {
         $search = trim((string) $request->get('search', ''));
 
-        return Inertia::render('Staff/Index', [
+        return Spa::render('Staff/Index', [
             'staff' => User::with([
                 'roles',
                 'branch:id,name',
@@ -72,7 +72,7 @@ class StaffController extends Controller
             'branch_ids' => 'nullable|array',
             'branch_ids.*' => 'exists:branches,id',
             'role_id' => 'required|exists:roles,id',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|max:250',
         ]);
 
         DB::transaction(function () use ($request) {
@@ -105,7 +105,7 @@ class StaffController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, string $locale, string $staff)
+    public function update(Request $request, string $staff)
     {
         $staff = $this->resolveStaff($staff);
 
@@ -123,7 +123,7 @@ class StaffController extends Controller
             'branch_ids.*' => 'exists:branches,id',
             'role_id' => 'required|exists:roles,id',
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|max:250',
         ]);
 
         DB::transaction(function () use ($request, $staff) {
@@ -163,7 +163,7 @@ class StaffController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(string $locale, string $staff)
+    public function destroy(string $staff)
     {
         $staff = $this->resolveStaff($staff);
 

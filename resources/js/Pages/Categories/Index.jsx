@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
@@ -96,6 +97,8 @@ export default function CategoryIndex({ auth, categories }) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             PRODUCT CATEGORIES
                         </Typography>
+                        <Stack direction="row" spacing={1}>
+                        <CsvExportButton source={categories} filename="categories.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
@@ -105,6 +108,7 @@ export default function CategoryIndex({ auth, categories }) {
                         >
                             Add New Category
                         </Button>
+                        </Stack>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
 

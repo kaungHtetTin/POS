@@ -531,6 +531,8 @@ class CashierPosController extends Controller
 
                     $quantityInUnit = $paidBaseDeduct / (int) $line['conversion_factor'];
                     $focQuantityInUnit = $focBaseDeduct / (int) $line['foc_conversion_factor'];
+                    $baseUnitCost = (float) $batch->purchase_price;
+                    $costTotal = round(($paidBaseDeduct + $focBaseDeduct) * $baseUnitCost, 2);
 
                     SaleItem::create([
                         'sale_id' => $sale->id,
@@ -542,6 +544,9 @@ class CashierPosController extends Controller
                         'foc_unit_id' => $line['foc_unit_id'],
                         'base_quantity' => $paidBaseDeduct,
                         'foc_base_quantity' => $focBaseDeduct,
+                        'base_unit_cost' => $baseUnitCost,
+                        'cost_total' => $costTotal,
+                        'cost_backfilled' => false,
                         'unit_price' => $line['unit_price'],
                         'price_type' => $line['price_type'],
                         'original_unit_price' => $line['original_unit_price'],
@@ -804,14 +809,19 @@ class CashierPosController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $branchId = $request->user()->currentBranchId();
+        $branchSetting = fn (string $suffix, string $legacy, string $default) => $branchId
+            ? Setting::get(Setting::branchKey($branchId, $suffix), Setting::get($legacy, $default))
+            : Setting::get($legacy, $default);
+
         $settings = [
             'pharmacy_name'       => Setting::get('invoice.pharmacy_name', config('app.name')),
             'receipt_header'      => Setting::get('invoice.receipt_header', ''),
             'receipt_footer'      => Setting::get('invoice.receipt_footer', ''),
-            'receipt_width'       => (int) Setting::get('pos.receipt_width', '80'), // 58 or 80
+            'receipt_width'       => (int) $branchSetting('pos.receipt_width', 'pos.receipt_width', '80'),
             'currency_symbol'     => Setting::get('app.currency_symbol', '$'),
-            'auto_print_receipt'  => Setting::get('pos.auto_print_receipt', '0') === '1',
-            'silent_print'        => Setting::get('pos.silent_print', '0') === '1',
+            'auto_print_receipt'  => $branchSetting('pos.auto_print_receipt', 'pos.auto_print_receipt', '0') === '1',
+            'silent_print'        => $branchSetting('pos.silent_print', 'pos.silent_print', '0') === '1',
             'show_generic_name'   => Setting::get('label.show_generic', '0') === '1',
             'show_expiry'         => Setting::get('label.show_expiry', '1') === '1',
             'show_batch'          => Setting::get('label.show_batch', '0') === '1',

@@ -1,6 +1,7 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router } from '@/spa';
 import {
     Alert,
     Box,
@@ -56,7 +57,7 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
                     <Button
-                        component="a"
+                        component={Link}
                         href={route('inventory.index', selectedBranchId ? { branch_id: selectedBranchId } : {})}
                         startIcon={<BackIcon />}
                         variant="outlined"
@@ -132,6 +133,9 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
                 )}
 
                 <Paper sx={{ p: 2 }}>
+                    <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
+                        <CsvExportButton source={branchGroups.flatMap((group) => (group.batches || []).map((batch) => ({ ...batch, branch: group.branch?.name })))} filename="inventory-batches.csv" />
+                    </Stack>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>

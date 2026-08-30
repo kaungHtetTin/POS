@@ -1,329 +1,224 @@
 import './bootstrap';
 import '../css/app.css';
 
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createInertiaApp } from '@inertiajs/react';
-import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { Alert, Box, CircularProgress, CssBaseline, LinearProgress, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import getTheme from './Theme/theme';
-import { useEffect, useState, useMemo } from 'react';
-import { router } from '@inertiajs/react';
 import { ColorModeContext } from './contexts/ColorModeContext';
+import PersistentShellContext from './contexts/PersistentShellContext';
+import PageContainer from './Components/PageContainer';
+import MainLayout from './Layouts/MainLayout';
+import PosLayout from './Layouts/PosLayout';
+import { SpaProvider, router } from './spa';
 
-const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
+const pages = import.meta.glob('./Pages/**/*.jsx');
+const initialPage = JSON.parse(document.getElementById('spa-page')?.textContent || '{}');
 const translatableAttributes = ['title', 'placeholder', 'aria-label', 'alt'];
-let currentTranslations = {};
+let currentTranslations = initialPage.props?.translations || {};
 
-const normalizeDuplicatedBasePath = (pathname, base) => {
-    if (!pathname || !base || base === '/') {
-        return pathname;
-    }
-
-    const cleanBase = `/${String(base).replace(/^\/+|\/+$/g, '')}`;
-    if (cleanBase === '/') {
-        return pathname;
-    }
-
-    const doubled = `${cleanBase}${cleanBase}`;
-    let nextPath = pathname;
-
-    while (nextPath === doubled || nextPath.startsWith(`${doubled}/`)) {
-        nextPath = nextPath.substring(cleanBase.length);
-    }
-
-    return nextPath;
-};
-
-const normalizeDuplicatedBase = (url, base) => {
-    if (!url) {
-        return url;
-    }
-
-    const isAbsolute = /^https?:\/\//i.test(url);
-
-    try {
-        const parsed = new URL(url, window.location.origin);
-        const normalizedPath = normalizeDuplicatedBasePath(parsed.pathname, base);
-        parsed.pathname = normalizedPath;
-        return isAbsolute
-            ? `${parsed.origin}${parsed.pathname}${parsed.search}${parsed.hash}`
-            : `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    } catch {
-        return url;
-    }
-};
-
-const coerceNavigationUrl = (url, base) => {
-    if (url === undefined || url === null || url === '') {
-        return url;
-    }
-
-    const raw = String(url);
-    const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw);
-    const normalizedInput = hasScheme || raw.startsWith('/')
-        ? raw
-        : `/${raw.replace(/^\/+/, '')}`;
-
-    return normalizeDuplicatedBase(normalizedInput, base);
+const resolvePage = (name) => {
+    const importer = pages[`./Pages/${name}.jsx`];
+    if (!importer) throw new Error(`React page not found: ${name}`);
+    return importer();
 };
 
 const translateValue = (value, translations) => {
-    if (!value || typeof value !== 'string') {
-        return value;
-    }
-
+    if (!value || typeof value !== 'string') return value;
     const trimmed = value.trim();
     const translated = translations?.[trimmed];
-    if (!translated) {
-        const colonMatch = trimmed.match(/^(.+?)(:\s.*)$/);
-        if (colonMatch && translations?.[colonMatch[1]]) {
-            return value.replace(trimmed, `${translations[colonMatch[1]]}${colonMatch[2]}`);
-        }
+    if (translated) return value.replace(trimmed, translated);
 
-        const countMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
-        if (countMatch && translations?.[countMatch[2]]) {
-            return value.replace(trimmed, `${countMatch[1]} ${translations[countMatch[2]]}`);
-        }
-
-        const parentheticalMatch = trimmed.match(/^(.+?)\s+\((.+)\)$/);
-        if (parentheticalMatch && translations?.[parentheticalMatch[1]]) {
-            return value.replace(trimmed, `${translations[parentheticalMatch[1]]} (${parentheticalMatch[2]})`);
-        }
-
-        return value;
+    const colonMatch = trimmed.match(/^(.+?)(:\s.*)$/);
+    if (colonMatch && translations?.[colonMatch[1]]) return value.replace(trimmed, `${translations[colonMatch[1]]}${colonMatch[2]}`);
+    const countMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+    if (countMatch && translations?.[countMatch[2]]) return value.replace(trimmed, `${countMatch[1]} ${translations[countMatch[2]]}`);
+    const parentheticalMatch = trimmed.match(/^(.+?)\s+\((.+)\)$/);
+    if (parentheticalMatch && translations?.[parentheticalMatch[1]]) {
+        return value.replace(trimmed, `${translations[parentheticalMatch[1]]} (${parentheticalMatch[2]})`);
     }
-
-    return value.replace(trimmed, translated);
+    return value;
 };
 
 const applyStaticTranslations = (translations) => {
-    if (!translations || typeof document === 'undefined') {
-        return;
-    }
-
+    if (!translations || typeof document === 'undefined') return;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-
-    while (walker.nextNode()) {
-        textNodes.push(walker.currentNode);
-    }
-
-    textNodes.forEach((node) => {
-        const parentTag = node.parentElement?.tagName;
-        if (!parentTag || ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(parentTag)) {
-            return;
-        }
-
-        node.nodeValue = translateValue(node.nodeValue, translations);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+        const tag = node.parentElement?.tagName;
+        if (tag && !['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(tag)) node.nodeValue = translateValue(node.nodeValue, translations);
     });
-
     translatableAttributes.forEach((attribute) => {
         document.querySelectorAll(`[${attribute}]`).forEach((element) => {
             const current = element.getAttribute(attribute);
             const next = translateValue(current, translations);
-            if (next && next !== current) {
-                element.setAttribute(attribute, next);
-            }
+            if (next && next !== current) element.setAttribute(attribute, next);
         });
     });
 };
 
-const scheduleStaticTranslations = (translations) => {
-    [0, 150, 400, 800].forEach((delay) => {
-        window.setTimeout(() => applyStaticTranslations(translations), delay);
+const scheduleTranslations = (page) => {
+    currentTranslations = page?.props?.locale === 'my' ? (page.props.translations || {}) : {};
+    if (page?.props?.locale !== 'my') return;
+    [0, 150, 400].forEach((delay) => window.setTimeout(() => applyStaticTranslations(currentTranslations), delay));
+};
+
+const updateZiggy = (page) => {
+    window.Ziggy = {
+        ...(window.Ziggy || {}),
+        ...(page.props.ziggy || {}),
+    };
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta && page?.props?.csrf_token) csrfMeta.content = page.props.csrf_token;
+};
+
+function PageLoadingState({ initial = false }) {
+    return (
+        <Box role="status" aria-live="polite" sx={{ minHeight: initial ? '100vh' : 240, display: 'grid', placeItems: 'center', p: 3 }}>
+            <Paper variant="outlined" sx={{ px: 3, py: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <CircularProgress size={22} />
+                <Box>
+                    <Typography variant="subtitle2" fontWeight={800}>Loading page</Typography>
+                    <Typography variant="caption" color="text.secondary">Getting the latest data…</Typography>
+                </Box>
+            </Paper>
+        </Box>
+    );
+}
+
+function PageContentSkeleton() {
+    return (
+        <PageContainer
+            role="status"
+            aria-live="polite"
+            aria-label="Loading page content"
+            sx={{ position: 'relative', minHeight: 360 }}
+        >
+            <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
+            <Stack spacing={1.25}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                    <Skeleton variant="rounded" width="min(32%, 260px)" height={28} />
+                    <Skeleton variant="rounded" width={112} height={32} />
+                </Stack>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+                        gap: 1,
+                    }}
+                >
+                    {[0, 1, 2].map((item) => (
+                        <Skeleton key={item} variant="rounded" height={68} />
+                    ))}
+                </Box>
+                <Paper variant="outlined" sx={{ p: 1.25 }}>
+                    <Stack spacing={1}>
+                        <Skeleton variant="rounded" width="42%" height={30} />
+                        {[0, 1, 2, 3, 4].map((item) => (
+                            <Skeleton key={item} variant="rounded" height={38} />
+                        ))}
+                    </Stack>
+                </Paper>
+            </Stack>
+        </PageContainer>
+    );
+}
+
+function ContentTransition({ loading, error, children }) {
+    if (loading) return <PageContentSkeleton />;
+
+    return (
+        <Box sx={{ minHeight: 240 }}>
+            {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+            {children}
+            {loading && (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'start center', pt: 8, zIndex: 5 }}>
+                    <Paper variant="outlined" sx={{ px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                        <CircularProgress size={18} />
+                        <Typography variant="body2" fontWeight={700}>Loading latest data…</Typography>
+                    </Paper>
+                </Box>
+            )}
+        </Box>
+    );
+}
+
+function Application() {
+    const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#087f74';
+    const [mode, setMode] = useState(() => {
+        const stored = window.localStorage.getItem('app.theme');
+        return stored === 'dark' || stored === 'light' ? stored : 'light';
     });
-};
-
-const normalizeCurrentBrowserUrl = (base) => {
-    const correctedPath = normalizeDuplicatedBasePath(window.location.pathname, base);
-    if (correctedPath !== window.location.pathname) {
-        window.history.replaceState(null, '', `${correctedPath}${window.location.search}${window.location.hash}`);
-    }
-};
-
-const buildGetUrl = (rawUrl, data = {}) => {
-    const parsed = new URL(rawUrl, window.location.origin);
-    const params = new URLSearchParams(parsed.search);
-
-    Object.entries(data || {}).forEach(([key, value]) => {
-        if (value === undefined || value === null || value === '') {
-            params.delete(key);
-            return;
-        }
-
-        if (Array.isArray(value)) {
-            params.delete(key);
-            value.forEach((item) => {
-                if (item !== undefined && item !== null && item !== '') {
-                    params.append(`${key}[]`, String(item));
-                }
-            });
-            return;
-        }
-
-        params.set(key, String(value));
+    const [primaryColor, setPrimaryColor] = useState(() => {
+        const stored = window.localStorage.getItem('app.brand');
+        return /^#[0-9A-Fa-f]{6}$/.test(stored || '') ? stored.toUpperCase() : defaultPrimaryColor;
     });
+    const [shellHeader, setShellHeader] = useState('');
+    const shellContext = useMemo(() => ({ setHeader: setShellHeader }), []);
 
-    const query = params.toString();
-    parsed.search = query ? `?${query}` : '';
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-};
+    const colorMode = useMemo(() => ({
+        mode,
+        primaryColor,
+        setMode,
+        setPrimaryColor: (color) => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(color || '')) setPrimaryColor(color.toUpperCase());
+        },
+        toggleColorMode: () => setMode((current) => current === 'light' ? 'dark' : 'light'),
+    }), [mode, primaryColor]);
+    const theme = useMemo(() => getTheme(mode, primaryColor), [mode, primaryColor]);
 
-createInertiaApp({
-    title: (title) => `${translateValue(title, currentTranslations)} - ${translateValue(appName, currentTranslations)}`,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
-    setup({ el, App, props }) {
-        // Fix for subfolder routing duplication
-        const base = props.initialPage.props.ziggy?.base || '';
-        props.initialPage.url = normalizeDuplicatedBase(props.initialPage.url, base);
-        normalizeCurrentBrowserUrl(base);
+    useEffect(() => {
+        document.documentElement.dataset.theme = mode;
+        document.documentElement.style.setProperty('--color-primary', primaryColor);
+        window.localStorage.setItem('app.theme', mode);
+        window.localStorage.setItem('app.brand', primaryColor);
+    }, [mode, primaryColor]);
 
-        if (!window.__forceBrowserGetNavigation && typeof router.visit === 'function') {
-            const originalVisit = router.visit.bind(router);
-            window.__forceBrowserGetNavigation = true;
+    useEffect(() => {
+        updateZiggy(initialPage);
+        scheduleTranslations(initialPage);
+        return router.on('navigate', (event) => {
+            const nextPage = event.detail.page;
+            updateZiggy(nextPage);
+            scheduleTranslations(nextPage);
+            if (!window.localStorage.getItem('app.brand')) {
+                const color = nextPage?.props?.settings?.app?.theme_primary_color;
+                if (/^#[0-9A-Fa-f]{6}$/.test(color || '')) setPrimaryColor(color.toUpperCase());
+            }
+        });
+    }, []);
 
-            router.visit = (url, options = {}) => {
-                const method = String(options?.method || 'get').toLowerCase();
-                const rawUrl = typeof url === 'string' ? url : (url?.url || String(url));
-                const withQuery = method === 'get' ? buildGetUrl(rawUrl, options?.data || {}) : rawUrl;
-                const target = coerceNavigationUrl(withQuery, base);
+    return (
+        <ColorModeContext.Provider value={colorMode}>
+            <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <SpaProvider initialPage={initialPage} resolve={resolvePage}>
+                    {({ PageComponent, page, loading, navigationError }) => {
+                        if (!PageComponent) return <PageLoadingState initial />;
+                        const content = (
+                            <ContentTransition loading={loading} error={navigationError}>
+                                <PageComponent {...page.props} />
+                            </ContentTransition>
+                        );
+                        const isAuthenticated = Boolean(page.props?.auth?.user);
+                        if (!isAuthenticated) return content;
 
-                if (method === 'get') {
-                    window.location.assign(target);
-                    return;
-                }
+                        const ShellLayout = page.component === 'POS/Index' ? PosLayout : MainLayout;
 
-                return originalVisit(target, options);
-            };
-        }
+                        return (
+                            <ShellLayout header={shellHeader}>
+                                <PersistentShellContext.Provider value={shellContext}>
+                                    {content}
+                                </PersistentShellContext.Provider>
+                            </ShellLayout>
+                        );
+                    }}
+                </SpaProvider>
+            </ThemeProvider>
+        </ColorModeContext.Provider>
+    );
+}
 
-        if (!window.__historyUrlGuardBound) {
-            const originalPushState = window.history.pushState.bind(window.history);
-            const originalReplaceState = window.history.replaceState.bind(window.history);
-
-            window.history.pushState = (state, title, url) => (
-                originalPushState(state, title, coerceNavigationUrl(url, base))
-            );
-
-            window.history.replaceState = (state, title, url) => (
-                originalReplaceState(state, title, coerceNavigationUrl(url, base))
-            );
-
-            window.__historyUrlGuardBound = true;
-        }
-
-        // Force browser-native navigation for GET requests to avoid SPA history
-        // rewriting duplicated base paths in subfolder deployments.
-
-        // Set global locale/defaults for Ziggy
-        if (props.initialPage.props.locale) {
-            const locale = props.initialPage.props.locale;
-            window.Ziggy = window.Ziggy || {};
-            window.Ziggy.locale = locale;
-            window.Ziggy.defaults = {
-                ...(window.Ziggy.defaults || {}),
-                locale,
-            };
-        }
-
-        if (props.initialPage.props.locale === 'my') {
-            currentTranslations = props.initialPage.props.translations || {};
-            scheduleStaticTranslations(currentTranslations);
-        }
-
-        if (!window.__inertiaUrlGuardBound) {
-            window.__inertiaUrlGuardBound = true;
-            router.on('navigate', (event) => {
-                const pageBase = event?.detail?.page?.props?.ziggy?.base || base;
-                normalizeCurrentBrowserUrl(pageBase);
-            });
-        }
-
-        if (!el.dataset.rendered) {
-            const root = createRoot(el);
-            el.dataset.rendered = 'true';
-
-            const Root = () => {
-                const defaultPrimaryColor = props.initialPage.props?.settings?.app?.theme_primary_color || '#087f74';
-                const [mode, setMode] = useState(() => {
-                    const stored = window.localStorage.getItem('app.theme');
-                    return stored === 'dark' || stored === 'light' ? stored : 'light';
-                });
-                const [primaryColor, setPrimaryColor] = useState(() => {
-                    const stored = window.localStorage.getItem('app.brand');
-                    return /^#[0-9A-Fa-f]{6}$/.test(stored || '') ? stored.toUpperCase() : defaultPrimaryColor;
-                });
-                const colorMode = useMemo(
-                    () => ({
-                        mode,
-                        primaryColor,
-                        setMode,
-                        setPrimaryColor: (nextColor) => {
-                            if (/^#[0-9A-Fa-f]{6}$/.test(nextColor || '')) {
-                                setPrimaryColor(nextColor.toUpperCase());
-                            }
-                        },
-                        toggleColorMode: () => {
-                            setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
-                        },
-                    }),
-                    [mode, primaryColor],
-                );
-
-                useEffect(() => {
-                    document.documentElement.dataset.theme = mode;
-                    document.documentElement.style.setProperty('--color-primary', primaryColor);
-                    window.localStorage.setItem('app.theme', mode);
-                    window.localStorage.setItem('app.brand', primaryColor);
-                }, [mode, primaryColor]);
-
-                useEffect(() => {
-                    const removeListener = router.on('navigate', (event) => {
-                        if (window.localStorage.getItem('app.brand')) {
-                            return;
-                        }
-
-                        const nextColor = event?.detail?.page?.props?.settings?.app?.theme_primary_color;
-                        if (typeof nextColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(nextColor)) {
-                            setPrimaryColor(nextColor.toUpperCase());
-                        }
-                    });
-
-                    return () => {
-                        if (typeof removeListener === 'function') {
-                            removeListener();
-                        }
-                    };
-                }, []);
-
-                const theme = useMemo(() => getTheme(mode, primaryColor), [mode, primaryColor]);
-
-                return (
-                    <ColorModeContext.Provider value={colorMode}>
-                        <ThemeProvider theme={theme}>
-                            <CssBaseline />
-                            <App {...props} />
-                        </ThemeProvider>
-                    </ColorModeContext.Provider>
-                );
-            };
-
-            root.render(<Root />);
-        }
-    },
-    progress: {
-        color: '#4B5563',
-    },
-});
-
-router.on('navigate', (event) => {
-    const page = event?.detail?.page;
-    if (!page || page.props?.locale !== 'my') {
-        currentTranslations = {};
-        return;
-    }
-
-    currentTranslations = page.props.translations || {};
-    scheduleStaticTranslations(currentTranslations);
-});
+createRoot(document.getElementById('app')).render(<Application />);

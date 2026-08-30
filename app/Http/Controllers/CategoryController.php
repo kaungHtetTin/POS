@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class CategoryController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Categories/Index', [
+        return Spa::render('Categories/Index', [
             'categories' => Category::withCount('products')->get(),
         ]);
     }
@@ -27,7 +27,7 @@ class CategoryController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, string $locale, Category $category)
+    public function update(Request $request, Category $category)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
@@ -39,7 +39,7 @@ class CategoryController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(string $locale, Category $category)
+    public function destroy(Category $category)
     {
         if ($category->products()->exists()) {
             abort(403, 'Category cannot be deleted because it has assigned products.');

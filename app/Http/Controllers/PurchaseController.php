@@ -12,7 +12,7 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class PurchaseController extends Controller
 {
@@ -36,7 +36,7 @@ class PurchaseController extends Controller
             });
         }
 
-        return Inertia::render('Purchases/Index', [
+        return Spa::render('Purchases/Index', [
             'purchases' => $query->latest()->paginate(15)->withQueryString(),
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
             'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level')
@@ -58,7 +58,7 @@ class PurchaseController extends Controller
 
     public function create()
     {
-        return Inertia::render('Purchases/Create', [
+        return Spa::render('Purchases/Create', [
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
             'products' => Product::select('id', 'name')
                 ->with([
@@ -75,7 +75,7 @@ class PurchaseController extends Controller
         ]);
     }
 
-    public function show(string $locale, Purchase $purchase)
+    public function show(Purchase $purchase)
     {
         $purchase->load([
             'supplier:id,name,phone,email,address,credit_limit,balance',
@@ -96,7 +96,7 @@ class PurchaseController extends Controller
                 return $row->product_id . ':' . $row->unit_id;
             });
 
-        return Inertia::render('Purchases/Show', [
+        return Spa::render('Purchases/Show', [
             'purchase' => [
                 'id' => $purchase->id,
                 'supplier_id' => $purchase->supplier_id,
@@ -360,7 +360,7 @@ class PurchaseController extends Controller
         return redirect()->back()->with('success', 'Purchase order created and stock received successfully.');
     }
 
-    public function update(Request $request, string $locale, Purchase $purchase)
+    public function update(Request $request, Purchase $purchase)
     {
         if ($purchase->payments()->exists()) {
             return redirect()->back()->withErrors([
@@ -565,7 +565,7 @@ class PurchaseController extends Controller
         return redirect()->back()->with('success', 'Purchase record updated and inventory synchronized successfully.');
     }
 
-    public function destroy(string $locale, Purchase $purchase)
+    public function destroy(Purchase $purchase)
     {
         if ($purchase->payments()->exists()) {
             return redirect()->back()->with('error', 'Purchase cannot be deleted after supplier payments have been recorded.');

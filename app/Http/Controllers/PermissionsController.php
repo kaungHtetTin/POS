@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class PermissionsController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Permissions/Index');
+        return Spa::render('Permissions/Index');
     }
 }

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router, useForm } from '@/spa';
 import {
     Alert,
     Box,
@@ -376,45 +378,27 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             PURCHASE ORDERS & STOCK RECEIPTS
                         </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <TextField
-                                size="small"
-                                placeholder="Search invoice or supplier..."
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ minWidth: { sm: 250 } }}
-                            />
-                            <Button variant="outlined" size="small" onClick={handleSearch}>Search</Button>
-                            <Button
-                                component={Link}
-                                href={route('purchases.create')}
-                                variant="contained"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                sx={{
-                                    height: 40,
-                                    minWidth: 164,
-                                    px: 2,
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0,
-                                }}
-                            >
-                                Create Purchase
-                            </Button>
-                        </Stack>
+                        <Button component={Link} href={route('purchases.create')} variant="contained" size="small" startIcon={<AddIcon />}>Create Purchase</Button>
                     </Stack>
+
+                    <ReportFilterToolbar
+                        ariaLabel="Purchase list filters"
+                        fieldKinds={['search']}
+                        onSubmit={() => handleSearch()}
+                        actions={<><Button variant="outlined" size="small" type="submit">Search</Button><CsvExportButton source={purchases} dataKey="purchases" filename="purchases.csv" /></>}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder="Search invoice or supplier..."
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
+                        />
+                    </ReportFilterToolbar>
 
                     <Divider sx={{ mb: 2 }} />
 
@@ -474,7 +458,12 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                             />
                                         </TableCell>
                                         <TableCell align="center">
-                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                            <Stack
+                                                direction="row"
+                                                spacing={0}
+                                                justifyContent="center"
+                                                sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}
+                                            >
                                                 <IconButton
                                                     component={Link}
                                                     href={route('purchases.show', { purchase: purchase.id })}

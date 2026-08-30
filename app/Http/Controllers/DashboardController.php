@@ -11,7 +11,7 @@ use App\Models\Supplier;
 use App\Models\ReturnEntry;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class DashboardController extends Controller
 {
@@ -96,7 +96,7 @@ class DashboardController extends Controller
 
         $branches = \App\Models\Branch::whereIn('id', $accessibleBranchIds)->get(['id', 'name']);
 
-        return Inertia::render('Dashboard', [
+        return Spa::render('Dashboard', [
             'stats' => [
                 'total_products' => $totalProducts,
                 'total_suppliers' => $totalSuppliers,

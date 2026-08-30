@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, router, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -263,7 +265,21 @@ export default function ReportsIndex({
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    <ReportFilterToolbar
+                        ariaLabel={__('Finance report filters')}
+                        fieldKinds={['wide', 'select', 'date', 'date', 'select', 'amount']}
+                        onSubmit={applyFilters}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon fontSize="small" />} type="submit">
+                                    {__('Apply')}
+                                </Button>
+                                <Button variant="outlined" size="small" onClick={clearFilters}>
+                                    {__('Reset')}
+                                </Button>
+                            </>
+                        )}
+                    >
                         <FormControl size="small" sx={{ flex: '1 1 240px', minWidth: { xs: '100%', sm: 240 } }}>
                             <InputLabel>{__('Branch')}</InputLabel>
                             <Select value={branchId} label={__('Branch')} onChange={(e) => setBranchId(e.target.value)}>
@@ -329,24 +345,14 @@ export default function ReportsIndex({
                             sx={{ flex: '1 1 160px', minWidth: { xs: '100%', sm: 160 } }}
                         />
 
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<FilterIcon fontSize="small" />}
-                            onClick={applyFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            {__('Apply')}
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={clearFilters}
-                            sx={{ minWidth: 120, width: { xs: '100%', sm: 'auto' } }}
-                        >
-                            {__('Reset')}
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                        <CsvExportButton source={[balance_sheet]} filename="balance-sheet.csv" label="Export Balance Sheet" />
+                        <CsvExportButton source={profit_trend || []} filename="profit-trend.csv" label="Export Profit Trend" />
+                        <CsvExportButton source={expenses_by_category || []} filename="expenses-by-category.csv" label="Export Expenses" />
+                        <CsvExportButton source={branch_performance || []} filename="branch-performance.csv" label="Export Branches" />
+                        <CsvExportButton source={expiring_batches || []} filename="expiring-batches.csv" label="Export Expiry" />
+                    </Stack>
 
                     <Divider sx={{ mb: 1.5 }} />
 

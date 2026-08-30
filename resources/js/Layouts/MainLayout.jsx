@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { usePage, router } from '@inertiajs/react';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Link, usePage, router } from '@/spa';
+import PersistentShellContext from '@/contexts/PersistentShellContext';
 import ThemeControl from '@/Components/ThemeControl';
 import SimpleIcon from '@/Components/SimpleIcon';
+import PageContainer from '@/Components/PageContainer';
 import {
     Badge,
     AppBar,
@@ -30,7 +32,29 @@ import {
 
 const drawerWidth = 214;
 
-export default function MainLayout({ children, header }) {
+export default function MainLayout(props) {
+    const persistentShell = useContext(PersistentShellContext);
+
+    if (persistentShell) {
+        return <EmbeddedPage {...props} shell={persistentShell} />;
+    }
+
+    return <MainLayoutShell {...props} />;
+}
+
+function EmbeddedPage({ children, header, shell }) {
+    useLayoutEffect(() => {
+        shell.setHeader(header || '');
+    }, [header, shell]);
+
+    return (
+        <PageContainer normalizeLegacyPadding>
+            {children}
+        </PageContainer>
+    );
+}
+
+function MainLayoutShell({ children, header }) {
     const { auth, flash, settings = {}, nav_counts = {}, translations = {}, locale, ziggy = {} } = usePage().props;
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
     const appBase = ziggy?.base || window.laravel_base || '';
@@ -78,7 +102,8 @@ export default function MainLayout({ children, header }) {
     };
 
     const changeLanguage = (lang) => {
-        window.location.href = route('language.switch', { lang });
+        handleCloseLangMenu();
+        router.action(route('language.switch'), { locale: lang });
     };
 
     const normalizePath = (value) => {
@@ -272,7 +297,7 @@ export default function MainLayout({ children, header }) {
                                 return (
                                     <ListItem key={item.text} disablePadding>
                                         <ListItemButton
-                                            component="a"
+                                            component={Link}
                                             href={item.href}
                                             selected={isActive}
                                             sx={{
@@ -395,6 +420,7 @@ export default function MainLayout({ children, header }) {
                     boxShadow: 'none',
                     borderBottom: '1px solid',
                     borderColor: 'divider',
+                    borderRadius: 0,
                     zIndex: (muiTheme) => muiTheme.zIndex.drawer - 1,
                 }}
             >
@@ -523,27 +549,27 @@ export default function MainLayout({ children, header }) {
                                 </Box>
                             </Box>
                             <Divider />
-                            <MenuItem component="a" href={route('dashboard')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('dashboard')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="grid" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Dashboard')}</Typography>
                             </MenuItem>
                             {auth.user?.permissions?.includes('process_sale') && (
-                                <MenuItem component="a" href={route('pos.index')} onClick={handleCloseUserMenu}>
+                                <MenuItem component={Link} href={route('pos.index')} onClick={handleCloseUserMenu}>
                                     <ListItemIcon><SimpleIcon name="card" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('POS')}</Typography>
                                 </MenuItem>
                             )}
-                            <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="user" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
                             {auth.user?.permissions?.includes('manage_branches') && (
-                                <MenuItem component="a" href={route('settings.index')} onClick={handleCloseUserMenu}>
+                                <MenuItem component={Link} href={route('settings.index')} onClick={handleCloseUserMenu}>
                                     <ListItemIcon><SimpleIcon name="settings" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('Settings')}</Typography>
                                 </MenuItem>
                             )}
-                            <MenuItem component="a" href={route('manual.index')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('manual.index')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="book" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('SOP Manual')}</Typography>
                             </MenuItem>
@@ -574,6 +600,7 @@ export default function MainLayout({ children, header }) {
                             boxSizing: 'border-box',
                             width: drawerWidth,
                             borderRightColor: 'divider',
+                            borderRadius: 0,
                         },
                     }}
                 >
@@ -587,6 +614,7 @@ export default function MainLayout({ children, header }) {
                             boxSizing: 'border-box',
                             width: drawerWidth,
                             borderRightColor: 'divider',
+                            borderRadius: 0,
                         },
                     }}
                     open
@@ -598,7 +626,7 @@ export default function MainLayout({ children, header }) {
                 component="main"
                 sx={{
                     flexGrow: 1,
-                    p: { xs: 1, md: 1.25 },
+                    p: 0,
                     width: { sm: `calc(100% - ${drawerWidth}px)` },
                     minWidth: 0,
                     minHeight: '100vh',

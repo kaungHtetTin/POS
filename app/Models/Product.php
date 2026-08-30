@@ -54,7 +54,7 @@ class Product extends Model
     public function units()
     {
         return $this->belongsToMany(Unit::class, 'product_units')
-                    ->withPivot(['id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit'])
+                    ->withPivot(['id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit'])
                     ->withTimestamps();
     }
 

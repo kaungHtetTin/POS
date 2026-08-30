@@ -222,6 +222,8 @@ class SaleSyncService
 
                     $quantityInUnit = $paidBaseDeduct / (int) $line['conversion_factor'];
                     $focQuantityInUnit = $focBaseDeduct / (int) $line['foc_conversion_factor'];
+                    $baseUnitCost = (float) $batch->purchase_price;
+                    $costTotal = round(($paidBaseDeduct + $focBaseDeduct) * $baseUnitCost, 2);
 
                     SaleItem::create([
                         'sale_id' => $sale->id,
@@ -233,6 +235,9 @@ class SaleSyncService
                         'foc_unit_id' => $line['foc_unit_id'],
                         'base_quantity' => $paidBaseDeduct,
                         'foc_base_quantity' => $focBaseDeduct,
+                        'base_unit_cost' => $baseUnitCost,
+                        'cost_total' => $costTotal,
+                        'cost_backfilled' => false,
                         'unit_price' => $line['unit_price'],
                         'price_type' => $line['price_type'],
                         'original_unit_price' => $line['original_unit_price'],

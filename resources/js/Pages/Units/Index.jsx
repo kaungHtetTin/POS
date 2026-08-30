@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
@@ -95,6 +96,8 @@ export default function UnitIndex({ auth, units }) {
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             MEASUREMENT UNITS
                         </Typography>
+                        <Stack direction="row" spacing={1}>
+                        <CsvExportButton source={units} filename="units.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
@@ -104,6 +107,7 @@ export default function UnitIndex({ auth, units }) {
                         >
                             Add New Unit
                         </Button>
+                        </Stack>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
 

@@ -6,7 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class ActivityLogController extends Controller
 {
@@ -77,7 +77,7 @@ class ActivityLogController extends Controller
             ->limit(200)
             ->get();
 
-        return Inertia::render('ActivityLogs/Index', [
+        return Spa::render('ActivityLogs/Index', [
             'users' => $users,
             'filters' => [
                 'from_date' => $fromDate?->toDateString() ?? '',

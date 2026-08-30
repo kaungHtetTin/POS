@@ -9,7 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class FinanceController extends Controller
 {
@@ -165,7 +165,7 @@ class FinanceController extends Controller
                 ];
             });
 
-        return Inertia::render('Finance/OutstandingBalance', [
+        return Spa::render('Finance/OutstandingBalance', [
             'branches' => $branches,
             'filters' => array_merge($filters, [
                 'branch_id' => $branchScope['all'] ? 'all' : $branchScope['branch_id'],
@@ -301,7 +301,7 @@ class FinanceController extends Controller
                 ];
             });
 
-        return Inertia::render('Finance/AmountReceivable', [
+        return Spa::render('Finance/AmountReceivable', [
             'branches' => $branches,
             'filters' => array_merge($filters, [
                 'branch_id' => $branchScope['all'] ? 'all' : $branchScope['branch_id'],
@@ -312,7 +312,7 @@ class FinanceController extends Controller
         ]);
     }
 
-    public function receiveReceivablePayment(Request $request, string $locale, Sale $sale)
+    public function receiveReceivablePayment(Request $request, Sale $sale)
     {
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:999999999999.99',

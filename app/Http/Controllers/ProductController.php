@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Models\Tax;
 use App\Models\Unit;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +39,7 @@ class ProductController extends Controller
 
         $defaultTaxId = \App\Models\Setting::get('invoice.default_tax_id', '');
 
-        return Inertia::render('Products/Index', [
+        return Spa::render('Products/Index', [
             'products' => $query->latest()->paginate(15)->withQueryString(),
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
@@ -56,9 +56,8 @@ class ProductController extends Controller
             'tax_id' => 'nullable|exists:taxes,id',
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'exists:taxes,id',
-            'name' => 'required|string|max:255',
-            'generic_name' => 'nullable|string|max:255',
-            'brand_name' => 'nullable|string|max:255',
+            'generic_name' => 'required|string|max:255',
+            'brand_name' => 'required|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:100',
             'barcode' => 'nullable|string|max:255|unique:products,barcode',
@@ -67,16 +66,18 @@ class ProductController extends Controller
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|max:250',
             'product_units' => 'required|array|min:1',
             'product_units.*.unit_id' => 'required|exists:units,id',
             'product_units.*.conversion_factor' => 'required|numeric|min:1',
             'product_units.*.selling_price' => 'required|numeric|min:0',
             'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
+            'product_units.*.is_default_selling_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated) {
+            $validated['name'] = $validated['brand_name'];
             $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
 
             $taxIds = collect($validated['tax_ids'] ?? [])
@@ -105,7 +106,13 @@ class ProductController extends Controller
 
             $product->taxes()->sync($taxIds->all());
 
-            foreach ($validated['product_units'] as $unitData) {
+            $defaultSellingIndex = collect($validated['product_units'])->search(fn ($unit) => $unit['is_default_selling_unit']);
+            $defaultSellingIndex = $defaultSellingIndex === false ? 0 : $defaultSellingIndex;
+
+            foreach ($validated['product_units'] as $index => $unitData) {
+                $unitData['is_base_unit'] = $index === 0;
+                $unitData['conversion_factor'] = $index === 0 ? 1 : $unitData['conversion_factor'];
+                $unitData['is_default_selling_unit'] = $index === $defaultSellingIndex;
                 $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
                 $product->product_units()->create($unitData);
             }
@@ -114,11 +121,22 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Medicine created successfully.');
     }
 
-    public function edit($locale, $product)
+    public function create(Request $request)
+    {
+        return Spa::render('Products/Create', [
+            'categories' => Category::all(),
+            'taxes' => Tax::where('status', true)->get(),
+            'units' => Unit::all(),
+            'default_tax_id' => \App\Models\Setting::get('invoice.default_tax_id', ''),
+            'initial_barcode' => $request->string('barcode')->toString(),
+        ]);
+    }
+
+    public function edit($product)
     {
         $productModel = Product::with(['category', 'taxes', 'product_units.unit'])->findOrFail($product);
 
-        return Inertia::render('Products/Edit', [
+        return Spa::render('Products/Edit', [
             'product' => $productModel,
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
@@ -126,7 +144,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function update(Request $request, $locale, $product)
+    public function update(Request $request, $product)
     {
         $product = Product::findOrFail($product);
 
@@ -135,9 +153,8 @@ class ProductController extends Controller
             'tax_id' => 'nullable|exists:taxes,id',
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'exists:taxes,id',
-            'name' => 'required|string|max:255',
-            'generic_name' => 'nullable|string|max:255',
-            'brand_name' => 'nullable|string|max:255',
+            'generic_name' => 'required|string|max:255',
+            'brand_name' => 'required|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:100',
             'barcode' => 'nullable|string|max:255|unique:products,barcode,' . $product->id,
@@ -146,16 +163,18 @@ class ProductController extends Controller
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_method' => 'required|in:Exclusive,Inclusive',
             'status' => 'required|in:Active,Inactive',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|max:250',
             'product_units' => 'required|array|min:1',
             'product_units.*.unit_id' => 'required|exists:units,id',
             'product_units.*.conversion_factor' => 'required|numeric|min:1',
             'product_units.*.selling_price' => 'required|numeric|min:0',
             'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
+            'product_units.*.is_default_selling_unit' => 'required|boolean',
         ]);
 
         DB::transaction(function () use ($request, $validated, $product) {
+            $validated['name'] = $validated['brand_name'];
             $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
 
             $taxIds = collect($validated['tax_ids'] ?? [])
@@ -189,7 +208,13 @@ class ProductController extends Controller
 
             // Update product units
             $product->product_units()->delete();
-            foreach ($validated['product_units'] as $unitData) {
+            $defaultSellingIndex = collect($validated['product_units'])->search(fn ($unit) => $unit['is_default_selling_unit']);
+            $defaultSellingIndex = $defaultSellingIndex === false ? 0 : $defaultSellingIndex;
+
+            foreach ($validated['product_units'] as $index => $unitData) {
+                $unitData['is_base_unit'] = $index === 0;
+                $unitData['conversion_factor'] = $index === 0 ? 1 : $unitData['conversion_factor'];
+                $unitData['is_default_selling_unit'] = $index === $defaultSellingIndex;
                 $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
                 $product->product_units()->create($unitData);
             }
@@ -198,7 +223,7 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Medicine updated successfully.');
     }
 
-    public function destroy($locale, $product)
+    public function destroy($product)
     {
         $product = Product::findOrFail($product);
 

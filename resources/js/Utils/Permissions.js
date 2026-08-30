@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { usePage } from '@/spa';
 
 /**
  * Custom hook to check if the current user has a specific permission.

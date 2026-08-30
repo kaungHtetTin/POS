@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import { Head, Link, router, useForm, usePage } from '@/spa';
 import {
     Alert,
     Autocomplete,
@@ -504,7 +505,15 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
     const renderProductSelection = () => (
         <Stack spacing={2.5}>
             {renderStepErrors()}
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+            <ReportFilterToolbar
+                ariaLabel="Purchase product filters"
+                fieldKinds={['search', 'wide']}
+                actions={(
+                    <Button type="button" variant="outlined" size="small" onClick={() => { setAppliedProductQuery(productQuery); setProductPage(1); }}>
+                        Search
+                    </Button>
+                )}
+            >
                 <TextField
                     fullWidth
                     size="small"
@@ -542,19 +551,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                         <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
                     ))}
                 </TextField>
-                <Button
-                    type="button"
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                        setAppliedProductQuery(productQuery);
-                        setProductPage(1);
-                    }}
-                    sx={{ height: 40, minWidth: 116, whiteSpace: 'nowrap' }}
-                >
-                    Search
-                </Button>
-            </Stack>
+            </ReportFilterToolbar>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                 <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>

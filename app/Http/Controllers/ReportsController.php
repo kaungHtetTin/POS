@@ -11,6 +11,7 @@ use App\Models\InventoryBatch;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\ReturnEntry;
+use App\Models\ReturnItem;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Supplier;
@@ -19,7 +20,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class ReportsController extends Controller
 {
@@ -138,8 +139,7 @@ class ReportsController extends Controller
 
         $cogs = (clone $salesBase)
             ->join('sale_items', 'sales.id', '=', 'sale_items.sale_id')
-            ->join('inventory_batches', 'sale_items.batch_id', '=', 'inventory_batches.id')
-            ->selectRaw('COALESCE(SUM((sale_items.base_quantity + COALESCE(sale_items.foc_base_quantity, 0)) * inventory_batches.purchase_price), 0) as cogs')
+            ->selectRaw('COALESCE(SUM(sale_items.cost_total), 0) as cogs')
             ->value('cogs');
 
         $returnsBase = ReturnEntry::query()
@@ -154,6 +154,18 @@ class ReportsController extends Controller
             ->where('type', 'Customer')
             ->selectRaw('COALESCE(SUM(refund_amount), 0) as refund_total')
             ->value('refund_total');
+
+        $customerReturnCogs = ReturnItem::query()
+            ->join('returns', 'return_items.return_id', '=', 'returns.id')
+            ->whereIn('returns.branch_id', $accessibleBranchIds)
+            ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                $q->where('returns.branch_id', $branchScope['branch_id']);
+            })
+            ->where('returns.type', 'Customer')
+            ->where('returns.status', 'Approved')
+            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->selectRaw('COALESCE(SUM(return_items.cost_total), 0) as return_cogs')
+            ->value('return_cogs');
 
         $supplierReturns = (clone $returnsBase)
             ->where('type', 'Supplier')
@@ -171,7 +183,8 @@ class ReportsController extends Controller
 
         $salesNetOfTax = (float) $salesSummary->grand_total - (float) $salesSummary->tax;
         $salesNetOfTaxAndReturns = $salesNetOfTax - (float) $customerReturns;
-        $grossProfit = $salesNetOfTaxAndReturns - (float) $cogs;
+        $netCogs = (float) $cogs - (float) $customerReturnCogs;
+        $grossProfit = $salesNetOfTaxAndReturns - $netCogs;
         $netProfit = $grossProfit - (float) $expensesTotal;
 
         $buildFinancialTrend = function (string $trendGroupBy) use ($salesBase, $returnsBase, $accessibleBranchIds, $branchScope, $fromDate, $toDate) {
@@ -227,9 +240,8 @@ class ReportsController extends Controller
 
             $cogsTrend = (clone $salesBase)
                 ->join('sale_items', 'sales.id', '=', 'sale_items.sale_id')
-                ->join('inventory_batches', 'sale_items.batch_id', '=', 'inventory_batches.id')
                 ->selectRaw($salesPeriodSelect)
-                ->selectRaw('COALESCE(SUM((sale_items.base_quantity + COALESCE(sale_items.foc_base_quantity, 0)) * inventory_batches.purchase_price), 0) as cogs')
+                ->selectRaw('COALESCE(SUM(sale_items.cost_total), 0) as cogs')
                 ->groupBy($salesPeriodExpr)
                 ->orderBy($salesPeriodExpr)
                 ->get();
@@ -240,6 +252,33 @@ class ReportsController extends Controller
                 ->selectRaw('COALESCE(SUM(refund_amount), 0) as customer_returns')
                 ->groupBy($returnsPeriodExpr)
                 ->orderBy($returnsPeriodExpr)
+                ->get();
+
+            $returnCostPeriodExpr = match ($trendGroupBy) {
+                'yearly' => DB::raw("DATE_FORMAT(returns.created_at, '%Y-01-01')"),
+                'monthly' => DB::raw("DATE_FORMAT(returns.created_at, '%Y-%m-01')"),
+                default => DB::raw('DATE(returns.created_at)'),
+            };
+
+            $returnCostPeriodSelect = match ($trendGroupBy) {
+                'yearly' => "DATE_FORMAT(returns.created_at, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(returns.created_at, '%Y-%m-01') as period",
+                default => 'DATE(returns.created_at) as period',
+            };
+
+            $customerReturnCogsTrend = ReturnItem::query()
+                ->join('returns', 'return_items.return_id', '=', 'returns.id')
+                ->whereIn('returns.branch_id', $accessibleBranchIds)
+                ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
+                    $q->where('returns.branch_id', $branchScope['branch_id']);
+                })
+                ->where('returns.type', 'Customer')
+                ->where('returns.status', 'Approved')
+                ->whereBetween('returns.created_at', [$fromDate, $toDate])
+                ->selectRaw($returnCostPeriodSelect)
+                ->selectRaw('COALESCE(SUM(return_items.cost_total), 0) as return_cogs')
+                ->groupBy($returnCostPeriodExpr)
+                ->orderBy($returnCostPeriodExpr)
                 ->get();
 
             $expensesTrend = Expense::query()
@@ -257,28 +296,31 @@ class ReportsController extends Controller
             $salesTrendByPeriod = $salesTrend->keyBy('period');
             $cogsTrendByPeriod = $cogsTrend->keyBy('period');
             $returnsTrendByPeriod = $customerReturnsTrend->keyBy('period');
+            $returnCogsTrendByPeriod = $customerReturnCogsTrend->keyBy('period');
             $expensesTrendByPeriod = $expensesTrend->keyBy('period');
 
             $profitPeriods = collect([])
                 ->merge($salesTrendByPeriod->keys())
                 ->merge($cogsTrendByPeriod->keys())
                 ->merge($returnsTrendByPeriod->keys())
+                ->merge($returnCogsTrendByPeriod->keys())
                 ->merge($expensesTrendByPeriod->keys())
                 ->unique()
                 ->sort()
                 ->values();
 
-            $profitTrend = $profitPeriods->map(function ($period) use ($salesTrendByPeriod, $cogsTrendByPeriod, $returnsTrendByPeriod, $expensesTrendByPeriod) {
+            $profitTrend = $profitPeriods->map(function ($period) use ($salesTrendByPeriod, $cogsTrendByPeriod, $returnsTrendByPeriod, $returnCogsTrendByPeriod, $expensesTrendByPeriod) {
                 $salesRow = $salesTrendByPeriod->get($period);
                 $cogsRow = $cogsTrendByPeriod->get($period);
                 $returnsRow = $returnsTrendByPeriod->get($period);
+                $returnCogsRow = $returnCogsTrendByPeriod->get($period);
                 $expensesRow = $expensesTrendByPeriod->get($period);
 
                 $grandTotal = (float) ($salesRow->grand_total ?? 0);
                 $tax = (float) ($salesRow->tax ?? 0);
                 $netSales = $grandTotal - $tax;
                 $customerReturnsAmount = (float) ($returnsRow->customer_returns ?? 0);
-                $cogsAmount = (float) ($cogsRow->cogs ?? 0);
+                $cogsAmount = (float) ($cogsRow->cogs ?? 0) - (float) ($returnCogsRow->return_cogs ?? 0);
                 $expensesAmount = (float) ($expensesRow->expenses_total ?? 0);
 
                 $grossProfitAmount = ($netSales - $customerReturnsAmount) - $cogsAmount;
@@ -394,7 +436,7 @@ class ReportsController extends Controller
             ->limit(100)
             ->get();
 
-        return Inertia::render('Reports/Index', [
+        return Spa::render('Reports/Index', [
             'branches' => $branches,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
@@ -409,7 +451,9 @@ class ReportsController extends Controller
                 'discount' => (float) ($salesSummary->discount ?? 0),
                 'tax' => (float) ($salesSummary->tax ?? 0),
                 'grand_total' => (float) ($salesSummary->grand_total ?? 0),
-                'cogs' => (float) $cogs,
+                'cogs' => $netCogs,
+                'gross_cogs' => (float) $cogs,
+                'customer_return_cogs' => (float) $customerReturnCogs,
                 'customer_returns' => (float) $customerReturns,
                 'supplier_returns' => (float) $supplierReturns,
                 'expenses_total' => (float) $expensesTotal,
@@ -558,7 +602,7 @@ class ReportsController extends Controller
                 ];
             });
 
-        return Inertia::render('Finance/SaleRepresentative', [
+        return Spa::render('Finance/SaleRepresentative', [
             'branches' => $branches,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
@@ -665,7 +709,7 @@ class ReportsController extends Controller
                 ];
             });
 
-        return Inertia::render('Reports/Expiry', [
+        return Spa::render('Reports/Expiry', [
             'branches' => $branches,
             'products' => $products,
             'batches' => $batches,
@@ -821,7 +865,7 @@ class ReportsController extends Controller
             $query->havingRaw('current_quantity <= products.min_stock_level');
         }
 
-        return Inertia::render('Reports/LowBalance', [
+        return Spa::render('Reports/LowBalance', [
             'branches' => $branches,
             'categories' => $categories,
             'items' => $query
@@ -1070,7 +1114,7 @@ class ReportsController extends Controller
                 ];
             });
 
-        return Inertia::render('Reports/SalesByCustomers', [
+        return Spa::render('Reports/SalesByCustomers', [
             'branches' => $branches,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
@@ -1271,7 +1315,7 @@ class ReportsController extends Controller
                 ];
             });
 
-        return Inertia::render('Reports/Purchases', [
+        return Spa::render('Reports/Purchases', [
             'branches' => $branches,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
@@ -1299,7 +1343,7 @@ class ReportsController extends Controller
         ]);
     }
 
-    public function purchaseSupplier(Request $request, string $locale, Supplier $supplier)
+    public function purchaseSupplier(Request $request, Supplier $supplier)
     {
         $user = $request->user();
         $accessibleBranchIds = $this->accessibleBranchIds($user);
@@ -1429,7 +1473,7 @@ class ReportsController extends Controller
                 ];
             });
 
-        return Inertia::render('Reports/PurchaseSupplier', [
+        return Spa::render('Reports/PurchaseSupplier', [
             'branches' => $branches,
             'supplier' => [
                 'id' => $supplier->id,
@@ -1559,7 +1603,7 @@ class ReportsController extends Controller
             ->orderBy(DB::raw('DATE(opened_at)'))
             ->get();
 
-        return Inertia::render('Reports/CashSessions', [
+        return Spa::render('Reports/CashSessions', [
             'branches' => $branches,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],

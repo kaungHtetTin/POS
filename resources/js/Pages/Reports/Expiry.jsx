@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router } from '@/spa';
 import MainLayout from '@/Layouts/MainLayout';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
 import {
     Autocomplete,
     Box,
@@ -90,15 +92,17 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                         </Typography>
                     </Stack>
 
-                    <Box
-                        sx={{
-                            mb: 2,
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 1,
-                            alignItems: 'center',
-                            minWidth: 0,
-                        }}
+                    <ReportFilterToolbar
+                        ariaLabel="Expiry report filters"
+                        fieldKinds={['wide', 'date', 'date', 'search']}
+                        onSubmit={applyFilters}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon />} type="submit">Apply</Button>
+                                <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>Reset</Button>
+                                <CsvExportButton source={batches} dataKey="batches" filename="expiry-report.csv" />
+                            </>
+                        )}
                     >
                         <FormControl
                             size="small"
@@ -189,30 +193,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             )}
                         />
 
-                        <Stack
-                            direction="row"
-                            spacing={1}
-                            useFlexGap
-                            flexWrap="wrap"
-                            sx={{
-                                flex: { xs: '1 1 100%', sm: '0 0 auto' },
-                                justifyContent: { xs: 'stretch', sm: 'flex-end' },
-                                '& .MuiButton-root': {
-                                    height: 40,
-                                    px: 2,
-                                    minWidth: { xs: 0, sm: 104 },
-                                    flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' },
-                                },
-                            }}
-                        >
-                            <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={applyFilters}>
-                                Apply
-                            </Button>
-                            <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>
-                                Reset
-                            </Button>
-                        </Stack>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
                         <Chip size="small" variant="outlined" label={`Total Batches: ${summary.total}`} />

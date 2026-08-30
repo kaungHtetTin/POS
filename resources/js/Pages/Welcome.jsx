@@ -1,4 +1,4 @@
-import { Link, Head } from '@inertiajs/react';
+import { Link, Head } from '@/spa';
 
 export default function Welcome(props) {
     return (

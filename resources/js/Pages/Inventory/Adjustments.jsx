@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, useForm, router } from '@/spa';
 import {
     Box,
     Button,
@@ -103,31 +105,23 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                             <AdjustmentIcon color="primary" />
                             Stock Adjustments (Damage/Returns)
                         </Typography>
-                        <Stack direction="row" spacing={1}>
-                            <TextField
-                                size="small"
-                                placeholder="Search product..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={handleOpen}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                New Adjustment
-                            </Button>
-                        </Stack>
+                        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>New Adjustment</Button>
                     </Stack>
+
+                    <ReportFilterToolbar
+                        ariaLabel="Inventory adjustment filters"
+                        fieldKinds={['search']}
+                        onSubmit={() => handleSearch()}
+                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={adjustments} dataKey="adjustments" filename="inventory-adjustments.csv" /></>}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder="Search product..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+                        />
+                    </ReportFilterToolbar>
 
                     <TableContainer>
                         <Table size="small">

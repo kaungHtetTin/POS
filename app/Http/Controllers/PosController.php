@@ -12,7 +12,7 @@ use App\Models\Sale;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class PosController extends Controller
 {
@@ -21,7 +21,7 @@ class PosController extends Controller
         $branchId = request()->user()->currentBranchId();
         
         if (!$branchId) {
-            return Inertia::render('POS/Index', [
+            return Spa::render('POS/Index', [
                 'pageTitle' => 'POS Interface',
                 'error' => 'No branch assigned. Please contact the administrator to assign you to a branch.',
                 'activeSession' => null,
@@ -31,7 +31,7 @@ class PosController extends Controller
         $userId = request()->user()->id;
         $activeSession = $this->getActiveSession($branchId, $userId);
 
-        return Inertia::render('POS/Index', [
+        return Spa::render('POS/Index', [
             'pageTitle' => 'POS Interface',
             'paymentMethods' => ['Cash', 'Card', 'Mobile', 'Wallet'],
             'paymentStatuses' => ['Paid', 'Partial', 'Due'],
@@ -93,7 +93,7 @@ class PosController extends Controller
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -136,6 +136,7 @@ class PosController extends Controller
                             'selling_price' => (float) $pu->selling_price,
                             'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                             'is_base_unit' => (bool) $pu->is_base_unit,
+                            'is_default_selling_unit' => (bool) $pu->is_default_selling_unit,
                         ];
                     })->values(),
                 ];
@@ -184,7 +185,7 @@ class PosController extends Controller
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -228,6 +229,7 @@ class PosController extends Controller
                         'selling_price' => (float) $pu->selling_price,
                         'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                         'is_base_unit' => (bool) $pu->is_base_unit,
+                        'is_default_selling_unit' => (bool) $pu->is_default_selling_unit,
                     ];
                 })->values(),
             ];
@@ -282,7 +284,7 @@ class PosController extends Controller
                 'tax:id,name,rate',
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -327,6 +329,7 @@ class PosController extends Controller
                     'selling_price' => (float) $pu->selling_price,
                     'wholesale_price' => (float) ($pu->wholesale_price ?? $pu->selling_price),
                     'is_base_unit' => (bool) $pu->is_base_unit,
+                    'is_default_selling_unit' => (bool) $pu->is_default_selling_unit,
                 ];
             })->values(),
         ]);
@@ -385,7 +388,7 @@ class PosController extends Controller
 
         $productIds = $items->pluck('product_id')->unique()->values();
         $products = Product::whereIn('id', $productIds)
-            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,wholesale_price,is_base_unit'])
+            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,wholesale_price,is_base_unit,is_default_selling_unit'])
             ->get()
             ->keyBy('id');
 
@@ -587,6 +590,8 @@ class PosController extends Controller
                     $quantityInUnit = $paidBaseDeduct / (int) $line['conversion_factor'];
                     $focQuantityInUnit = $focBaseDeduct / (int) $line['foc_conversion_factor'];
                     $totalPrice = $quantityInUnit * (float) $line['unit_price'];
+                    $baseUnitCost = (float) $batch->purchase_price;
+                    $costTotal = round(($paidBaseDeduct + $focBaseDeduct) * $baseUnitCost, 2);
 
                     $sale->items()->create([
                         'product_id' => $line['product_id'],
@@ -597,6 +602,9 @@ class PosController extends Controller
                         'foc_unit_id' => $line['foc_unit_id'],
                         'base_quantity' => $paidBaseDeduct,
                         'foc_base_quantity' => $focBaseDeduct,
+                        'base_unit_cost' => $baseUnitCost,
+                        'cost_total' => $costTotal,
+                        'cost_backfilled' => false,
                         'unit_price' => $line['unit_price'],
                         'price_type' => $line['price_type'],
                         'original_unit_price' => $line['original_unit_price'],
@@ -657,7 +665,7 @@ class PosController extends Controller
         ];
 
         return redirect()
-            ->route('pos.index', ['locale' => app()->getLocale()])
+            ->route('pos.index')
             ->with('success', 'Sale completed successfully.')
             ->with('sale_receipt', $saleReceipt);
     }
@@ -672,7 +680,7 @@ class PosController extends Controller
         
         if (!$branchId) {
             return redirect()
-                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->route('pos.index')
                 ->withErrors(['session' => 'No branch assigned to user.']);
         }
 
@@ -681,7 +689,7 @@ class PosController extends Controller
         $existing = $this->getActiveSession($branchId, $userId);
         if ($existing) {
             return redirect()
-                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->route('pos.index')
                 ->withErrors(['session' => 'You already have an open cashier session.']);
         }
 
@@ -699,7 +707,7 @@ class PosController extends Controller
         ]);
 
         return redirect()
-            ->route('pos.index', ['locale' => app()->getLocale()])
+            ->route('pos.index')
             ->with('success', 'Cashier session started.');
     }
 
@@ -714,7 +722,7 @@ class PosController extends Controller
         
         if (!$branchId) {
             return redirect()
-                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->route('pos.index')
                 ->withErrors(['session' => 'No branch assigned to user.']);
         }
 
@@ -723,7 +731,7 @@ class PosController extends Controller
 
         if (!$activeSession) {
             return redirect()
-                ->route('pos.index', ['locale' => app()->getLocale()])
+                ->route('pos.index')
                 ->withErrors(['session' => 'No open cashier session to close.']);
         }
 
@@ -748,7 +756,7 @@ class PosController extends Controller
         $statusText = $difference === 0.0 ? 'balanced' : ($difference > 0 ? 'over' : 'short');
 
         return redirect()
-            ->route('pos.index', ['locale' => app()->getLocale()])
+            ->route('pos.index')
             ->with('success', "Cashier session closed ({$statusText}).");
     }
 

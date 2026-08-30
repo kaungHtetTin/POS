@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class BranchController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Branches/Index', [
+        return Spa::render('Branches/Index', [
             'branches' => Branch::withCount('users')->get(),
         ]);
     }
@@ -41,7 +41,7 @@ class BranchController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, string $locale, Branch $branch)
+    public function update(Request $request, Branch $branch)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:branches,name,' . $branch->id,
@@ -55,7 +55,7 @@ class BranchController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(string $locale, Branch $branch)
+    public function destroy(Branch $branch)
     {
         if ($branch->users()->exists()) {
             abort(403, 'Branch cannot be deleted because it has assigned staff members.');

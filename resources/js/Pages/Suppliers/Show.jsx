@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, Link, router, useForm, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -192,11 +193,14 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                 </Paper>
 
                 <Paper sx={{ p: 2, mb: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                        <PurchaseIcon color="primary" fontSize="small" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                            Purchases
-                        </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <PurchaseIcon color="primary" fontSize="small" />
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                Purchases
+                            </Typography>
+                        </Stack>
+                        <CsvExportButton source={purchases} dataKey="purchases" pageParam="purchases_page" filename="supplier-purchases.csv" />
                     </Stack>
                     <TableContainer>
                         <Table size="small">
@@ -280,9 +284,12 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                 </Paper>
 
                 <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5 }}>
-                        Payment History
-                    </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                            Payment History
+                        </Typography>
+                        <CsvExportButton source={payments} dataKey="payments" pageParam="payments_page" filename="supplier-payments.csv" />
+                    </Stack>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>

@@ -1,6 +1,6 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/spa';
 import {
     Box,
     Typography,
@@ -53,7 +53,7 @@ export default function Manual({ auth, appName }) {
             content: (
                 <Box>
                     <Typography variant="body1" paragraph>
-                        The application is built on a modern, monolithic architecture using the <strong>Laravel-Inertia-React</strong> stack. This provides the SEO and routing benefits of a traditional server-side framework with the interactivity of a Single Page Application (SPA).
+                        The application uses a <strong>Laravel JSON + React SPA</strong> architecture. Laravel owns routing, validation, authorization, and accounting logic while the persistent React shell changes only the active page content.
                     </Typography>
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={4}>
@@ -81,7 +81,7 @@ export default function Manual({ auth, appName }) {
                                     </Box>
                                     <List dense>
                                         <ListItem><ListItemText primary="Vite Build Tool" secondary="Instant HMR and fast builds" /></ListItem>
-                                        <ListItem><ListItemText primary="Inertia.js" secondary="State-sharing without APIs (shared props)" /></ListItem>
+                                        <ListItem><ListItemText primary="Native SPA Runtime" secondary="JSON page data, persistent navigation, and cancellable loading transitions" /></ListItem>
                                         <ListItem><ListItemText primary="Material UI (MUI)" secondary="Custom 4px radius, dense theme" /></ListItem>
                                         <ListItem><ListItemText primary="Context API" secondary="Global theme and language state" /></ListItem>
                                     </List>
@@ -700,7 +700,7 @@ export default function Manual({ auth, appName }) {
                                 <CardContent>
                                     <Typography variant="subtitle2" fontWeight="bold">Frontend Debugging</Typography>
                                     <Typography variant="caption" display="block">
-                                        UI crashes or Inertia errors can be inspected by pressing <code>F12</code> and checking the <strong>Console</strong> tab.
+                                        UI crashes or SPA request errors can be inspected by pressing <code>F12</code> and checking the <strong>Console</strong> and <strong>Network</strong> tabs.
                                     </Typography>
                                 </CardContent>
                             </Card>

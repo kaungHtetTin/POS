@@ -11,7 +11,7 @@ use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Support\Spa;
 
 class StockTransferController extends Controller
 {
@@ -24,7 +24,7 @@ class StockTransferController extends Controller
             $query->where('reference_number', 'like', "%{$request->search}%");
         }
 
-        return Inertia::render('Inventory/Transfers', [
+        return Spa::render('Inventory/Transfers', [
             'transfers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
         ]);
@@ -32,7 +32,7 @@ class StockTransferController extends Controller
 
     public function create()
     {
-        return Inertia::render('Inventory/Transfers/Create', [
+        return Spa::render('Inventory/Transfers/Create', [
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
             'products' => Product::with('category:id,name')
                 ->with('inventories:id,product_id,branch_id,quantity')

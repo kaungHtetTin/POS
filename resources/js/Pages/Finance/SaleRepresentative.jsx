@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, usePage } from '@inertiajs/react';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import CsvExportButton from '@/Components/CsvExportButton';
+import { Head, router, usePage } from '@/spa';
 import {
     Avatar,
     Box,
@@ -169,7 +171,18 @@ export default function SaleRepresentative({
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('SALE REPRESENTATIVE FILTERS')}</Typography>
                     </Stack>
 
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}>
+                    <ReportFilterToolbar
+                        ariaLabel={__('Sale representative filters')}
+                        fieldKinds={['wide', 'select', 'date', 'date', 'search']}
+                        onSubmit={() => applyFilters()}
+                        actions={(
+                            <>
+                                <Button variant="contained" size="small" startIcon={<FilterIcon />} type="submit">{__('Apply')}</Button>
+                                <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters}>{__('Reset')}</Button>
+                                <CsvExportButton source={representatives} dataKey="representatives" filename="sale-representatives.csv" />
+                            </>
+                        )}
+                    >
                         <FormControl size="small" sx={{ flex: { xs: '1 1 100%', sm: '1 1 220px' }, minWidth: 0 }}>
                             <InputLabel>{__('Branch')}</InputLabel>
                             <Select value={branchId} label={__('Branch')} onChange={(event) => setBranchId(event.target.value)}>
@@ -229,13 +242,7 @@ export default function SaleRepresentative({
                             }}
                             sx={{ flex: { xs: '1 1 100%', lg: '2 1 260px' }, minWidth: 0 }}
                         />
-                        <Button variant="contained" size="small" startIcon={<FilterIcon />} onClick={() => applyFilters()} sx={{ height: 40 }}>
-                            {__('Apply')}
-                        </Button>
-                        <Button variant="outlined" size="small" startIcon={<ResetIcon />} onClick={resetFilters} sx={{ height: 40 }}>
-                            {__('Reset')}
-                        </Button>
-                    </Box>
+                    </ReportFilterToolbar>
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(5, 1fr)' }, gap: 1.2 }}>
                         {summaryCards.map(([label, value]) => (

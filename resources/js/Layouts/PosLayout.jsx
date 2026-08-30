@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { usePage, router } from '@inertiajs/react';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Link, usePage, router } from '@/spa';
+import PersistentShellContext from '@/contexts/PersistentShellContext';
 import ThemeControl from '@/Components/ThemeControl';
 import SimpleIcon from '@/Components/SimpleIcon';
 import {
@@ -23,7 +24,25 @@ import {
     TextField,
 } from '@mui/material';
 
-export default function PosLayout({ children, header = 'POS' }) {
+export default function PosLayout(props) {
+    const persistentShell = useContext(PersistentShellContext);
+
+    if (persistentShell) {
+        return <EmbeddedPosPage {...props} shell={persistentShell} />;
+    }
+
+    return <PosLayoutShell {...props} />;
+}
+
+function EmbeddedPosPage({ children, header = 'POS', shell }) {
+    useLayoutEffect(() => {
+        shell.setHeader(header);
+    }, [header, shell]);
+
+    return children;
+}
+
+function PosLayoutShell({ children, header = 'POS' }) {
     const { auth, flash, translations = {}, locale, ziggy = {} } = usePage().props;
     const appBase = ziggy?.base || window.laravel_base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -64,7 +83,8 @@ export default function PosLayout({ children, header = 'POS' }) {
     };
 
     const changeLanguage = (lang) => {
-        window.location.href = route('language.switch', { lang });
+        handleCloseLangMenu();
+        router.action(route('language.switch'), { locale: lang });
     };
 
     const normalizePath = (value) => {
@@ -132,6 +152,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                     boxShadow: 'none',
                     borderBottom: '1px solid',
                     borderColor: 'divider',
+                    borderRadius: 0,
                 }}
             >
                 <Toolbar sx={{ minHeight: '54px !important', gap: 1, px: { xs: 1.5, sm: 2.5 } }}>
@@ -143,7 +164,7 @@ export default function PosLayout({ children, header = 'POS' }) {
                         {navItems.map((item) => (
                             <Button
                                 key={item.text}
-                                component="a"
+                                component={Link}
                                 href={item.href}
                                 size="small"
                                 startIcon={<SimpleIcon name={item.icon} size={16} />}
@@ -296,27 +317,27 @@ export default function PosLayout({ children, header = 'POS' }) {
                                 </Box>
                             </Box>
                             <Divider />
-                            <MenuItem component="a" href={route('dashboard')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('dashboard')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="grid" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Dashboard')}</Typography>
                             </MenuItem>
                             {permissions.includes('view_financial_reports') && (
-                                <MenuItem component="a" href={route('sales.index')} onClick={handleCloseUserMenu}>
+                                <MenuItem component={Link} href={route('sales.index')} onClick={handleCloseUserMenu}>
                                     <ListItemIcon><SimpleIcon name="receipt" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('Sales')}</Typography>
                                 </MenuItem>
                             )}
-                            <MenuItem component="a" href={route('profile.edit')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="user" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
                             </MenuItem>
                             {permissions.includes('manage_branches') && (
-                                <MenuItem component="a" href={route('settings.index')} onClick={handleCloseUserMenu}>
+                                <MenuItem component={Link} href={route('settings.index')} onClick={handleCloseUserMenu}>
                                     <ListItemIcon><SimpleIcon name="settings" size={17} /></ListItemIcon>
                                     <Typography variant="body2">{__('Settings')}</Typography>
                                 </MenuItem>
                             )}
-                            <MenuItem component="a" href={route('manual.index')} onClick={handleCloseUserMenu}>
+                            <MenuItem component={Link} href={route('manual.index')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="book" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('SOP Manual')}</Typography>
                             </MenuItem>

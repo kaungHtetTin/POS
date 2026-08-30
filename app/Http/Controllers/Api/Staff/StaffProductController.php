@@ -381,7 +381,7 @@ class StaffProductController extends Controller
             'discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'tax_method' => ['required', 'in:Exclusive,Inclusive'],
             'status' => ['required', 'in:Active,Inactive'],
-            'image' => ['nullable', 'image', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:250'],
             'product_units' => ['required', 'array', 'min:1'],
             'product_units.*.unit_id' => ['required', 'exists:units,id'],
             'product_units.*.conversion_factor' => ['required', 'numeric', 'min:1'],

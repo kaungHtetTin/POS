@@ -24,7 +24,7 @@ class InventoryBatch extends Model
     protected $casts = [
         'expiry_date' => 'date',
         'quantity' => 'integer',
-        'purchase_price' => 'decimal:2',
+        'purchase_price' => 'decimal:6',
         'selling_price' => 'decimal:2',
         'is_synced' => 'boolean',
     ];

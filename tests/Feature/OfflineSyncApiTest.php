@@ -11,6 +11,7 @@ use App\Models\ProductUnit;
 use App\Models\Purchase;
 use App\Models\Role;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
@@ -92,6 +93,9 @@ class OfflineSyncApiTest extends TestCase
         $this->assertSame($user->id, Sale::where('client_reference', 'android-sale-001')->value('sale_staff_id'));
         $this->assertSame(8, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertSame(8, InventoryBatch::where('product_id', $product->id)->first()->quantity);
+        $this->assertEquals(50.000000, (float) SaleItem::first()->base_unit_cost);
+        $this->assertEquals(100.00, (float) SaleItem::first()->cost_total);
+        $this->assertFalse((bool) SaleItem::first()->cost_backfilled);
 
         $this->postJson('http://localhost/api/sync/sales', $payload)
             ->assertOk()

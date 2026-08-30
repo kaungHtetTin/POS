@@ -1,6 +1,6 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link } from '@/spa';
 import { Box, Typography, Button, Paper, useTheme } from '@mui/material';
 import { 
     GppBad as GppBadIcon, 
@@ -80,7 +80,7 @@ export default function Error({ status, message, auth }) {
 
                     <Button
                         component={Link}
-                        href={route('dashboard', { locale: 'en' })}
+                        href={route('dashboard')}
                         variant="contained"
                         startIcon={<HomeIcon />}
                         sx={{ px: 4, py: 1.2, borderRadius: 1, fontWeight: 700 }}

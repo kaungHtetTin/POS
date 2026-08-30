@@ -87,6 +87,8 @@ class SaleVoidTest extends TestCase
             'foc_unit_id' => $unit->id,
             'base_quantity' => 2,
             'foc_base_quantity' => 1,
+            'base_unit_cost' => 50,
+            'cost_total' => 150,
             'unit_price' => 22.5,
             'total_price' => 45,
             'created_at' => now(),
@@ -94,7 +96,7 @@ class SaleVoidTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->post("/en/sales/{$sale->id}/void", [
+            ->post("/sales/{$sale->id}/void", [
                 'reason' => 'Wrong medicine selected',
             ]);
 
@@ -105,6 +107,7 @@ class SaleVoidTest extends TestCase
         $this->assertSame($user->id, $sale->fresh()->voided_by_user_id);
         $this->assertSame('Wrong medicine selected', $sale->fresh()->void_reason);
         $this->assertSame(10, $batch->fresh()->quantity);
+        $this->assertEquals(50.00, (float) $batch->fresh()->purchase_price);
         $this->assertSame(10, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertEquals(0.00, (float) $session->fresh()->cash_received_total);
         $this->assertEquals(0.00, (float) $session->fresh()->change_given_total);

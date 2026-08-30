@@ -10,7 +10,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class SalesByCustomersReportTest extends TestCase
@@ -40,18 +39,17 @@ class SalesByCustomersReportTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get('/en/reports/sales-by-customers?duration=custom&from_date=2026-07-01&to_date=2026-07-31');
+            ->withHeader('X-SPA', 'true')
+            ->get('/reports/sales-by-customers?duration=custom&from_date=2026-07-01&to_date=2026-07-31');
 
-        $response->assertOk();
-        $response->assertInertia(fn (Assert $page) => $page
-            ->component('Reports/SalesByCustomers')
-            ->where('summary.sale_count', 3)
-            ->where('summary.customer_count', 2)
-            ->where('customers.data.0.name', 'Aye Aye')
-            ->where('customers.data.0.grand_total', 450)
-            ->where('customers.data.1.name', 'Mg Mg')
-            ->where('customers.data.1.grand_total', 150)
-        );
+        $response->assertOk()
+            ->assertJsonPath('component', 'Reports/SalesByCustomers')
+            ->assertJsonPath('props.summary.sale_count', 3)
+            ->assertJsonPath('props.summary.customer_count', 2)
+            ->assertJsonPath('props.top_customers.0.name', 'Aye Aye')
+            ->assertJsonPath('props.top_customers.0.grand_total', 450)
+            ->assertJsonPath('props.top_customers.1.name', 'Mg Mg')
+            ->assertJsonPath('props.top_customers.1.grand_total', 150);
     }
 
     protected function createSale(string $branchId, string $userId, ?string $customerId, string $invoiceNumber, float $amount): void

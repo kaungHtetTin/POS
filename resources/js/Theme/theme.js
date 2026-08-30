@@ -79,7 +79,9 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             },
         },
         shape: {
-            borderRadius: 8,
+            // Compact radius scale: numeric sx values now resolve from a 4px base.
+            // Keep fully rounded values only for semantic pills and circles.
+            borderRadius: 4,
         },
         components: {
             MuiCssBaseline: {
@@ -151,7 +153,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
-                        borderRadius: 8,
+                        borderRadius: 6,
                         boxShadow: tokens.shadow,
                         backdropFilter: 'blur(14px) saturate(125%)',
                         WebkitBackdropFilter: 'blur(14px) saturate(125%)',
@@ -173,7 +175,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
-                        borderRadius: 8,
+                        borderRadius: 6,
                         boxShadow: tokens.shadow,
                         backdropFilter: 'blur(14px) saturate(125%)',
                         WebkitBackdropFilter: 'blur(14px) saturate(125%)',
@@ -587,7 +589,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 styleOverrides: {
                     paper: {
                         maxHeight: '90vh',
-                        borderRadius: 10,
+                        borderRadius: 8,
                         border: '1px solid',
                         borderColor: tokens.border,
                         backgroundColor: tokens.glass,
@@ -691,7 +693,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiAlert: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 8,
+                        borderRadius: 6,
                         fontSize: 12,
                     },
                 },
