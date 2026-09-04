@@ -89,7 +89,7 @@ function PullToRefresh({ onRefresh, children }) {
     };
 
     return (
-        <div className={`pull-refresh ${refreshing ? 'pull-refresh--refreshing' : ''}`} style={{ '--pull-distance': `${distance}px` }} onTouchStart={start} onTouchMove={move} onTouchEnd={end} onTouchCancel={end}>
+        <div className={`pull-refresh ${distance > 0 || refreshing ? 'pull-refresh--active' : ''} ${refreshing ? 'pull-refresh--refreshing' : ''}`} style={{ '--pull-distance': `${distance}px` }} onTouchStart={start} onTouchMove={move} onTouchEnd={end} onTouchCancel={end}>
             <div className="pull-refresh__indicator" role="status" aria-live="polite"><Icon name="sync" size={20} /><span>{refreshing ? 'Refreshing…' : armed ? 'Release to refresh' : 'Pull to refresh'}</span></div>
             <div className="pull-refresh__content">{children}</div>
         </div>
