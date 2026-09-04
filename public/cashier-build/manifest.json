@@ -1,0 +1,14 @@
+{
+  "resources/js/mobile/main.css": {
+    "file": "assets/main-908cbdb2.css",
+    "src": "resources/js/mobile/main.css"
+  },
+  "resources/js/mobile/main.jsx": {
+    "css": [
+      "assets/main-908cbdb2.css"
+    ],
+    "file": "assets/main-834d386e.js",
+    "isEntry": true,
+    "src": "resources/js/mobile/main.jsx"
+  }
+}

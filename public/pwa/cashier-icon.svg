@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Cashier POS">
+  <rect width="512" height="512" rx="112" fill="#087f74"/>
+  <circle cx="410" cy="102" r="82" fill="#20b9a8" opacity=".42"/>
+  <path d="M164 112h184a36 36 0 0 1 36 36v216a36 36 0 0 1-36 36H164a36 36 0 0 1-36-36V148a36 36 0 0 1 36-36Z" fill="#fff"/>
+  <path d="M177 160h158a13 13 0 0 1 13 13v60a13 13 0 0 1-13 13H177a13 13 0 0 1-13-13v-60a13 13 0 0 1 13-13Z" fill="#dff6f1"/>
+  <path d="M256 172v62M225 203h62" stroke="#087f74" stroke-width="22" stroke-linecap="round"/>
+  <g fill="#087f74">
+    <rect x="164" y="278" width="48" height="38" rx="10"/>
+    <rect x="232" y="278" width="48" height="38" rx="10"/>
+    <rect x="300" y="278" width="48" height="38" rx="10"/>
+    <rect x="164" y="334" width="48" height="38" rx="10"/>
+    <rect x="232" y="334" width="116" height="38" rx="10"/>
+  </g>
+</svg>

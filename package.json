@@ -2,7 +2,9 @@
     "private": true,
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "dev:cashier": "vite --config vite.cashier.config.js",
+        "build": "vite build && npm run build:cashier",
+        "build:cashier": "vite build --config vite.cashier.config.js"
     },
     "devDependencies": {
         "@headlessui/react": "^1.4.2",

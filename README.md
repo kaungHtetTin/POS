@@ -62,3 +62,24 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Cashier mobile PWA
+
+The cashier-only mobile application is available at `/cashier/`. It is a separate React single-page application backed by the existing Sanctum cashier API, so the desktop administration interface is unaffected.
+
+The mobile app includes cashier login, cash-session controls, product/barcode search, cart and checkout, customer selection/creation, receipt history/detail, branch switching, profile/photo/password editing, and installable PWA support. Product data and the active cart are cached locally. Sales made without a connection are stored with an idempotent client reference and retried through `/api/sync/sales` when connectivity returns.
+
+Build the desktop and cashier bundles together:
+
+```bash
+npm run build
+```
+
+For cashier-only development or production builds:
+
+```bash
+npm run dev:cashier
+npm run build:cashier
+```
+
+Service workers require HTTPS in production (localhost is accepted for local development). Keep `public/cashier-sw.js`, `public/cashier-build`, and `public/pwa` in the deployed public directory.

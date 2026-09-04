@@ -1548,10 +1548,37 @@ class ReportsController extends Controller
                 'user:id,name',
                 'closedByUser:id,name',
             ])
+            ->withCount(['sales as sale_count' => function ($q) {
+                $q->where('status', '!=', 'Voided');
+            }])
+            ->withSum(['sales as total_sales_live' => function ($q) {
+                $q->where('status', '!=', 'Voided');
+            }], 'grand_total')
+            ->withSum(['sales as cash_sales_total' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Cash');
+            }], 'grand_total')
+            ->withSum(['sales as card_sales_total' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Card');
+            }], 'grand_total')
+            ->withSum(['sales as mobile_sales_total' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Mobile');
+            }], 'grand_total')
+            ->withSum(['sales as wallet_sales_total' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Wallet');
+            }], 'grand_total')
+            ->withSum(['sales as cash_received_live' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Cash');
+            }], 'amount_received')
+            ->withSum(['sales as change_given_live' => function ($q) {
+                $q->where('status', '!=', 'Voided')->where('payment_method', 'Cash');
+            }], 'change_due')
             ->orderByDesc('cash_sessions.opened_at')
             ->paginate(15)
             ->withQueryString()
             ->through(function ($session) {
+                $cashReceived = (float) ($session->cash_received_live ?? 0);
+                $changeGiven = (float) ($session->change_given_live ?? 0);
+                $netCash = $cashReceived - $changeGiven;
                 return [
                     'id' => $session->id,
                     'branch_name' => $session->branch?->name ?? '-',
@@ -1561,10 +1588,16 @@ class ReportsController extends Controller
                     'opened_at' => optional($session->opened_at)->toDateTimeString(),
                     'closed_at' => optional($session->closed_at)->toDateTimeString(),
                     'opening_amount' => (float) $session->opening_amount,
-                    'cash_received_total' => (float) $session->cash_received_total,
-                    'change_given_total' => (float) $session->change_given_total,
-                    'net_cash_sales' => (float) $session->net_cash_sales,
-                    'expected_amount' => (float) $session->expected_amount,
+                    'cash_received_total' => $cashReceived,
+                    'change_given_total' => $changeGiven,
+                    'net_cash_sales' => $netCash,
+                    'cash_sales_total' => (float) ($session->cash_sales_total ?? 0),
+                    'card_sales_total' => (float) ($session->card_sales_total ?? 0),
+                    'mobile_sales_total' => (float) ($session->mobile_sales_total ?? 0),
+                    'wallet_sales_total' => (float) ($session->wallet_sales_total ?? 0),
+                    'total_sales' => (float) ($session->total_sales_live ?? 0),
+                    'sale_count' => (int) ($session->sale_count ?? 0),
+                    'expected_amount' => (float) $session->opening_amount + $netCash,
                     'closing_counted_amount' => $session->closing_counted_amount !== null ? (float) $session->closing_counted_amount : null,
                     'difference' => $session->difference !== null ? (float) $session->difference : null,
                     'notes' => $session->notes,
@@ -1583,6 +1616,23 @@ class ReportsController extends Controller
             ->selectRaw('COALESCE(SUM(closing_counted_amount), 0) as counted_amount_total')
             ->selectRaw('COALESCE(SUM(difference), 0) as difference_total')
             ->first();
+
+        $paymentSummary = Sale::query()
+            ->whereIn('cash_session_id', (clone $baseQuery)->select('cash_sessions.id'))
+            ->where('sales.status', '!=', 'Voided')
+            ->selectRaw('COUNT(*) as sale_count')
+            ->selectRaw('COALESCE(SUM(grand_total), 0) as total_sales')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Cash" THEN grand_total ELSE 0 END), 0) as cash_sales_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Card" THEN grand_total ELSE 0 END), 0) as card_sales_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Mobile" THEN grand_total ELSE 0 END), 0) as mobile_sales_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Wallet" THEN grand_total ELSE 0 END), 0) as wallet_sales_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Cash" THEN amount_received ELSE 0 END), 0) as cash_received_total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_method = "Cash" THEN change_due ELSE 0 END), 0) as change_given_total')
+            ->first();
+
+        $summaryCashReceived = (float) ($paymentSummary?->cash_received_total ?? 0);
+        $summaryChangeGiven = (float) ($paymentSummary?->change_given_total ?? 0);
+        $summaryNetCash = $summaryCashReceived - $summaryChangeGiven;
 
         $byBranch = (clone $baseQuery)
             ->join('branches', 'cash_sessions.branch_id', '=', 'branches.id')
@@ -1616,10 +1666,16 @@ class ReportsController extends Controller
                 'open_sessions' => (int) ($summary?->open_sessions ?? 0),
                 'closed_sessions' => (int) ($summary?->closed_sessions ?? 0),
                 'opening_amount_total' => (float) ($summary?->opening_amount_total ?? 0),
-                'cash_received_total' => (float) ($summary?->cash_received_total ?? 0),
-                'change_given_total' => (float) ($summary?->change_given_total ?? 0),
-                'net_cash_sales_total' => (float) ($summary?->net_cash_sales_total ?? 0),
-                'expected_amount_total' => (float) ($summary?->expected_amount_total ?? 0),
+                'sale_count' => (int) ($paymentSummary?->sale_count ?? 0),
+                'cash_sales_total' => (float) ($paymentSummary?->cash_sales_total ?? 0),
+                'card_sales_total' => (float) ($paymentSummary?->card_sales_total ?? 0),
+                'mobile_sales_total' => (float) ($paymentSummary?->mobile_sales_total ?? 0),
+                'wallet_sales_total' => (float) ($paymentSummary?->wallet_sales_total ?? 0),
+                'total_sales' => (float) ($paymentSummary?->total_sales ?? 0),
+                'cash_received_total' => $summaryCashReceived,
+                'change_given_total' => $summaryChangeGiven,
+                'net_cash_sales_total' => $summaryNetCash,
+                'expected_amount_total' => (float) ($summary?->opening_amount_total ?? 0) + $summaryNetCash,
                 'counted_amount_total' => (float) ($summary?->counted_amount_total ?? 0),
                 'difference_total' => (float) ($summary?->difference_total ?? 0),
             ],

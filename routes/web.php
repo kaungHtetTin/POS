@@ -48,6 +48,86 @@ Route::get('/', function () {
     return redirect()->route('dashboard');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Cashier mobile PWA
+|--------------------------------------------------------------------------
+|
+| This is intentionally public at the shell level. The app authenticates
+| against Sanctum's token API and every cashier operation remains protected
+| by the existing API permission checks.
+*/
+Route::get('/cashier/manifest.webmanifest', function () {
+    return response()->json([
+        'id' => url('/cashier/'),
+        'name' => config('app.name', 'Pharmacy POS').' Cashier',
+        'short_name' => 'Cashier POS',
+        'description' => 'Mobile point of sale for pharmacy cashiers.',
+        'start_url' => url('/cashier/'),
+        'scope' => url('/cashier/'),
+        'display' => 'standalone',
+        'display_override' => ['window-controls-overlay', 'standalone', 'minimal-ui'],
+        'background_color' => '#f4f7f5',
+        'theme_color' => '#087f74',
+        'orientation' => 'portrait-primary',
+        'categories' => ['business', 'medical', 'productivity'],
+        'icons' => [
+            [
+                'src' => url('/pwa/cashier-icon-192.png'),
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => url('/pwa/cashier-icon-512.png'),
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => url('/pwa/cashier-maskable.svg'),
+                'sizes' => 'any',
+                'type' => 'image/svg+xml',
+                'purpose' => 'maskable',
+            ],
+        ],
+        'shortcuts' => [
+            [
+                'name' => 'New sale',
+                'short_name' => 'Sale',
+                'url' => url('/cashier/#sale'),
+                'icons' => [[
+                    'src' => url('/pwa/cashier-icon-192.png'),
+                    'sizes' => '192x192',
+                    'type' => 'image/png',
+                ]],
+            ],
+            [
+                'name' => 'Sale history',
+                'short_name' => 'History',
+                'url' => url('/cashier/#history'),
+                'icons' => [[
+                    'src' => url('/pwa/cashier-icon-192.png'),
+                    'sizes' => '192x192',
+                    'type' => 'image/png',
+                ]],
+            ],
+        ],
+    ])->header('Content-Type', 'application/manifest+json');
+})->name('cashier-pwa.manifest');
+
+Route::get('/cashier/{path?}', function () {
+    return view('cashier', [
+        'cashierPwaConfig' => [
+            'appName' => config('app.name', 'Pharmacy POS'),
+            'baseUrl' => rtrim(url('/'), '/'),
+            'apiUrl' => rtrim(url('/api'), '/'),
+            'serviceWorkerUrl' => url('/cashier-sw.js'),
+            'scopeUrl' => url('/cashier/'),
+        ],
+    ]);
+})->where('path', '^(?!manifest\.webmanifest$).*$')->name('cashier-pwa');
+
 Route::post('/language', [LanguageController::class, 'switch'])->name('language.switch');
 
 // Authentication and application routes share one locale-independent URL space.

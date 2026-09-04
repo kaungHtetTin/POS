@@ -832,21 +832,33 @@ class PosController extends Controller
 
     protected function getSessionCashTotals(CashSession $session): array
     {
-        $totals = Sale::query()
+        $sales = Sale::query()
             ->where('cash_session_id', $session->id)
-            ->where('payment_method', 'Cash')
-            ->where('status', '!=', 'Voided')
+            ->where('status', '!=', 'Voided');
+
+        $totals = (clone $sales)
             ->selectRaw('COALESCE(SUM(amount_received), 0) as cash_received_total')
             ->selectRaw('COALESCE(SUM(change_due), 0) as change_given_total')
+            ->where('payment_method', 'Cash')
             ->first();
 
         $cashReceivedTotal = (float) ($totals?->cash_received_total ?? 0);
         $changeGivenTotal = (float) ($totals?->change_given_total ?? 0);
+        $paymentTotals = (clone $sales)
+            ->selectRaw('payment_method, COALESCE(SUM(grand_total), 0) as total')
+            ->groupBy('payment_method')
+            ->pluck('total', 'payment_method');
 
         return [
             'cash_received_total' => $cashReceivedTotal,
             'change_given_total' => $changeGivenTotal,
             'net_cash_sales' => $cashReceivedTotal - $changeGivenTotal,
+            'cash_sales_total' => (float) ($paymentTotals['Cash'] ?? 0),
+            'card_sales_total' => (float) ($paymentTotals['Card'] ?? 0),
+            'mobile_sales_total' => (float) ($paymentTotals['Mobile'] ?? 0),
+            'wallet_sales_total' => (float) ($paymentTotals['Wallet'] ?? 0),
+            'total_sales' => (float) $paymentTotals->sum(),
+            'sale_count' => (clone $sales)->count(),
         ];
     }
 
@@ -865,6 +877,12 @@ class PosController extends Controller
             'cash_received_total' => (float) $totals['cash_received_total'],
             'change_given_total' => (float) $totals['change_given_total'],
             'net_cash_sales' => (float) $totals['net_cash_sales'],
+            'cash_sales_total' => (float) $totals['cash_sales_total'],
+            'card_sales_total' => (float) $totals['card_sales_total'],
+            'mobile_sales_total' => (float) $totals['mobile_sales_total'],
+            'wallet_sales_total' => (float) $totals['wallet_sales_total'],
+            'total_sales' => (float) $totals['total_sales'],
+            'sale_count' => (int) $totals['sale_count'],
             'expected_amount' => (float) $expectedAmount,
             'closing_counted_amount' => $countedAmount,
             'difference' => $countedAmount !== null ? $countedAmount - $expectedAmount : null,

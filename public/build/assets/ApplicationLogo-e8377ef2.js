@@ -1,0 +1,1 @@
+import{k as o,a as t,B as e}from"./app-88daee06.js";const r=o(t("path",{d:"M21 5h-2.64l1.14-3.14L17.15 1l-1.46 4H3v2l2 6-2 6v2h18v-2l-2-6 2-6zm-5 9h-3v3h-2v-3H8v-2h3V9h2v3h3z"}));function h({sx:n,...i}){return t(e,{sx:{display:"flex",alignItems:"center",justifyContent:"center",...n},children:t(r,{sx:{fontSize:"inherit",color:"inherit"}})})}export{h as A};

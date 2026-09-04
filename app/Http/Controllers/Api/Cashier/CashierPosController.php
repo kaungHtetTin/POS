@@ -69,7 +69,7 @@ class CashierPosController extends Controller
             ->with([
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -98,6 +98,7 @@ class CashierPosController extends Controller
                             'selling_price' => $pu->selling_price,
                             'wholesale_price' => $pu->wholesale_price ?? $pu->selling_price,
                             'is_base_unit' => $pu->is_base_unit,
+                            'is_default_selling_unit' => $pu->is_default_selling_unit,
                         ];
                     }),
                 ];
@@ -666,9 +667,20 @@ class CashierPosController extends Controller
             return response()->json(['message' => 'No active session found.'], 404);
         }
 
+        $totals = $this->getSessionTotals($session);
+        $expectedAmount = (float) $session->opening_amount + $totals['net_cash_sales'];
+        $countedAmount = (float) $validated['closing_balance'];
+
         $session->update([
             'closed_at' => now(),
-            'closing_balance' => $validated['closing_balance'],
+            'closed_by_user_id' => $request->user()->id,
+            'cash_received_total' => $totals['cash_received_total'],
+            'change_given_total' => $totals['change_given_total'],
+            'net_cash_sales' => $totals['net_cash_sales'],
+            'expected_amount' => $expectedAmount,
+            'closing_counted_amount' => $countedAmount,
+            'difference' => $countedAmount - $expectedAmount,
+            'status' => 'closed',
             'notes' => $validated['notes'] ?? $session->notes,
         ]);
 
@@ -779,23 +791,58 @@ class CashierPosController extends Controller
         return $summary;
     }
 
+    private function getSessionTotals(CashSession $session): array
+    {
+        $sales = Sale::query()
+            ->where('cash_session_id', $session->id)
+            ->where('status', '!=', 'Voided');
+        $cash = (clone $sales)
+            ->where('payment_method', 'Cash')
+            ->selectRaw('COALESCE(SUM(amount_received), 0) as received')
+            ->selectRaw('COALESCE(SUM(change_due), 0) as change_given')
+            ->first();
+        $paymentTotals = (clone $sales)
+            ->selectRaw('payment_method, COALESCE(SUM(grand_total), 0) as total')
+            ->groupBy('payment_method')
+            ->pluck('total', 'payment_method');
+        $cashReceived = (float) ($cash?->received ?? 0);
+        $changeGiven = (float) ($cash?->change_given ?? 0);
+
+        return [
+            'cash_received_total' => $cashReceived,
+            'change_given_total' => $changeGiven,
+            'net_cash_sales' => $cashReceived - $changeGiven,
+            'cash_sales_total' => (float) ($paymentTotals['Cash'] ?? 0),
+            'card_sales_total' => (float) ($paymentTotals['Card'] ?? 0),
+            'mobile_sales_total' => (float) ($paymentTotals['Mobile'] ?? 0),
+            'wallet_sales_total' => (float) ($paymentTotals['Wallet'] ?? 0),
+            'total_sales' => (float) $paymentTotals->sum(),
+            'sale_count' => (clone $sales)->count(),
+        ];
+    }
+
     private function buildSessionPayload(CashSession $session)
     {
-        $totalSales = Sale::where('cash_session_id', $session->id)
-            ->where('status', '!=', 'Voided')
-            ->sum('grand_total');
-        $totalCash = Sale::where('cash_session_id', $session->id)
-            ->where('payment_method', 'Cash')
-            ->where('status', '!=', 'Voided')
-            ->sum('amount_received');
+        $totals = $this->getSessionTotals($session);
+        $expectedAmount = (float) $session->opening_amount + $totals['net_cash_sales'];
 
         return [
             'id' => $session->id,
+            'status' => $session->status,
             'opened_at' => $session->opened_at,
+            'closed_at' => $session->closed_at,
             'opening_balance' => $session->opening_amount, // map DB column back to API field
-            'total_sales' => $totalSales,
-            'total_cash' => $totalCash,
-            'expected_closing' => $session->opening_amount + $totalCash,
+            'cash_received_total' => $totals['cash_received_total'],
+            'change_given_total' => $totals['change_given_total'],
+            'net_cash_sales' => $totals['net_cash_sales'],
+            'cash_sales_total' => $totals['cash_sales_total'],
+            'card_sales_total' => $totals['card_sales_total'],
+            'mobile_sales_total' => $totals['mobile_sales_total'],
+            'wallet_sales_total' => $totals['wallet_sales_total'],
+            'total_cash' => $totals['net_cash_sales'],
+            'total_sales' => $totals['total_sales'],
+            'sale_count' => $totals['sale_count'],
+            'expected_closing' => $expectedAmount,
         ];
     }
 

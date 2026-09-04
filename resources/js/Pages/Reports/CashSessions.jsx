@@ -132,7 +132,13 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                         <Chip size="small" variant="outlined" label={`Sessions: ${summary.sessions_count || 0}`} />
                         <Chip size="small" variant="outlined" label={`Open: ${summary.open_sessions || 0}`} />
                         <Chip size="small" variant="outlined" label={`Closed: ${summary.closed_sessions || 0}`} />
+                        <Chip size="small" variant="outlined" label={`Sales: ${summary.sale_count || 0}`} />
                         <Chip size="small" variant="outlined" label={`Opening Total: ${money(summary.opening_amount_total)}`} />
+                        <Chip size="small" color="success" variant="outlined" label={`Cash Sales: ${money(summary.cash_sales_total)}`} />
+                        <Chip size="small" color="info" variant="outlined" label={`Card Sales: ${money(summary.card_sales_total)}`} />
+                        <Chip size="small" color="secondary" variant="outlined" label={`Mobile Sales: ${money(summary.mobile_sales_total)}`} />
+                        <Chip size="small" color="warning" variant="outlined" label={`Wallet Sales: ${money(summary.wallet_sales_total)}`} />
+                        <Chip size="small" color="primary" label={`All Sales: ${money(summary.total_sales)}`} />
                         <Chip size="small" variant="outlined" label={`Cash Received: ${money(summary.cash_received_total)}`} />
                         <Chip size="small" variant="outlined" label={`Change Given: ${money(summary.change_given_total)}`} />
                         <Chip size="small" variant="outlined" label={`Net Cash Sales: ${money(summary.net_cash_sales_total)}`} color="primary" />
@@ -236,6 +242,12 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                         <TableCell sx={{ fontWeight: 700 }}>Opened At</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>Closed At</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Sales</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Cash</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Card</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Mobile</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Wallet</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }} align="right">Total Sales</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }} align="right">Opening</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }} align="right">Expected</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }} align="right">Counted</TableCell>
@@ -254,6 +266,12 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                             <TableCell>
                                                 <Chip size="small" label={row.status} color={row.status === 'open' ? 'warning' : 'success'} />
                                             </TableCell>
+                                            <TableCell align="right">{row.sale_count || 0}</TableCell>
+                                            <TableCell align="right">{money(row.cash_sales_total)}</TableCell>
+                                            <TableCell align="right">{money(row.card_sales_total)}</TableCell>
+                                            <TableCell align="right">{money(row.mobile_sales_total)}</TableCell>
+                                            <TableCell align="right">{money(row.wallet_sales_total)}</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 800 }}>{money(row.total_sales)}</TableCell>
                                             <TableCell align="right">{money(row.opening_amount)}</TableCell>
                                             <TableCell align="right">{money(row.expected_amount)}</TableCell>
                                             <TableCell align="right">{row.closing_counted_amount == null ? '-' : money(row.closing_counted_amount)}</TableCell>
@@ -269,7 +287,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                     ))}
                                     {sessionRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={11} align="center" sx={{ py: 3 }}>
+                                                <TableCell colSpan={17} align="center" sx={{ py: 3 }}>
                                                 <Typography variant="body2" color="text.secondary italic">
                                                     No session history for selected filters.
                                                 </Typography>

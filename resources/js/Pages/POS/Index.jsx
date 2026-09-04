@@ -2139,6 +2139,31 @@ export default function PosIndex({
                                     </Typography>
                                 </Stack>
                                 <Divider />
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, fontWeight: 800 }}>
+                                        {__('Sales by payment method')}
+                                    </Typography>
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                                        {[
+                                            [__('Cash'), activeSession?.cash_sales_total],
+                                            [__('Card'), activeSession?.card_sales_total],
+                                            [__('Mobile'), activeSession?.mobile_sales_total],
+                                            [__('Wallet'), activeSession?.wallet_sales_total],
+                                        ].map(([label, value]) => (
+                                            <Paper key={label} variant="outlined" sx={{ p: 1 }}>
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{label}</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>{currencySymbol}{Number(value || 0).toFixed(2)}</Typography>
+                                            </Paper>
+                                        ))}
+                                    </Box>
+                                    <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{__('Total Sales')}</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                            {currencySymbol}{Number(activeSession?.total_sales || 0).toFixed(2)}
+                                        </Typography>
+                                    </Stack>
+                                </Box>
+                                <Divider />
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                     {__('Expected Drawer')}: {currencySymbol}{activeSessionExpected.toFixed(2)}
                                 </Typography>
