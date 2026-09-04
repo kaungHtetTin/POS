@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use App\Support\Spa;
 
 class PosController extends Controller
@@ -523,6 +524,21 @@ class PosController extends Controller
 
         $createdSale = null;
         DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $saleDiscount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
+            $activeSession = CashSession::query()
+                ->whereKey($activeSession->id)
+                ->where('branch_id', $branchId)
+                ->where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$activeSession) {
+                throw ValidationException::withMessages([
+                    'session' => 'This cashier session is closed. Refresh the POS and open a session before making another sale.',
+                ]);
+            }
+
             $saleStaffId = $activeSession->user_id ?: $userId;
 
             $sale = Sale::create([
@@ -727,31 +743,45 @@ class PosController extends Controller
         }
 
         $userId = $request->user()->id;
-        $activeSession = $this->getActiveSession($branchId, $userId);
+        $activeSession = null;
+        $difference = 0.0;
+        DB::transaction(function () use ($branchId, $userId, $validated, &$activeSession, &$difference) {
+            $activeSession = CashSession::query()
+                ->where('branch_id', $branchId)
+                ->where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$activeSession) {
+                return;
+            }
+
+            $totals = $this->getSessionCashTotals($activeSession);
+            $expectedAmount = (float) $activeSession->opening_amount + (float) $totals['net_cash_sales'];
+            $countedAmount = (float) $validated['closing_counted_amount'];
+            $difference = $countedAmount - $expectedAmount;
+
+            $activeSession->update([
+                'cash_received_total' => $totals['cash_received_total'],
+                'change_given_total' => $totals['change_given_total'],
+                'net_cash_sales' => $totals['net_cash_sales'],
+                'expected_amount' => $expectedAmount,
+                'closing_counted_amount' => $countedAmount,
+                'difference' => $difference,
+                'notes' => $validated['notes'] ?? null,
+                'closed_by_user_id' => $userId,
+                'closed_at' => now(),
+                'status' => 'closed',
+            ]);
+        });
 
         if (!$activeSession) {
             return redirect()
                 ->route('pos.index')
                 ->withErrors(['session' => 'No open cashier session to close.']);
         }
-
-        $totals = $this->getSessionCashTotals($activeSession);
-        $expectedAmount = (float) $activeSession->opening_amount + (float) $totals['net_cash_sales'];
-        $countedAmount = (float) $validated['closing_counted_amount'];
-        $difference = $countedAmount - $expectedAmount;
-
-        $activeSession->update([
-            'cash_received_total' => $totals['cash_received_total'],
-            'change_given_total' => $totals['change_given_total'],
-            'net_cash_sales' => $totals['net_cash_sales'],
-            'expected_amount' => $expectedAmount,
-            'closing_counted_amount' => $countedAmount,
-            'difference' => $difference,
-            'notes' => $validated['notes'] ?? null,
-            'closed_by_user_id' => $userId,
-            'closed_at' => now(),
-            'status' => 'closed',
-        ]);
 
         $statusText = $difference === 0.0 ? 'balanced' : ($difference > 0 ? 'over' : 'short');
 

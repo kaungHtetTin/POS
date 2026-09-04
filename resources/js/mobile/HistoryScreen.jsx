@@ -3,7 +3,7 @@ import { apiRequest, queryString } from './api';
 import Icon from './Icons';
 import { getPendingSales } from './storage';
 import { EmptyState, SkeletonList, flattenErrors, formatDate, money } from './Ui';
-import { syncPendingSales } from './SalesScreen';
+import { printReceipt, syncPendingSales } from './SalesScreen';
 
 function SaleDetail({ sale, currency }) {
     const items = sale.items || [];
@@ -46,6 +46,7 @@ export default function HistoryScreen({ token, online, notify, onViewChange }) {
     const [detail, setDetail] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [currency, setCurrency] = useState('$');
+    const [receiptSettings, setReceiptSettings] = useState({ pharmacy_name: 'Pharmacy POS', receipt_header: '', receipt_footer: 'Thank you' });
 
     const load = useCallback(async (page = 1) => {
         setPending(getPendingSales());
@@ -60,6 +61,7 @@ export default function HistoryScreen({ token, online, notify, onViewChange }) {
             setSales(result.data || []);
             setPagination({ current_page: result.current_page || 1, last_page: result.last_page || 1 });
             setCurrency(settings.currency_symbol || '$');
+            setReceiptSettings(settings);
         } catch (requestError) {
             setError(requestError.message);
         } finally {
@@ -138,7 +140,7 @@ export default function HistoryScreen({ token, online, notify, onViewChange }) {
                         <div><span>Receipt details</span><h2>{detail?.invoice_number || 'Loading sale…'}</h2></div>
                     </div>
                     {error && <div className="form-alert form-alert--page">{error}</div>}
-                    {detailLoading ? <SkeletonList count={4} /> : <SaleDetail sale={detail} currency={currency} />}
+                    {detailLoading ? <SkeletonList count={4} /> : detail && <><SaleDetail sale={detail} currency={currency} /><button className="button button--primary button--full sale-detail__print" type="button" onClick={() => printReceipt(detail, receiptSettings, currency)}><Icon name="receipt" size={18} /> Print receipt</button></>}
                 </section>
             </main>
         );

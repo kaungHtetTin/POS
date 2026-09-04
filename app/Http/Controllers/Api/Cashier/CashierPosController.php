@@ -376,6 +376,7 @@ class CashierPosController extends Controller
         $userId = $request->user()->id;
         $activeSession = CashSession::where('branch_id', $branchId)
             ->where('user_id', $userId)
+            ->where('status', 'open')
             ->whereNull('closed_at')
             ->first();
 
@@ -384,6 +385,20 @@ class CashierPosController extends Controller
         }
 
         $result = DB::transaction(function () use ($validated, $branchId, $userId, $activeSession) {
+            $activeSession = CashSession::whereKey($activeSession->id)
+                ->where('branch_id', $branchId)
+                ->where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$activeSession) {
+                throw ValidationException::withMessages([
+                    'cash_session_id' => 'This cash session is closed. Refresh the register and open a session before making another sale.',
+                ]);
+            }
+
             $items = collect($validated['items'])->map(function ($item) {
                 $item['quantity'] = (float) $item['quantity'];
                 $item['foc_quantity'] = (float) ($item['foc_quantity'] ?? 0);
@@ -594,11 +609,13 @@ class CashierPosController extends Controller
 
         $session = CashSession::where('branch_id', $branchId)
             ->where('user_id', $request->user()->id)
+            ->where('status', 'open')
             ->whereNull('closed_at')
+            ->latest('opened_at')
             ->first();
 
         if (!$session) {
-            return response()->json(null);
+            return response('null', 200, ['Content-Type' => 'application/json']);
         }
 
         return response()->json($this->buildSessionPayload($session));
@@ -625,6 +642,7 @@ class CashierPosController extends Controller
 
         $existing = CashSession::where('branch_id', $branchId)
             ->where('user_id', $request->user()->id)
+            ->where('status', 'open')
             ->whereNull('closed_at')
             ->first();
 
@@ -658,31 +676,42 @@ class CashierPosController extends Controller
         ]);
 
         $branchId = $request->user()->currentBranchId();
-        $session = CashSession::where('branch_id', $branchId)
-            ->where('user_id', $request->user()->id)
-            ->whereNull('closed_at')
-            ->first();
+        $userId = $request->user()->id;
+        $session = DB::transaction(function () use ($branchId, $userId, $validated) {
+            $session = CashSession::where('branch_id', $branchId)
+                ->where('user_id', $userId)
+                ->where('status', 'open')
+                ->whereNull('closed_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$session) {
+                return null;
+            }
+
+            $totals = $this->getSessionTotals($session);
+            $expectedAmount = (float) $session->opening_amount + $totals['net_cash_sales'];
+            $countedAmount = (float) $validated['closing_balance'];
+
+            $session->update([
+                'closed_at' => now(),
+                'closed_by_user_id' => $userId,
+                'cash_received_total' => $totals['cash_received_total'],
+                'change_given_total' => $totals['change_given_total'],
+                'net_cash_sales' => $totals['net_cash_sales'],
+                'expected_amount' => $expectedAmount,
+                'closing_counted_amount' => $countedAmount,
+                'difference' => $countedAmount - $expectedAmount,
+                'status' => 'closed',
+                'notes' => $validated['notes'] ?? $session->notes,
+            ]);
+
+            return $session->fresh();
+        });
 
         if (!$session) {
             return response()->json(['message' => 'No active session found.'], 404);
         }
-
-        $totals = $this->getSessionTotals($session);
-        $expectedAmount = (float) $session->opening_amount + $totals['net_cash_sales'];
-        $countedAmount = (float) $validated['closing_balance'];
-
-        $session->update([
-            'closed_at' => now(),
-            'closed_by_user_id' => $request->user()->id,
-            'cash_received_total' => $totals['cash_received_total'],
-            'change_given_total' => $totals['change_given_total'],
-            'net_cash_sales' => $totals['net_cash_sales'],
-            'expected_amount' => $expectedAmount,
-            'closing_counted_amount' => $countedAmount,
-            'difference' => $countedAmount - $expectedAmount,
-            'status' => 'closed',
-            'notes' => $validated['notes'] ?? $session->notes,
-        ]);
 
         return response()->json(['message' => 'Session closed successfully.', 'session' => $session]);
     }
@@ -928,6 +957,17 @@ class CashierPosController extends Controller
         ]);
 
         $user = $request->user();
+
+        $hasOpenSession = CashSession::where('user_id', $user->id)
+            ->where('status', 'open')
+            ->whereNull('closed_at')
+            ->exists();
+
+        if ($hasOpenSession) {
+            return response()->json([
+                'message' => 'Close your active cash session before switching branches.',
+            ], 422);
+        }
 
         // Check if user has access to this branch
         if (!$user->canAccessBranch($validated['branch_id'])) {

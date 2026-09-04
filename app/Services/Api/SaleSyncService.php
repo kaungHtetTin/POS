@@ -162,14 +162,14 @@ class SaleSyncService
             $amountReceived = (float) $validated['amount_received'];
             $changeDue = max($amountReceived - $grandTotal, 0);
             $cashSession = $this->resolveCashSession($validated, $branchId, $user);
-            $saleStaffId = $cashSession?->user_id ?? $user->id;
+            $saleStaffId = $cashSession->user_id;
 
             $sale = Sale::create([
                 'branch_id' => $branchId,
                 'user_id' => $user->id,
                 'sale_staff_id' => $saleStaffId,
                 'customer_id' => $validated['customer_id'] ?? null,
-                'cash_session_id' => $cashSession?->id,
+                'cash_session_id' => $cashSession->id,
                 'invoice_number' => $validated['invoice_number'] ?? $this->makeInvoiceNumber($clientReference),
                 'client_reference' => $clientReference,
                 'total_amount' => $subTotal,
@@ -284,12 +284,13 @@ class SaleSyncService
         return $value ? (string) $value : null;
     }
 
-    private function resolveCashSession(array $validated, string $branchId, User $user): ?CashSession
+    private function resolveCashSession(array $validated, string $branchId, User $user): CashSession
     {
         if (!empty($validated['cash_session_id'])) {
             $session = CashSession::whereKey($validated['cash_session_id'])
                 ->where('branch_id', $branchId)
                 ->where('user_id', $user->id)
+                ->lockForUpdate()
                 ->first();
 
             if (!$session) {
@@ -298,13 +299,29 @@ class SaleSyncService
                 ]);
             }
 
+            if ($session->status !== 'open' || $session->closed_at !== null) {
+                throw ValidationException::withMessages([
+                    'cash_session_id' => 'This cash session is closed. Refresh the register and open a session before making another sale.',
+                ]);
+            }
+
             return $session;
         }
 
-        return CashSession::where('branch_id', $branchId)
+        $session = CashSession::where('branch_id', $branchId)
             ->where('user_id', $user->id)
+            ->where('status', 'open')
             ->whereNull('closed_at')
+            ->lockForUpdate()
             ->first();
+
+        if (!$session) {
+            throw ValidationException::withMessages([
+                'cash_session_id' => 'No active cash session. Open a session before making a sale.',
+            ]);
+        }
+
+        return $session;
     }
 
     private function userCanAccessBranch(User $user, string $branchId): bool

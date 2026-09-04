@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { installLocalization } from './localization';
 import './styles.css';
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -12,4 +13,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     });
 }
 
-createRoot(document.getElementById('cashier-app')).render(<App />);
+const appRoot = document.getElementById('cashier-app');
+installLocalization(appRoot);
+createRoot(appRoot).render(<App />);

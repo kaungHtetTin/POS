@@ -5,6 +5,7 @@ import Icon from './Icons';
 import SalesScreen from './SalesScreen';
 import HistoryScreen from './HistoryScreen';
 import ProfileScreen from './ProfileScreen';
+import LocaleSelect from './LocaleSelect';
 
 const ROUTES = ['sale', 'history', 'profile'];
 
@@ -127,9 +128,12 @@ function Login({ onLogin, online, install }) {
     return (
         <main className="login-page">
             <section className="login-card">
-                <div className="brand-lockup">
-                    <span className="brand-mark"><Icon name="cash" size={30} strokeWidth={1.8} /></span>
-                    <span><strong>{config.appName || 'Pharmacy POS'}</strong><small>Cashier mobile</small></span>
+                <div className="login-card__top">
+                    <div className="brand-lockup">
+                        <span className="brand-mark"><Icon name="cash" size={30} strokeWidth={1.8} /></span>
+                        <span><strong>{config.appName || 'Pharmacy POS'}</strong><small>Cashier mobile</small></span>
+                    </div>
+                    <LocaleSelect compact onError={setError} />
                 </div>
 
                 <div className="login-intro">

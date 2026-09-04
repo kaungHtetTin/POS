@@ -3,6 +3,7 @@ import { apiRequest } from './api';
 import Icon from './Icons';
 import { getPendingSales, keys, saveJson } from './storage';
 import { Modal, formatDate, money } from './Ui';
+import LocaleSelect from './LocaleSelect';
 
 export default function ProfileScreen({ token, profile, setProfile, online, install, notify, onLogout }) {
     const [form, setForm] = useState({ name: profile.name || '', email: profile.email || '', phone: profile.phone || '', image: null });
@@ -139,6 +140,11 @@ export default function ProfileScreen({ token, profile, setProfile, online, inst
                     <label className="field"><span>Active branch</span><select value={profile.current_branch_id || ''} onChange={(event) => switchBranch(event.target.value)} disabled={branchBusy || Boolean(session)}>{branches.map((branch) => <option value={branch.id} key={branch.id}>{branch.name}</option>)}</select>{session && <small>Close the current shift before switching.</small>}</label>
                 ) : <div className="branch-summary"><span className="customer-initial"><Icon name="store" size={19} /></span><span><strong>{profile.active_branch?.name || profile.assigned_branch?.name || 'No branch assigned'}</strong><small>{profile.active_branch?.address || profile.assigned_branch?.address || 'Ask an administrator to assign a branch.'}</small></span></div>}
                 {session ? <div className="active-session-card"><span><i className="status-dot status-dot--online" /> Shift open</span><strong>{money(session.total_sales, currency)} sales</strong><small>Opened {formatDate(session.opened_at)}</small></div> : <div className="active-session-card active-session-card--closed"><span><i className="status-dot" /> No active shift</span><small>Open a shift from the Sale screen.</small></div>}
+            </section>
+
+            <section className="settings-card">
+                <div className="settings-card__title"><span><Icon name="language" size={19} /></span><div><h2>Language</h2><p>Cashier display language</p></div></div>
+                <LocaleSelect onError={setError} />
             </section>
 
             <section className="settings-card">

@@ -58,11 +58,20 @@ Route::get('/', function () {
 | by the existing API permission checks.
 */
 Route::get('/cashier/manifest.webmanifest', function () {
+    $locale = app()->getLocale();
+    $translations = [];
+    foreach ($locale === 'en' ? [] : [base_path("lang/{$locale}.json"), base_path("lang/cashier-{$locale}.json")] as $translationFile) {
+        if (is_file($translationFile)) {
+            $translations = array_replace($translations, json_decode(file_get_contents($translationFile), true) ?: []);
+        }
+    }
+    $translate = static fn (string $text): string => $translations[$text] ?? $text;
+
     return response()->json([
         'id' => url('/cashier/'),
-        'name' => config('app.name', 'Pharmacy POS').' Cashier',
-        'short_name' => 'Cashier POS',
-        'description' => 'Mobile point of sale for pharmacy cashiers.',
+        'name' => config('app.name', 'Pharmacy POS').' '.$translate('Cashier'),
+        'short_name' => $translate('Cashier POS'),
+        'description' => $translate('Mobile point of sale for pharmacy cashiers.'),
         'start_url' => url('/cashier/'),
         'scope' => url('/cashier/'),
         'display' => 'standalone',
@@ -93,8 +102,8 @@ Route::get('/cashier/manifest.webmanifest', function () {
         ],
         'shortcuts' => [
             [
-                'name' => 'New sale',
-                'short_name' => 'Sale',
+                'name' => $translate('New sale'),
+                'short_name' => $translate('Sale'),
                 'url' => url('/cashier/#sale'),
                 'icons' => [[
                     'src' => url('/pwa/cashier-icon-192.png'),
@@ -103,8 +112,8 @@ Route::get('/cashier/manifest.webmanifest', function () {
                 ]],
             ],
             [
-                'name' => 'Sale history',
-                'short_name' => 'History',
+                'name' => $translate('Sale history'),
+                'short_name' => $translate('History'),
                 'url' => url('/cashier/#history'),
                 'icons' => [[
                     'src' => url('/pwa/cashier-icon-192.png'),
@@ -117,9 +126,29 @@ Route::get('/cashier/manifest.webmanifest', function () {
 })->name('cashier-pwa.manifest');
 
 Route::get('/cashier/{path?}', function () {
+    $locale = app()->getLocale();
+    $translations = [];
+
+    foreach ($locale === 'en' ? [] : [base_path("lang/{$locale}.json"), base_path("lang/cashier-{$locale}.json")] as $translationFile) {
+        if (is_file($translationFile)) {
+            $translations = array_replace(
+                $translations,
+                json_decode(file_get_contents($translationFile), true) ?: []
+            );
+        }
+    }
+    $translate = static fn (string $text): string => $translations[$text] ?? $text;
+
     return view('cashier', [
         'cashierPwaConfig' => [
             'appName' => config('app.name', 'Pharmacy POS'),
+            'locale' => $locale,
+            'translations' => $translations,
+            'languageUrl' => route('language.switch'),
+            'csrfToken' => csrf_token(),
+            'pageTitle' => $translate('Cashier POS').' - '.config('app.name', 'Pharmacy POS'),
+            'pageDescription' => $translate('Mobile point of sale for pharmacy cashiers.'),
+            'noScriptMessage' => $translate('This cashier app requires JavaScript.'),
             'baseUrl' => rtrim(url('/'), '/'),
             'apiUrl' => rtrim(url('/api'), '/'),
             'serviceWorkerUrl' => url('/cashier-sw.js'),

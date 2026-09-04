@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\CashSession;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Permission;
@@ -59,6 +60,13 @@ class OfflineSyncApiTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 10,
         ]);
+        $cashSession = CashSession::create([
+            'branch_id' => $branch->id,
+            'user_id' => $user->id,
+            'opening_amount' => 100,
+            'opened_at' => now(),
+            'status' => 'open',
+        ]);
 
         Sanctum::actingAs($user);
 
@@ -67,6 +75,7 @@ class OfflineSyncApiTest extends TestCase
                 [
                     'client_reference' => 'android-sale-001',
                     'branch_id' => $branch->id,
+                    'cash_session_id' => $cashSession->id,
                     'payment_method' => 'Cash',
                     'payment_status' => 'Paid',
                     'amount_received' => 200,
@@ -90,9 +99,11 @@ class OfflineSyncApiTest extends TestCase
             ->assertJsonPath('synced.0.status', 'synced');
 
         $this->assertSame(1, Sale::where('client_reference', 'android-sale-001')->count());
+        $this->assertSame($cashSession->id, Sale::where('client_reference', 'android-sale-001')->value('cash_session_id'));
         $this->assertSame($user->id, Sale::where('client_reference', 'android-sale-001')->value('sale_staff_id'));
         $this->assertSame(8, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertSame(8, InventoryBatch::where('product_id', $product->id)->first()->quantity);
+
         $this->assertEquals(50.000000, (float) SaleItem::first()->base_unit_cost);
         $this->assertEquals(100.00, (float) SaleItem::first()->cost_total);
         $this->assertFalse((bool) SaleItem::first()->cost_backfilled);
@@ -106,6 +117,92 @@ class OfflineSyncApiTest extends TestCase
         $this->assertSame(1, Sale::where('client_reference', 'android-sale-001')->count());
         $this->assertSame(8, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertSame(8, InventoryBatch::where('product_id', $product->id)->first()->quantity);
+
+        $cashSession->update(['status' => 'closed', 'closed_at' => now()]);
+        $payload['sales'][0]['client_reference'] = 'android-sale-closed-session';
+
+        $this->postJson('http://localhost/api/sync/sales', $payload)
+            ->assertOk()
+            ->assertJsonPath('summary.synced', 0)
+            ->assertJsonPath('summary.failed', 1)
+            ->assertJsonPath('failed.0.errors.cash_session_id.0', 'This cash session is closed. Refresh the register and open a session before making another sale.');
+
+        $this->assertDatabaseMissing('sales', ['client_reference' => 'android-sale-closed-session']);
+        $this->assertSame(8, Inventory::where('product_id', $product->id)->first()->quantity);
+
+        $this->postJson('http://localhost/api/cashier/sales', [
+            'payment_method' => 'Cash',
+            'payment_status' => 'Paid',
+            'amount_received' => 100,
+            'items' => [[
+                'product_id' => $product->id,
+                'product_unit_id' => $productUnit->id,
+                'quantity' => 1,
+                'unit_price' => 100,
+            ]],
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'No active cash session. Please open a session first.');
+
+        $this->withoutMiddleware();
+        $this->actingAs($user)
+            ->post('/pos/checkout', [
+                'payment_method' => 'Cash',
+                'payment_status' => 'Paid',
+                'amount_received' => 100,
+                'items' => [[
+                    'product_id' => $product->id,
+                    'unit_id' => $unit->id,
+                    'quantity' => 1,
+                ]],
+            ])
+            ->assertSessionHasErrors('session');
+
+        $this->assertSame(1, Sale::count());
+    }
+
+    public function test_same_cashier_account_uses_the_same_active_session_across_devices(): void
+    {
+        $branch = Branch::create([
+            'name' => 'Shared Session Branch',
+            'phone' => '09123456789',
+            'address' => 'Yangon',
+            'status' => 'Active',
+        ]);
+        $user = User::factory()->create(['branch_id' => $branch->id]);
+        $this->givePermission($user, 'Cashier', 'Process Sale', 'process_sale');
+        $cashSession = CashSession::create([
+            'branch_id' => $branch->id,
+            'user_id' => $user->id,
+            'opening_amount' => 125,
+            'opened_at' => now(),
+            'status' => 'open',
+        ]);
+        $deviceOneToken = $user->createToken('cashier-device-one')->plainTextToken;
+        $deviceTwoToken = $user->createToken('cashier-device-two')->plainTextToken;
+
+        $this->withToken($deviceOneToken)
+            ->getJson('http://localhost/api/cashier/sessions/active')
+            ->assertOk()
+            ->assertJsonPath('id', $cashSession->id)
+            ->assertJsonPath('status', 'open');
+
+        $this->withToken($deviceTwoToken)
+            ->getJson('http://localhost/api/cashier/sessions/active')
+            ->assertOk()
+            ->assertJsonPath('id', $cashSession->id)
+            ->assertJsonPath('status', 'open');
+
+        $this->withToken($deviceTwoToken)
+            ->postJson("http://localhost/api/cashier/sessions/{$cashSession->id}/close", [
+                'closing_balance' => 125,
+            ])
+            ->assertOk()
+            ->assertJsonPath('session.status', 'closed');
+
+        $this->withToken($deviceOneToken)
+            ->getJson('http://localhost/api/cashier/sessions/active')
+            ->assertOk()
+            ->assertContent('null');
     }
 
     public function test_offline_purchase_sync_is_idempotent(): void

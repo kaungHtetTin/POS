@@ -3,6 +3,7 @@ import { ApiError, apiRequest, queryString } from './api';
 import Icon from './Icons';
 import { addPendingSale, getPendingSales, keys, loadJson, makeReference, saveJson, setPendingSales } from './storage';
 import { EmptyState, Modal, SkeletonList, flattenErrors, formatDate, money } from './Ui';
+import { t } from './localization';
 
 function resolveUnit(product, unitId) {
     return product.units?.find((unit) => String(unit.id) === String(unitId))
@@ -133,12 +134,12 @@ function CustomerChooser({ token, selected, onSelect, online }) {
     return <div className="customer-chooser"><div className="search-box"><Icon name="search" size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or phone" /></div>{error && <div className="form-alert">{error}</div>}<button type="button" className={`customer-option ${!selected ? 'selected' : ''}`} onClick={() => onSelect(null)}><span className="customer-initial">W</span><span><strong>Walk-in customer</strong><small>Full payment required</small></span>{!selected && <Icon name="check" />}</button><div className="customer-results">{customers.map((customer) => <button type="button" key={customer.id} className={`customer-option ${selected?.id === customer.id ? 'selected' : ''}`} onClick={() => onSelect(customer)}><span className="customer-initial">{customer.name?.charAt(0).toUpperCase()}</span><span><strong>{customer.name}</strong><small>{customer.phone}</small></span>{selected?.id === customer.id && <Icon name="check" />}</button>)}{loading && <span className="inline-loading"><span className="spinner" /> Loading customers…</span>}</div><button type="button" className="button button--soft button--full" onClick={() => setCreating(true)} disabled={!online}><Icon name="plus" size={18} /> New customer</button></div>;
 }
 
-function printReceipt(sale, settings, currency) {
+export function printReceipt(sale, settings, currency) {
     const escape = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
     const popup = window.open('', '_blank', 'width=420,height=700');
     if (!popup) return;
     const items = sale.items || [];
-    popup.document.write(`<html><head><title>${escape(sale.invoice_number)}</title><style>body{font:14px monospace;padding:20px;max-width:320px;margin:auto}h2,p{text-align:center}.row{display:flex;justify-content:space-between;gap:12px;margin:8px 0}.total{font-size:18px;font-weight:bold;border-top:1px dashed;padding-top:12px}</style></head><body><h2>${escape(settings.pharmacy_name || 'Pharmacy POS')}</h2><p>${escape(settings.receipt_header || '')}</p><p>${escape(sale.invoice_number || '')}<br>${escape(formatDate(sale.sale_date || new Date().toISOString()))}</p>${items.map((item) => `<div class="row"><span>${escape(item.product?.name || item.product_name || 'Item')} × ${escape(item.quantity)}</span><span>${escape(money(item.total_price || Number(item.quantity) * Number(item.unit_price), currency))}</span></div>`).join('')}<div class="row total"><span>Total</span><span>${escape(money(sale.grand_total, currency))}</span></div><p>${escape(settings.receipt_footer || 'Thank you')}</p><script>window.onload=()=>window.print()<\/script></body></html>`);
+    popup.document.write(`<html lang="${escape(document.documentElement.lang)}"><head><meta charset="utf-8"><title>${escape(sale.invoice_number)}</title><style>body{font:14px "Noto Sans Myanmar","Myanmar Text",Pyidaungsu,monospace;padding:20px;max-width:320px;margin:auto}h2,p{text-align:center}.row{display:flex;justify-content:space-between;gap:12px;margin:8px 0}.total{font-size:18px;font-weight:bold;border-top:1px dashed;padding-top:12px}</style></head><body><h2>${escape(settings.pharmacy_name || t('Pharmacy POS'))}</h2><p>${escape(settings.receipt_header || '')}</p><p>${escape(sale.invoice_number || '')}<br>${escape(formatDate(sale.sale_date || new Date().toISOString()))}</p>${items.map((item) => `<div class="row"><span>${escape(item.product?.name || item.product_name || t('Item'))} × ${escape(item.quantity)}</span><span>${escape(money(item.total_price || Number(item.quantity) * Number(item.unit_price), currency))}</span></div>`).join('')}<div class="row total"><span>${escape(t('Total'))}</span><span>${escape(money(sale.grand_total, currency))}</span></div><p>${escape(settings.receipt_footer || t('Thank you'))}</p><script>window.onload=()=>window.print()<\/script></body></html>`);
     popup.document.close();
 }
 
@@ -151,8 +152,8 @@ function ReceiptPage({ sale, settings, onNewSale, currency }) {
         const timer = window.setTimeout(() => printReceipt(sale, settings, currency), 250);
         return () => window.clearTimeout(timer);
     }, [currency, sale, settings]);
-    const receiptText = [settings.pharmacy_name || 'Pharmacy POS', `Receipt ${sale.invoice_number || sale.client_reference || ''}`, ...items.map((item) => `${item.product?.name || item.product_name || 'Item'} × ${item.quantity}`), `Total: ${money(sale.grand_total, currency)}`].join('\n');
-    const share = async () => navigator.share ? navigator.share({ title: `Receipt ${sale.invoice_number || ''}`, text: receiptText }) : navigator.clipboard.writeText(receiptText);
+    const receiptText = [settings.pharmacy_name || t('Pharmacy POS'), `${t('Receipt')} ${sale.invoice_number || sale.client_reference || ''}`, ...items.map((item) => `${item.product?.name || item.product_name || t('Item')} × ${item.quantity}`), `${t('Total')}: ${money(sale.grand_total, currency)}`].join('\n');
+    const share = async () => navigator.share ? navigator.share({ title: `${t('Receipt')} ${sale.invoice_number || ''}`, text: receiptText }) : navigator.clipboard.writeText(receiptText);
     return (
         <section className="page-stage receipt-page">
             <div className="success-emblem"><Icon name="check" size={34} /></div>
@@ -229,6 +230,17 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
     }, [branchId, online, query, token]);
 
     useEffect(() => { const timer = window.setTimeout(loadRegister, query ? 280 : 0); return () => window.clearTimeout(timer); }, [loadRegister, query]);
+    useEffect(() => {
+        if (!online) return undefined;
+        const refreshFromServer = () => loadRegister();
+        const refreshWhenVisible = () => { if (document.visibilityState === 'visible') loadRegister(); };
+        window.addEventListener('focus', refreshFromServer);
+        document.addEventListener('visibilitychange', refreshWhenVisible);
+        return () => {
+            window.removeEventListener('focus', refreshFromServer);
+            document.removeEventListener('visibilitychange', refreshWhenVisible);
+        };
+    }, [loadRegister, online]);
     useEffect(() => saveJson(cartKey, cart), [cart, cartKey]);
     useEffect(() => {
         const initialStep = window.history.state?.cashierSaleStep;
@@ -256,6 +268,7 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
         }
     }, [customerOpen, receipt, sessionOpen]);
     useEffect(() => { if (!cart.length && mobileStep !== 'products' && mobileStep !== 'complete') navigateSaleStep('products', { replace: true }); }, [cart.length, mobileStep, navigateSaleStep]);
+    useEffect(() => { if (!session && ['cart', 'checkout'].includes(mobileStep)) navigateSaleStep('products', { replace: true }); }, [mobileStep, navigateSaleStep, session]);
     useEffect(() => { onViewChange?.(mobileStep); }, [mobileStep, onViewChange]);
     useEffect(() => {
         if (!online) return undefined;
@@ -340,6 +353,11 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
     };
 
     const submitSale = async () => {
+        if (!session) {
+            setError('This cash session is closed. Open a session before making another sale.');
+            navigateSaleStep('products', { replace: true });
+            return;
+        }
         if (!selectedCustomer && paymentStatus !== 'Paid') return setError('Choose a customer for partial or due sales.');
         if (paymentMethod === 'Cash' && paymentStatus === 'Paid' && Number(amountReceived || 0) < totals.grandTotal) return setError(`Cash received is short by ${money(totals.grandTotal - Number(amountReceived || 0), currency)}.`);
         if (hasStockIssue) return setError('Cart quantity exceeds available stock.');
@@ -354,7 +372,13 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
             setReceipt(result.synced?.[0]?.record || { ...pending, grand_total: totals.grandTotal, items: receiptItems });
             notify('Sale completed successfully.');
         } catch (requestError) {
-            if (requestError.status) { setError(requestError.message); setSubmitting(false); return; }
+            if (requestError.status) {
+                if (/cash session|active session/i.test(requestError.message || '')) {
+                    setSession(null);
+                    saveJson(keys.session(branchId), null);
+                }
+                setError(requestError.message); setSubmitting(false); return;
+            }
             addPendingSale(pending); setReceipt({ ...pending, grand_total: totals.grandTotal, items: receiptItems }); notify('Sale saved safely and will sync when online.', 'info');
         }
         setCart([]); setSelectedCustomer(null); setPaymentMethod('Cash'); setPaymentStatus('Paid'); setAmountReceived(''); navigateSaleStep('complete', { replace: true }); setSubmitting(false);

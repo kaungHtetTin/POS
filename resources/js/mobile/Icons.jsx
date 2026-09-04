@@ -23,6 +23,7 @@ export default function Icon({ name, size = 22, strokeWidth = 2, className = '' 
         download: <><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/></>,
         share: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></>,
         cash: <><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9H5v1M18 15h1v-1"/></>,
+        language: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></>,
     };
 
     return (

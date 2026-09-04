@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import Icon from './Icons';
+import { getLocale } from './localization';
 
 export function Modal({ open, title, children, onClose, wide = false, footer }) {
     useEffect(() => {
@@ -60,12 +61,14 @@ export function SkeletonList({ count = 4 }) {
     return <div className="skeleton-list" aria-label="Loading">{Array.from({ length: count }).map((_, index) => <div key={index} className="skeleton-card"><i /><span><b /><b /></span></div>)}</div>;
 }
 
-export const money = (value, symbol = '$') => `${symbol}${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const intlLocale = () => getLocale() === 'my' ? 'my-MM' : 'en-US';
+
+export const money = (value, symbol = '$') => `${symbol}${Number(value || 0).toLocaleString(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const formatDate = (value, withTime = true) => {
     if (!value) return '—';
     try {
-        return new Intl.DateTimeFormat(undefined, withTime
+        return new Intl.DateTimeFormat(intlLocale(), withTime
             ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
             : { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
     } catch {

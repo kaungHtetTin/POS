@@ -7,10 +7,11 @@
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="Cashier POS">
-        <meta name="description" content="Mobile point of sale for pharmacy cashiers">
+        <meta name="apple-mobile-web-app-title" content="{{ $cashierPwaConfig['pageTitle'] }}">
+        <meta name="description" content="{{ $cashierPwaConfig['pageDescription'] }}">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>Cashier POS - {{ config('app.name', 'Pharmacy POS') }}</title>
+        <title>{{ $cashierPwaConfig['pageTitle'] }}</title>
 
         <link rel="manifest" href="{{ route('cashier-pwa.manifest') }}">
         <link rel="icon" href="{{ url('/pwa/cashier-icon.svg') }}" type="image/svg+xml">
@@ -23,7 +24,7 @@
         @vite('resources/js/mobile/main.jsx', 'cashier-build')
     </head>
     <body>
-        <noscript>This cashier app requires JavaScript.</noscript>
+        <noscript>{{ $cashierPwaConfig['noScriptMessage'] }}</noscript>
         <div id="cashier-app"></div>
     </body>
 </html>

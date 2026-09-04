@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CashSession;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -147,6 +148,17 @@ class AccountController extends Controller
         ]);
 
         $user = $request->user();
+        $hasOpenSession = CashSession::where('user_id', $user->id)
+            ->where('status', 'open')
+            ->whereNull('closed_at')
+            ->exists();
+
+        if ($hasOpenSession) {
+            return response()->json([
+                'message' => 'Close your active cash session before switching branches.',
+            ], 422);
+        }
+
         $canAccessAllBranches = $user->hasRole('Owner')
             || $user->hasRole('Root')
             || $user->hasPermission('manage_branches');
