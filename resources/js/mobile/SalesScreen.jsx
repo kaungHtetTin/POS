@@ -142,7 +142,7 @@ function printReceipt(sale, settings, currency) {
     popup.document.close();
 }
 
-function Receipt({ sale, settings, onClose, currency }) {
+function ReceiptPage({ sale, settings, onNewSale, currency }) {
     const attempted = useRef(false);
     const items = sale.items || [];
     useEffect(() => {
@@ -153,10 +153,19 @@ function Receipt({ sale, settings, onClose, currency }) {
     }, [currency, sale, settings]);
     const receiptText = [settings.pharmacy_name || 'Pharmacy POS', `Receipt ${sale.invoice_number || sale.client_reference || ''}`, ...items.map((item) => `${item.product?.name || item.product_name || 'Item'} × ${item.quantity}`), `Total: ${money(sale.grand_total, currency)}`].join('\n');
     const share = async () => navigator.share ? navigator.share({ title: `Receipt ${sale.invoice_number || ''}`, text: receiptText }) : navigator.clipboard.writeText(receiptText);
-    return <Modal open title="Sale complete" onClose={onClose} footer={<><button className="button button--soft" type="button" onClick={share}><Icon name="share" size={18} /> Share</button><button className="button button--primary" type="button" onClick={() => printReceipt(sale, settings, currency)}><Icon name="receipt" size={18} /> Print receipt</button></>}><div className="success-emblem"><Icon name="check" size={34} /></div><div className="receipt-summary"><span>Receipt</span><strong>{sale.invoice_number || 'Queued sale'}</strong><small>{formatDate(sale.sale_date || new Date().toISOString())}</small></div><div className="receipt-items">{items.map((item, index) => <div key={item.id || index}><span>{item.product?.name || item.product_name || 'Item'} <small>× {Number(item.quantity)}</small></span><strong>{money(item.total_price || Number(item.quantity) * Number(item.unit_price), currency)}</strong></div>)}</div><div className="receipt-total"><span>Total paid</span><strong>{money(sale.grand_total, currency)}</strong></div></Modal>;
+    return (
+        <section className="page-stage receipt-page">
+            <div className="success-emblem"><Icon name="check" size={34} /></div>
+            <div className="receipt-summary"><span>Sale complete</span><strong>{sale.invoice_number || 'Queued sale'}</strong><small>{formatDate(sale.sale_date || new Date().toISOString())}</small></div>
+            <div className="receipt-items">{items.map((item, index) => <div key={item.id || index}><span>{item.product?.name || item.product_name || 'Item'} <small>× {Number(item.quantity)}</small></span><strong>{money(item.total_price || Number(item.quantity) * Number(item.unit_price), currency)}</strong></div>)}</div>
+            <div className="receipt-total"><span>Total paid</span><strong>{money(sale.grand_total, currency)}</strong></div>
+            <div className="receipt-page__actions"><button className="button button--soft" type="button" onClick={share}><Icon name="share" size={18} /> Share</button><button className="button button--soft" type="button" onClick={() => printReceipt(sale, settings, currency)}><Icon name="receipt" size={18} /> Print</button></div>
+            <button className="button button--primary button--large button--full" type="button" onClick={onNewSale}><Icon name="plus" size={19} /> New sale</button>
+        </section>
+    );
 }
 
-export default function SalesScreen({ token, profile, online, notify, onPriceModeChange }) {
+export default function SalesScreen({ token, profile, online, notify, onPriceModeChange, onViewChange }) {
     const branchId = profile.current_branch_id;
     const cartKey = keys.cart(profile.id, branchId);
     const [products, setProducts] = useState(() => loadJson(keys.products(branchId), []));
@@ -201,7 +210,6 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
         if (window.history.state?.cashierSaleOverlay === name) return window.history.back();
         if (name === 'customer') setCustomerOpen(false);
         if (name === 'session') setSessionOpen(false);
-        if (name === 'receipt') setReceipt(null);
     }, []);
 
     const loadRegister = useCallback(async () => {
@@ -239,7 +247,7 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
         return () => window.removeEventListener('popstate', onBack);
     }, [navigateSaleStep]);
     useEffect(() => {
-        const activeOverlay = customerOpen ? 'customer' : sessionOpen ? 'session' : receipt ? 'receipt' : null;
+        const activeOverlay = customerOpen ? 'customer' : sessionOpen ? 'session' : null;
         const historyOverlay = window.history.state?.cashierSaleOverlay || null;
         if (activeOverlay && historyOverlay !== activeOverlay) {
             window.history.pushState({ ...(window.history.state || {}), cashierSaleOverlay: activeOverlay }, '', window.location.href);
@@ -247,7 +255,8 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
             window.history.back();
         }
     }, [customerOpen, receipt, sessionOpen]);
-    useEffect(() => { if (!cart.length && mobileStep !== 'products') navigateSaleStep('products', { replace: true }); }, [cart.length, mobileStep, navigateSaleStep]);
+    useEffect(() => { if (!cart.length && mobileStep !== 'products' && mobileStep !== 'complete') navigateSaleStep('products', { replace: true }); }, [cart.length, mobileStep, navigateSaleStep]);
+    useEffect(() => { onViewChange?.(mobileStep); }, [mobileStep, onViewChange]);
     useEffect(() => {
         if (!online) return undefined;
         const sync = async () => { try { const result = await syncPendingSales(token); if (Number(result.synced || 0) > 0) notify(`${result.synced} pending sale${result.synced > 1 ? 's' : ''} synced.`); } catch { /* Retry later. */ } };
@@ -348,12 +357,18 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
             if (requestError.status) { setError(requestError.message); setSubmitting(false); return; }
             addPendingSale(pending); setReceipt({ ...pending, grand_total: totals.grandTotal, items: receiptItems }); notify('Sale saved safely and will sync when online.', 'info');
         }
-        setCart([]); setSelectedCustomer(null); setPaymentMethod('Cash'); setPaymentStatus('Paid'); setAmountReceived(''); navigateSaleStep('products', { replace: true }); openSaleOverlay('receipt'); setSubmitting(false);
+        setCart([]); setSelectedCustomer(null); setPaymentMethod('Cash'); setPaymentStatus('Paid'); setAmountReceived(''); navigateSaleStep('complete', { replace: true }); setSubmitting(false);
         if (online) loadRegister();
     };
 
+    const startNewSale = () => {
+        setReceipt(null);
+        navigateSaleStep('products', { replace: true });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
-        <main className="sale-screen">
+        <main className={`sale-screen ${mobileStep === 'products' && cart.length ? 'sale-screen--cart-dock' : ''}`}>
             {error && <div className="form-alert form-alert--page" role="alert">{error}<button type="button" onClick={() => setError('')}><Icon name="close" size={16} /></button></div>}
 
             {mobileStep === 'products' && <><section className={`shift-strip ${session ? 'shift-strip--open' : ''}`}><span className="shift-strip__icon"><Icon name="cash" size={21} /></span><div><strong>{session ? 'Shift open' : 'Shift not started'}</strong><small>{session ? `Since ${formatDate(session.opened_at)} · ${money(session.total_sales, currency)} sales` : 'Enter your opening cash to begin'}</small></div><button type="button" onClick={() => { setError(''); setSessionOpen(true); }}>{session ? 'Manage' : 'Start shift'}</button></section><section className="catalog-section"><div className="price-mode"><span>Price mode</span><div><button type="button" className={salePriceType === 'retail' ? 'active' : ''} onClick={() => changePriceType('retail')}>Retail</button><button type="button" className={salePriceType === 'wholesale' ? 'active' : ''} onClick={() => changePriceType('wholesale')}>Wholesale</button></div></div><div className="search-box search-box--large"><Icon name="search" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); scanBarcode(query); } }} placeholder="Scan barcode or search medicine" autoComplete="off" />{query && <button type="button" onClick={() => setQuery('')}><Icon name="close" size={18} /></button>}</div><div className="section-heading"><div><h2>Products</h2><p>{loadingProducts ? 'Finding stock…' : `${products.length} available results`}</p></div>{!online && <span className="muted-badge">Cached stock</span>}</div>{loadingProducts && !products.length ? <SkeletonList count={5} /> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} unitId={selectedUnits[product.id]} onUnitChange={(id, unitId) => setSelectedUnits((current) => ({ ...current, [id]: unitId }))} onAdd={addProduct} currency={currency} priceType={salePriceType} />)}</div> : <EmptyState icon="search" title="No products found">Try a different medicine name or barcode.</EmptyState>}</section>{cart.length > 0 && <button className="cart-dock" type="button" onClick={() => navigateSaleStep('cart')} aria-label={`View cart with ${cart.length} products`}><span className="cart-dock__count">{cart.length}</span><span><small>{totals.quantity} items</small><strong>View cart</strong></span><b>{money(totals.grandTotal, currency)}</b><Icon name="chevron" size={19} /></button>}</>}
@@ -372,7 +387,7 @@ export default function SalesScreen({ token, profile, online, notify, onPriceMod
                 </div>}
                 <form id="shift-form" className="form-stack" onSubmit={updateSession}><label className="field"><span>{session ? 'Counted cash' : 'Opening cash'}</span><input type="number" min="0" step="0.01" inputMode="decimal" value={sessionForm.amount} onChange={(event) => setSessionForm({ ...sessionForm, amount: event.target.value })} required /></label><label className="field"><span>Notes <i>optional</i></span><textarea rows="3" value={sessionForm.notes} onChange={(event) => setSessionForm({ ...sessionForm, notes: event.target.value })} /></label>{!online && <div className="form-alert">Connect to manage your shift.</div>}</form>
             </Modal>
-            {receipt && <Receipt sale={receipt} settings={settings} currency={currency} onClose={() => setReceipt(null)} />}
+            {mobileStep === 'complete' && receipt && <ReceiptPage sale={receipt} settings={settings} currency={currency} onNewSale={startNewSale} />}
         </main>
     );
 }

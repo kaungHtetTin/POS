@@ -186,6 +186,8 @@ function AuthenticatedApp({ token, profile, setProfile, online, install, onLogou
     const [toast, setToast] = useState(null);
     const [pendingCount, setPendingCount] = useState(() => loadJson(keys.pendingSales, []).length);
     const [salePriceMode, setSalePriceMode] = useState('retail');
+    const [saleView, setSaleView] = useState('products');
+    const [historyView, setHistoryView] = useState('list');
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
@@ -209,6 +211,10 @@ function AuthenticatedApp({ token, profile, setProfile, online, install, onLogou
     };
     const notify = useCallback((message, type = 'success') => setToast({ message, type, id: Date.now() }), []);
     const branchName = profile.active_branch?.name || profile.assigned_branch?.name || 'No branch';
+    const headerLabel = route === 'sale' ? (saleView === 'complete' ? 'RECEIPT' : 'POINT OF SALE') : route === 'history' && historyView === 'detail' ? 'SALE HISTORY' : route.toUpperCase();
+    const headerTitle = route === 'sale'
+        ? ({ products: 'New sale', cart: 'Current sale', checkout: 'Checkout', complete: 'Sale complete' }[saleView] || 'New sale')
+        : route === 'history' ? (historyView === 'detail' ? 'Sale details' : 'Sale history') : 'My profile';
     const refreshPage = useCallback(async () => {
         if (online) {
             try {
@@ -230,10 +236,10 @@ function AuthenticatedApp({ token, profile, setProfile, online, install, onLogou
         <div className="app-shell">
             <header className="app-header">
                 <div>
-                    <span className="app-header__label">{route === 'sale' ? 'POINT OF SALE' : route.toUpperCase()}</span>
+                    <span className="app-header__label">{headerLabel}</span>
                     <h1>
-                        {route === 'sale' ? 'New sale' : route === 'history' ? 'Sale history' : 'My profile'}
-                        {route === 'sale' && salePriceMode === 'wholesale' && <span className="header-mode-alert" role="status">Wholesale</span>}
+                        {headerTitle}
+                        {route === 'sale' && saleView !== 'complete' && salePriceMode === 'wholesale' && <span className="header-mode-alert" role="status">Wholesale</span>}
                     </h1>
                 </div>
                 <div className="header-branch" title={branchName}>
@@ -251,8 +257,8 @@ function AuthenticatedApp({ token, profile, setProfile, online, install, onLogou
             )}
 
             <div className="screen-area" key={`${route}-${refreshKey}`}>
-                {route === 'sale' && <SalesScreen token={token} profile={profile} online={online} notify={notify} navigate={navigate} onPriceModeChange={setSalePriceMode} />}
-                {route === 'history' && <HistoryScreen token={token} online={online} notify={notify} />}
+                {route === 'sale' && <SalesScreen token={token} profile={profile} online={online} notify={notify} navigate={navigate} onPriceModeChange={setSalePriceMode} onViewChange={setSaleView} />}
+                {route === 'history' && <HistoryScreen token={token} online={online} notify={notify} onViewChange={setHistoryView} />}
                 {route === 'profile' && <ProfileScreen token={token} profile={profile} setProfile={setProfile} online={online} install={install} notify={notify} onLogout={onLogout} />}
             </div>
             </PullToRefresh>

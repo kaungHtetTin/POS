@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { apiRequest, queryString } from './api';
 import Icon from './Icons';
 import { getPendingSales } from './storage';
-import { EmptyState, Modal, SkeletonList, flattenErrors, formatDate, money } from './Ui';
+import { EmptyState, SkeletonList, flattenErrors, formatDate, money } from './Ui';
 import { syncPendingSales } from './SalesScreen';
 
 function SaleDetail({ sale, currency }) {
@@ -35,7 +35,7 @@ function SaleDetail({ sale, currency }) {
     );
 }
 
-export default function HistoryScreen({ token, online, notify }) {
+export default function HistoryScreen({ token, online, notify, onViewChange }) {
     const [sales, setSales] = useState([]);
     const [pending, setPending] = useState(() => getPendingSales());
     const [pagination, setPagination] = useState({ current_page: 1, last_page: 1 });
@@ -77,6 +77,21 @@ export default function HistoryScreen({ token, online, notify }) {
         };
     }, [load, query]);
 
+    useEffect(() => {
+        onViewChange?.(detail ? 'detail' : 'list');
+    }, [detail, onViewChange]);
+
+    useEffect(() => {
+        const onBack = (event) => {
+            if ((window.location.hash.replace('#', '') || 'sale') === 'history' && event.state?.cashierHistoryView !== 'detail') {
+                setDetail(null);
+                setDetailLoading(false);
+            }
+        };
+        window.addEventListener('popstate', onBack);
+        return () => window.removeEventListener('popstate', onBack);
+    }, []);
+
     const retry = async () => {
         setSyncing(true);
         setError('');
@@ -95,6 +110,7 @@ export default function HistoryScreen({ token, online, notify }) {
 
     const showDetail = async (sale) => {
         if (!online) return;
+        window.history.pushState({ ...(window.history.state || {}), cashierHistoryView: 'detail' }, '', window.location.href);
         setDetail(sale);
         setDetailLoading(true);
         try {
@@ -102,10 +118,31 @@ export default function HistoryScreen({ token, online, notify }) {
         } catch (requestError) {
             setError(requestError.message);
             setDetail(null);
+            if (window.history.state?.cashierHistoryView === 'detail') window.history.back();
         } finally {
             setDetailLoading(false);
         }
     };
+
+    const closeDetail = () => {
+        if (window.history.state?.cashierHistoryView === 'detail') window.history.back();
+        else setDetail(null);
+    };
+
+    if (detail || detailLoading) {
+        return (
+            <main className="history-screen history-detail-page">
+                <section className="page-stage">
+                    <div className="page-stage__heading">
+                        <button className="back-link" type="button" onClick={closeDetail}><Icon name="arrow" size={18} /> Sale history</button>
+                        <div><span>Receipt details</span><h2>{detail?.invoice_number || 'Loading sale…'}</h2></div>
+                    </div>
+                    {error && <div className="form-alert form-alert--page">{error}</div>}
+                    {detailLoading ? <SkeletonList count={4} /> : <SaleDetail sale={detail} currency={currency} />}
+                </section>
+            </main>
+        );
+    }
 
     return (
         <main className="history-screen">
@@ -139,9 +176,6 @@ export default function HistoryScreen({ token, online, notify }) {
                 {pagination.last_page > 1 && <div className="pagination"><button type="button" disabled={pagination.current_page <= 1 || loading} onClick={() => load(pagination.current_page - 1)}><Icon name="arrow" size={17} /> Newer</button><span>{pagination.current_page} / {pagination.last_page}</span><button type="button" disabled={pagination.current_page >= pagination.last_page || loading} onClick={() => load(pagination.current_page + 1)}>Older <Icon name="chevron" size={17} /></button></div>}
             </section>
 
-            <Modal open={Boolean(detail)} wide title={detail?.invoice_number || 'Sale details'} onClose={() => setDetail(null)}>
-                {detailLoading ? <SkeletonList count={4} /> : detail && <SaleDetail sale={detail} currency={currency} />}
-            </Modal>
         </main>
     );
 }
