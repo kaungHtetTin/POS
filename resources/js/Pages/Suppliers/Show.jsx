@@ -168,14 +168,10 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                         <Box
                             sx={{
                                 display: 'grid',
-                                gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 140px)' },
+                                gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 140px)' },
                                 gap: 1,
                             }}
                         >
-                            <Paper variant="outlined" sx={{ p: 1.2 }}>
-                                <Typography variant="caption" color="text.secondary">Credit Limit</Typography>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(supplier.credit_limit)}</Typography>
-                            </Paper>
                             <Paper variant="outlined" sx={{ p: 1.2 }}>
                                 <Typography variant="caption" color="text.secondary">Outstanding</Typography>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(supplier.balance)}</Typography>

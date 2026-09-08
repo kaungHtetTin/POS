@@ -73,7 +73,6 @@ class SupplierController extends Controller
             'email' => 'nullable|email|max:255|unique:suppliers,email',
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
-            'credit_limit' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
         Supplier::create($validated);
@@ -89,7 +88,6 @@ class SupplierController extends Controller
             'email' => 'nullable|email|max:255|unique:suppliers,email,' . $supplier->id,
             'address' => 'nullable|string|max:500',
             'payment_terms' => 'nullable|string|max:500',
-            'credit_limit' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
         $supplier->update($validated);

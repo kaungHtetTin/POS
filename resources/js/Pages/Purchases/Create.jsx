@@ -37,7 +37,6 @@ import {
     NavigateNext as NavigateNextIcon,
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
-    WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 
 const steps = ['Basic Information', 'Select Product', 'Fill Quantity', 'Review & Confirm'];
@@ -141,8 +140,6 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
 
         return Number(selectedSupplier.balance || 0) + dueAmount;
     }, [selectedSupplier, dueAmount]);
-
-    const exceedsCredit = selectedSupplier && projectedBalance > Number(selectedSupplier.credit_limit || 0);
 
     const serverErrorMessages = useMemo(
         () => Object.values(errors).flatMap((error) => Array.isArray(error) ? error : [error]).filter(Boolean),
@@ -284,9 +281,6 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
             if (data.payment_status === 'Partial' && Number(data.paid_amount || 0) > totalAmount) {
                 messages.push('Paid amount cannot exceed total purchase amount.');
             }
-            if (exceedsCredit) {
-                messages.push('Projected supplier balance exceeds the credit limit.');
-            }
         }
 
         return messages;
@@ -345,11 +339,6 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
         <Stack spacing={2.5}>
             {renderStepErrors()}
             {errors.supplier_id && <Alert severity="error">{errors.supplier_id}</Alert>}
-            {exceedsCredit && (
-                <Alert severity="error" icon={<WarningIcon fontSize="inherit" />}>
-                    Credit limit warning: projected balance ({money(projectedBalance)}) exceeds supplier credit limit ({money(selectedSupplier?.credit_limit)}).
-                </Alert>
-            )}
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                 <Autocomplete
@@ -371,7 +360,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                                         {supplier.name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        Balance: {money(supplier.balance)} | Limit: {money(supplier.credit_limit)}
+                                        Balance: {money(supplier.balance)}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -482,18 +471,14 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
             </Box>
 
             {selectedSupplier && (
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
                     <Paper variant="outlined" sx={{ p: 1.5 }}>
                         <Typography variant="caption" color="text.secondary">Current Balance</Typography>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(selectedSupplier.balance)}</Typography>
                     </Paper>
                     <Paper variant="outlined" sx={{ p: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">Credit Limit</Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(selectedSupplier.credit_limit)}</Typography>
-                    </Paper>
-                    <Paper variant="outlined" sx={{ p: 1.5 }}>
                         <Typography variant="caption" color="text.secondary">Projected Balance</Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: exceedsCredit ? 'error.main' : 'success.main' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary' }}>
                             {money(projectedBalance)}
                         </Typography>
                     </Paper>

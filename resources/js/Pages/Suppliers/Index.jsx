@@ -35,7 +35,6 @@ import {
     Phone as PhoneIcon,
     Email as EmailIcon,
     AccountBalanceWallet as BalanceIcon,
-    CreditCard as CreditIcon,
     Search as SearchIcon,
     Visibility as VisibilityIcon,
 } from '@mui/icons-material';
@@ -53,7 +52,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
         email: '',
         address: '',
         payment_terms: '',
-        credit_limit: '0',
     });
 
     const handleOpen = (supplier = null) => {
@@ -66,7 +64,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                 email: supplier.email || '',
                 address: supplier.address || '',
                 payment_terms: supplier.payment_terms || '',
-                credit_limit: supplier.credit_limit ?? '0',
             });
         } else {
             setEditMode(false);
@@ -78,7 +75,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                 email: '',
                 address: '',
                 payment_terms: '',
-                credit_limit: '0',
             });
         }
         setOpen(true);
@@ -154,7 +150,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Supplier</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Contact & Terms</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Credit Limit</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Outstanding Balance</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Purchases</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
@@ -198,15 +193,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                                     {supplier.payment_terms || 'No payment terms configured'}
                                                 </Typography>
                                             </Stack>
-                                        </TableCell>
-                                        <TableCell align="center" sx={{ verticalAlign: 'top', pt: 1.5 }}>
-                                            <Chip
-                                                size="small"
-                                                icon={<CreditIcon />}
-                                                label={`$${Number(supplier.credit_limit || 0).toFixed(2)}`}
-                                                variant="outlined"
-                                                sx={{ fontSize: '11px', height: '22px' }}
-                                            />
                                         </TableCell>
                                         <TableCell align="center" sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Chip
@@ -263,7 +249,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 ))}
                                 {supplierRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No suppliers found. Click "Add Supplier" to create your first supplier.
                                             </Typography>
@@ -349,18 +335,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 onChange={(e) => setData('payment_terms', e.target.value)}
                                 error={!!errors.payment_terms}
                                 helperText={errors.payment_terms}
-                            />
-                            <TextField
-                                label="Credit Limit"
-                                type="number"
-                                fullWidth
-                                size="small"
-                                value={data.credit_limit}
-                                onChange={(e) => setData('credit_limit', e.target.value)}
-                                error={!!errors.credit_limit}
-                                helperText={errors.credit_limit}
-                                inputProps={{ min: 0, step: '0.01' }}
-                                required
                             />
                         </Stack>
                     </DialogContent>

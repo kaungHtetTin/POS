@@ -306,12 +306,6 @@ class StaffPurchaseController extends Controller
             $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
             $projectedBalance = (float) $supplier->balance + $dueAmount;
 
-            if ($projectedBalance > (float) $supplier->credit_limit) {
-                throw ValidationException::withMessages([
-                    'supplier_id' => 'Credit limit exceeded for selected supplier.',
-                ]);
-            }
-
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
                 'branch_id' => $validated['branch_id'],

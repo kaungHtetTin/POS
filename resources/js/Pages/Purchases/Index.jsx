@@ -38,7 +38,6 @@ import {
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
     Visibility as VisibilityIcon,
-    WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 
 const emptyItem = {
@@ -145,8 +144,6 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
         return Number(selectedSupplier.balance || 0) - existingDueForSelectedSupplier + dueAmount;
     }, [selectedSupplier, dueAmount, editingPurchase]);
-
-    const exceedsCredit = selectedSupplier && projectedBalance > Number(selectedSupplier.credit_limit || 0);
 
     const formatPurchaseDate = (value) => {
         if (!value) {
@@ -540,11 +537,6 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                     </DialogTitle>
                     <DialogContent dividers>
                         <Stack spacing={2.5} sx={{ mt: 1 }}>
-                            {exceedsCredit && (
-                                <Alert severity="error" icon={<WarningIcon fontSize="inherit" />}>
-                                    Credit limit warning: projected balance (${Number(projectedBalance || 0).toFixed(2)}) exceeds supplier credit limit (${Number(selectedSupplier?.credit_limit || 0).toFixed(2)}).
-                                </Alert>
-                            )}
 
                             {editingPurchase && (
                                 <Alert severity="warning" sx={{ mb: 1 }}>
@@ -669,9 +661,6 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                         Current Balance: ${Number(selectedSupplier.balance || 0).toFixed(2)}
                                     </Alert>
                                     <Alert severity="info" sx={{ flex: 1 }}>
-                                        Credit Limit: ${Number(selectedSupplier.credit_limit || 0).toFixed(2)}
-                                    </Alert>
-                                    <Alert severity={exceedsCredit ? 'error' : 'success'} sx={{ flex: 1 }}>
                                         Projected Balance: ${Number(projectedBalance || 0).toFixed(2)}
                                     </Alert>
                                 </Stack>

@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\InventoryBatch;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
@@ -32,7 +33,7 @@ class PurchaseWorkflowTest extends TestCase
         $supplier = Supplier::create([
             'name' => 'Acme Supplier',
             'phone' => '01999999999',
-            'credit_limit' => 50000,
+            'credit_limit' => 0,
             'balance' => 0,
         ]);
         $product = Product::factory()->create();
@@ -79,6 +80,51 @@ class PurchaseWorkflowTest extends TestCase
         $this->assertSame(50, $createdBatch->quantity);
         $this->assertEquals(12.00, (float) $createdBatch->purchase_price);
         $this->assertEquals(25.00, (float) $createdBatch->selling_price);
+        $purchase = Purchase::firstOrFail();
+        $this->assertEquals(600, (float) $purchase->due_amount);
+        $this->assertEquals(600, (float) $supplier->fresh()->balance);
+
+        $this->actingAs($user)->patch('/purchases/' . $purchase->id, [
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'invoice_number' => $purchase->invoice_number,
+            'purchase_date' => Carbon::today()->toDateString(),
+            'payment_status' => 'Partial',
+            'paid_amount' => 100,
+            'items' => [[
+                'product_id' => $product->id,
+                'unit_id' => $unit->id,
+                'batch_number' => $createdBatch->batch_number,
+                'expiry_date' => Carbon::today()->addMonths(12)->toDateString(),
+                'quantity' => 6,
+                'unit_price' => 120,
+                'selling_price' => 250,
+            ]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertEquals(720, (float) $purchase->fresh()->total_amount);
+        $this->assertEquals(620, (float) $purchase->fresh()->due_amount);
+        $this->assertEquals(620, (float) $supplier->fresh()->balance);
+        $this->assertSame(60, $createdBatch->fresh()->quantity);
+
+        $this->actingAs($user)->post('/supplier-payments', [
+            'supplier_id' => $supplier->id,
+            'purchase_id' => $purchase->id,
+            'branch_id' => $branch->id,
+            'payment_date' => Carbon::today()->toDateString(),
+            'amount' => 120,
+            'payment_method' => 'Cash',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertEquals(500, (float) $supplier->fresh()->balance);
+        $this->assertEquals(500, (float) $purchase->fresh()->due_amount);
+        $this->assertEquals(220, (float) $purchase->fresh()->paid_amount);
+        $this->assertDatabaseHas('supplier_payments', [
+            'supplier_id' => $supplier->id,
+            'purchase_id' => $purchase->id,
+            'amount' => 120,
+        ]);
+
     }
 
     public function test_existing_batch_costs_are_updated_with_weighted_average(): void
@@ -95,7 +141,7 @@ class PurchaseWorkflowTest extends TestCase
         $supplier = Supplier::create([
             'name' => 'Acme Supplier',
             'phone' => '01999999999',
-            'credit_limit' => 50000,
+            'credit_limit' => 0,
             'balance' => 0,
         ]);
         $product = Product::factory()->create();
@@ -154,4 +200,22 @@ class PurchaseWorkflowTest extends TestCase
         $this->assertEquals(13.33, round((float) $updatedBatch->purchase_price, 2));
         $this->assertEquals(20.00, round((float) $updatedBatch->selling_price, 2));
     }
+    public function test_supplier_can_be_created_and_updated_without_a_credit_limit(): void
+    {
+        $this->withoutMiddleware(EnsureUserHasPermission::class);
+        $user = User::factory()->create();
+        $this->actingAs($user)->post('/suppliers', [
+            'name' => 'Unlimited Supplier',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $supplier = Supplier::where('name', 'Unlimited Supplier')->firstOrFail();
+        $supplier->update(['balance' => 250]);
+        $this->actingAs($user)->patch('/suppliers/' . $supplier->id, [
+            'name' => 'Updated Supplier',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('Updated Supplier', $supplier->fresh()->name);
+        $this->assertEquals(250, (float) $supplier->fresh()->balance);
+    }
+
 }

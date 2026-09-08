@@ -1059,7 +1059,7 @@ Response:
 Possible errors:
 
 - `422` if `paid_amount` exceeds the purchase total.
-- `422` if the purchase due amount would exceed the supplier credit limit.
+- Supplier credit limits are not enforced. Purchase due amounts continue to update the supplier balance. Any `credit_limit` returned in supplier data is a legacy field retained for compatibility and must not block purchases.
 
 ## Status Codes
 

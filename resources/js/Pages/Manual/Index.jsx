@@ -353,7 +353,7 @@ export default function Manual({ auth, appName }) {
                         All new stock enters the system through the <strong>Purchases</strong> module. This is the only way to create new inventory batches with expiry dates.
                     </Typography>
                     <Box sx={{ pl: 2, borderLeft: '3px solid', borderColor: 'primary.light', mb: 3 }}>
-                        <Typography variant="body2"><strong>Supplier Credit:</strong> The system validates the supplier's <i>Credit Limit</i>. If a purchase's due amount exceeds this limit, the system will issue a warning or block the transaction.</Typography>
+                        <Typography variant="body2"><strong>Supplier Credit:</strong> Purchases have no supplier credit limit. Unpaid purchase amounts increase the supplier balance, and supplier payments reduce the outstanding balance.</Typography>
                         <Typography variant="body2"><strong>Batch Details:</strong> For every item, you must record a <i>Batch Number</i> and <i>Expiry Date</i>. If no batch number is provided, the system generates one automatically based on the date.</Typography>
                         <Typography variant="body2"><strong>Pricing:</strong> You must set both the <i>Cost Price</i> (what you paid) and the <i>Selling Price</i> (what the customer pays) for the specific batch.</Typography>
                     </Box>

@@ -205,7 +205,8 @@ class OfflineSyncApiTest extends TestCase
             ->assertContent('null');
     }
 
-    public function test_offline_purchase_sync_is_idempotent(): void
+    /** @dataProvider purchaseEndpoints */
+    public function test_purchase_without_credit_limit_preserves_balances(string $endpoint): void
     {
         $branch = Branch::create([
             'name' => 'Main Branch',
@@ -219,7 +220,7 @@ class OfflineSyncApiTest extends TestCase
         $supplier = Supplier::create([
             'name' => 'Acme Supplier',
             'phone' => '09111111111',
-            'credit_limit' => 10000,
+            'credit_limit' => 1,
             'balance' => 0,
         ]);
         $product = Product::factory()->create();
@@ -262,6 +263,16 @@ class OfflineSyncApiTest extends TestCase
             ],
         ];
 
+        if ($endpoint === 'staff') {
+            $this->postJson('http://localhost/api/staff/purchases', $payload['purchases'][0])
+                ->assertCreated();
+            $this->assertSame(1, Purchase::count());
+            $this->assertEquals(150, (float) Purchase::firstOrFail()->due_amount);
+            $this->assertSame(40, Inventory::where('product_id', $product->id)->first()->quantity);
+            $this->assertEquals(150, (float) $supplier->fresh()->balance);
+            return;
+        }
+
         $this->postJson('http://localhost/api/v1/sync/purchases', $payload)
             ->assertOk()
             ->assertJsonPath('summary.synced', 1)
@@ -281,6 +292,11 @@ class OfflineSyncApiTest extends TestCase
         $this->assertSame(1, Purchase::where('client_reference', 'android-purchase-001')->count());
         $this->assertSame(40, Inventory::where('product_id', $product->id)->first()->quantity);
         $this->assertEquals(150.00, (float) $supplier->fresh()->balance);
+    }
+
+    public static function purchaseEndpoints(): array
+    {
+        return [['staff'], ['sync']];
     }
 
     private function givePermission(User $user, string $roleName, string $permissionName, string $permissionSlug): void

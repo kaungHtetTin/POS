@@ -256,13 +256,6 @@ class PurchaseController extends Controller
         $dueAmount = $totalAmount - $paidAmount;
         $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
         $supplier = Supplier::findOrFail($validated['supplier_id']);
-        $projectedBalance = (float) $supplier->balance + $dueAmount;
-
-        if ($projectedBalance > (float) $supplier->credit_limit) {
-            return redirect()->back()->withErrors([
-                'supplier_id' => 'Credit limit exceeded for selected supplier.',
-            ])->with('error', 'Warning: This purchase exceeds supplier credit limit.')->withInput();
-        }
 
         DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
             $purchase = Purchase::create([
@@ -456,14 +449,6 @@ class PurchaseController extends Controller
         $dueAmount = $totalAmount - $paidAmount;
         $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
         $supplier = Supplier::findOrFail($validated['supplier_id']);
-
-        $existingDueForSelectedSupplier = $purchase->supplier_id === $validated['supplier_id']
-            ? (float) $purchase->due_amount
-            : 0;
-        $projectedBalance = (float) $supplier->balance - $existingDueForSelectedSupplier + $dueAmount;
-        if ($projectedBalance > (float) $supplier->credit_limit) {
-            return redirect()->back()->withErrors(['supplier_id' => 'Credit limit exceeded for selected supplier.'])->withInput();
-        }
 
         DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
             // 1. Reverse old inventory and supplier balance

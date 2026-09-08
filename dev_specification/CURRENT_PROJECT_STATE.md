@@ -36,7 +36,7 @@ This document reflects the actual implementation state of the codebase. The road
 
 ### Phase 3: Inventory & Supplier Management - Completed
 
-- **Suppliers**: CRUD, balance, credit limit; purchase flow warns when exceeding supplier credit limit.
+- **Suppliers**: CRUD and balance tracking; purchases have no supplier credit limit.
 - **Purchases**: Create, edit, detail page, purchase items, batch creation, expiry, cost, payment amounts, payment status, supplier FOC quantity, and wholesale price updates.
 - **Inventory**: `inventories` aggregate stock and `inventory_batches` FEFO stock are both maintained.
 - **Stock transfers**: Branch-to-branch transfer workflow with statuses.
