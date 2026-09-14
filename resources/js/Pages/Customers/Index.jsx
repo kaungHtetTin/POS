@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -46,6 +46,21 @@ export default function CustomerIndex({ auth, customers, filters }) {
     const [search, setSearch] = useState(filters?.search || '');
     const customerRows = customers?.data || customers || [];
 
+    useEffect(() => {
+        const normalizedSearch = search.trim();
+        if (normalizedSearch === (filters?.search || '')) return;
+
+        const timer = window.setTimeout(() => {
+            router.get(route('customers.index'), { search: normalizedSearch || undefined }, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 350);
+
+        return () => window.clearTimeout(timer);
+    }, [search, filters?.search]);
+
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
         phone: '',
@@ -84,9 +99,10 @@ export default function CustomerIndex({ auth, customers, filters }) {
         setEditingCustomer(null);
     };
 
-    const handleSearch = (page = undefined) => {
-        router.get(route('customers.index'), { search: search || undefined, page }, {
+    const handlePageChange = (page) => {
+        router.get(route('customers.index'), { search: search.trim() || undefined, page }, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
         });
     };
@@ -130,8 +146,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                     <ReportFilterToolbar
                         ariaLabel={__('Customer filters')}
                         fieldKinds={['search']}
-                        onSubmit={() => handleSearch()}
-                        actions={<><Button variant="outlined" size="small" type="submit">{__('Search')}</Button><CsvExportButton source={customers} dataKey="customers" filename="customers.csv" /></>}
+                        actions={<CsvExportButton source={customers} dataKey="customers" filename="customers.csv" />}
                     >
                         <TextField
                             size="small"
@@ -229,7 +244,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 size="small"
                                 count={customers.last_page}
                                 page={customers.current_page}
-                                onChange={(event, page) => handleSearch(page)}
+                                onChange={(event, page) => handlePageChange(page)}
                                 color="primary"
                             />
                         </Stack>

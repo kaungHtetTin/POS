@@ -338,6 +338,14 @@ class PosController extends Controller
 
     public function checkout(Request $request)
     {
+        return DB::transaction(function () use ($request) {
+            app(\App\Services\AutomaticPricingService::class)->lock();
+            return $this->checkoutWithPricingLock($request);
+        });
+    }
+
+    private function checkoutWithPricingLock(Request $request)
+    {
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'amount_received' => 'nullable|numeric|min:0|max:999999999999.99',
@@ -389,7 +397,7 @@ class PosController extends Controller
 
         $productIds = $items->pluck('product_id')->unique()->values();
         $products = Product::whereIn('id', $productIds)
-            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,wholesale_price,is_base_unit,is_default_selling_unit'])
+            ->with(['tax:id,rate', 'taxes:id,rate', 'product_units:product_id,unit_id,conversion_factor,selling_price,wholesale_price,selling_price_mode,wholesale_price_mode,is_base_unit,is_default_selling_unit'])
             ->get()
             ->keyBy('id');
 
@@ -457,6 +465,7 @@ class PosController extends Controller
             }
 
             $priceType = $item['price_type'] ?? 'retail';
+            app(\App\Services\AutomaticPricingService::class)->assertSellable($productUnit, $priceType === 'wholesale' ? 'wholesale_price' : 'selling_price');
             $originalUnitPrice = $priceType === 'wholesale'
                 ? (float) ($productUnit->wholesale_price ?? $productUnit->selling_price)
                 : (float) $productUnit->selling_price;

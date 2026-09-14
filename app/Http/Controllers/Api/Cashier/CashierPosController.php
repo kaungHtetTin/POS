@@ -69,7 +69,7 @@ class CashierPosController extends Controller
             ->with([
                 'taxes:id,name,rate',
                 'product_units' => function ($q) {
-                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit', 'is_default_selling_unit')
+                    $q->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit', 'is_default_selling_unit')
                         ->with(['unit:id,name,short_name']);
                 },
             ])
@@ -385,6 +385,7 @@ class CashierPosController extends Controller
         }
 
         $result = DB::transaction(function () use ($validated, $branchId, $userId, $activeSession) {
+            app(\App\Services\AutomaticPricingService::class)->lock();
             $activeSession = CashSession::whereKey($activeSession->id)
                 ->where('branch_id', $branchId)
                 ->where('user_id', $userId)
@@ -416,7 +417,7 @@ class CashierPosController extends Controller
             $products = Product::whereIn('id', $productIds)
                 ->with(['taxes:id,rate', 'product_units' => function ($q) use ($productUnitIds) {
                     $q->whereIn('id', $productUnitIds)
-                        ->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit');
+                        ->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit');
                 }])
                 ->get()
                 ->keyBy('id');
@@ -447,6 +448,7 @@ class CashierPosController extends Controller
                 $focConversionFactor = max((int) $focProductUnit->conversion_factor, 1);
                 $baseQuantity = (int) round($item['quantity'] * $conversionFactor);
                 $focBaseQuantity = (int) round($item['foc_quantity'] * $focConversionFactor);
+                app(\App\Services\AutomaticPricingService::class)->assertSellable($productUnit, $item['price_type'] === 'wholesale' ? 'wholesale_price' : 'selling_price');
                 $originalUnitPrice = $item['price_type'] === 'wholesale'
                     ? (float) ($productUnit->wholesale_price ?? $productUnit->selling_price)
                     : (float) $productUnit->selling_price;

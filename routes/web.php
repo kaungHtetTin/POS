@@ -8,10 +8,12 @@ use App\Http\Controllers\PermissionsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\UnitController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImportController;
+use App\Http\Controllers\PricingRuleController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierImportController;
 use App\Http\Controllers\SupplierPaymentController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\InventoryAdjustmentController;
@@ -210,16 +212,20 @@ Route::middleware('auth')->group(function () {
         Route::patch('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:manage_inventory');
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy')->middleware('permission:manage_inventory');
 
-        Route::get('/units', [UnitController::class, 'index'])->name('units.index')->middleware('permission:manage_inventory');
-        Route::post('/units', [UnitController::class, 'store'])->name('units.store')->middleware('permission:manage_inventory');
-        Route::patch('/units/{unit}', [UnitController::class, 'update'])->name('units.update')->middleware('permission:manage_inventory');
-        Route::delete('/units/{unit}', [UnitController::class, 'destroy'])->name('units.destroy')->middleware('permission:manage_inventory');
-
         Route::get('/taxes', [TaxController::class, 'index'])->name('taxes.index')->middleware('permission:manage_inventory');
         Route::post('/taxes', [TaxController::class, 'store'])->name('taxes.store')->middleware('permission:manage_inventory');
         Route::patch('/taxes/{tax}', [TaxController::class, 'update'])->name('taxes.update')->middleware('permission:manage_inventory');
         Route::delete('/taxes/{tax}', [TaxController::class, 'destroy'])->name('taxes.destroy')->middleware('permission:manage_inventory');
 
+        Route::middleware('permission:manage_inventory')->group(function () {
+            Route::get('/products/import', [ProductImportController::class, 'create'])->name('products.import.create');
+            Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
+            Route::get('/products/import/unit-prices/template', [ProductImportController::class, 'unitPriceTemplate'])->name('products.import.unit-prices.template');
+            Route::post('/products/import', [ProductImportController::class, 'store'])->name('products.import.store');
+            Route::post('/products/import/unit-prices', [ProductImportController::class, 'storeUnitPrices'])->name('products.import.unit-prices.store');
+        });
+        Route::post('/settings/prices/{rule}/preview', [PricingRuleController::class, 'preview'])->name('pricing.preview')->middleware('permission:manage_branches');
+        Route::patch('/settings/prices/{rule}', [PricingRuleController::class, 'update'])->name('pricing.update')->middleware('permission:manage_branches');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:manage_inventory');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:manage_inventory');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:manage_inventory');
@@ -228,6 +234,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:manage_inventory');
 
         Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index')->middleware('permission:manage_inventory');
+        Route::middleware('permission:manage_inventory')->group(function () {
+            Route::get('/suppliers/import', [SupplierImportController::class, 'create'])->name('suppliers.import');
+            Route::get('/suppliers/import/template', [SupplierImportController::class, 'template'])->name('suppliers.import.template');
+            Route::post('/suppliers/import', [SupplierImportController::class, 'store'])->name('suppliers.import.store');
+        });
         Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show')->middleware('permission:manage_inventory');
         Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store')->middleware('permission:manage_inventory');
         Route::patch('/suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update')->middleware('permission:manage_inventory');

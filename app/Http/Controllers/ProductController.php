@@ -57,6 +57,8 @@ class ProductController extends Controller
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'exists:taxes,id',
             'generic_name' => 'required|string|max:255',
+            'pricing_base_cost' => 'nullable|numeric|min:0|max:999999999999.999999',
+            'pricing_version' => 'sometimes|integer|min:1',
             'brand_name' => 'required|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:100',
@@ -68,8 +70,12 @@ class ProductController extends Controller
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:250',
             'product_units' => 'required|array|min:1',
-            'product_units.*.unit_id' => 'required|exists:units,id',
-            'product_units.*.conversion_factor' => 'required|numeric|min:1',
+            'product_units.*.unit_id' => 'nullable|exists:units,id',
+            'product_units.*.unit_name' => 'nullable|string|max:255',
+            'product_units.*.unit_short_name' => 'nullable|string|max:50',
+            'product_units.*.selling_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.wholesale_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.conversion_factor' => 'required|integer|min:1|max:2147483647',
             'product_units.*.selling_price' => 'required|numeric|min:0',
             'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
@@ -77,6 +83,8 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
             $validated['name'] = $validated['brand_name'];
             $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
 
@@ -106,16 +114,9 @@ class ProductController extends Controller
 
             $product->taxes()->sync($taxIds->all());
 
-            $defaultSellingIndex = collect($validated['product_units'])->search(fn ($unit) => $unit['is_default_selling_unit']);
-            $defaultSellingIndex = $defaultSellingIndex === false ? 0 : $defaultSellingIndex;
-
-            foreach ($validated['product_units'] as $index => $unitData) {
-                $unitData['is_base_unit'] = $index === 0;
-                $unitData['conversion_factor'] = $index === 0 ? 1 : $unitData['conversion_factor'];
-                $unitData['is_default_selling_unit'] = $index === $defaultSellingIndex;
-                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
-                $product->product_units()->create($unitData);
-            }
+            $units = app(\App\Services\UnitCatalogService::class)->resolveRows($validated['product_units']);
+            $pricing->saveUnits($product, $units);
+            $pricing->refreshProduct($product, 'medicine_save', $request->user()->id);
         });
 
         return redirect()->back()->with('success', 'Medicine created successfully.');
@@ -124,6 +125,7 @@ class ProductController extends Controller
     public function create(Request $request)
     {
         return Spa::render('Products/Create', [
+            'pricing_rules' => \App\Models\PricingRule::all(),
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
             'units' => Unit::all(),
@@ -136,7 +138,11 @@ class ProductController extends Controller
     {
         $productModel = Product::with(['category', 'taxes', 'product_units.unit'])->findOrFail($product);
 
+        $productModel->setAttribute('pricing_has_purchase', DB::table('purchase_items')->where('product_id', $productModel->id)->exists());
+        $productModel->setAttribute('pricing_buying_cost', app(\App\Services\AutomaticPricingService::class)->readCost($productModel));
+
         return Spa::render('Products/Edit', [
+            'pricing_rules' => \App\Models\PricingRule::all(),
             'product' => $productModel,
             'categories' => Category::all(),
             'taxes' => Tax::where('status', true)->get(),
@@ -154,6 +160,8 @@ class ProductController extends Controller
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'exists:taxes,id',
             'generic_name' => 'required|string|max:255',
+            'pricing_base_cost' => 'nullable|numeric|min:0|max:999999999999.999999',
+            'pricing_version' => 'sometimes|integer|min:1',
             'brand_name' => 'required|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:100',
@@ -165,8 +173,12 @@ class ProductController extends Controller
             'status' => 'required|in:Active,Inactive',
             'image' => 'nullable|image|max:250',
             'product_units' => 'required|array|min:1',
-            'product_units.*.unit_id' => 'required|exists:units,id',
-            'product_units.*.conversion_factor' => 'required|numeric|min:1',
+            'product_units.*.unit_id' => 'nullable|exists:units,id',
+            'product_units.*.unit_name' => 'nullable|string|max:255',
+            'product_units.*.unit_short_name' => 'nullable|string|max:50',
+            'product_units.*.selling_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.wholesale_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.conversion_factor' => 'required|integer|min:1|max:2147483647',
             'product_units.*.selling_price' => 'required|numeric|min:0',
             'product_units.*.wholesale_price' => 'nullable|numeric|min:0',
             'product_units.*.is_base_unit' => 'required|boolean',
@@ -174,6 +186,15 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated, $product) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
+            $product = Product::lockForUpdate()->findOrFail($product->id);
+            $hasAutomatic = $product->product_units()->where(function ($query) {
+                $query->where('selling_price_mode', 'automatic')->orWhere('wholesale_price_mode', 'automatic');
+            })->exists();
+            if (($request->has('pricing_version') || $hasAutomatic) && (int) $request->input('pricing_version', 0) !== $product->pricing_version) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['pricing' => 'Medicine prices changed. Reload this medicine before saving.']);
+            }
             $validated['name'] = $validated['brand_name'];
             $validated['discount_percentage'] = (float) ($validated['discount_percentage'] ?? 0);
 
@@ -206,18 +227,9 @@ class ProductController extends Controller
 
             $product->taxes()->sync($taxIds->all());
 
-            // Update product units
-            $product->product_units()->delete();
-            $defaultSellingIndex = collect($validated['product_units'])->search(fn ($unit) => $unit['is_default_selling_unit']);
-            $defaultSellingIndex = $defaultSellingIndex === false ? 0 : $defaultSellingIndex;
-
-            foreach ($validated['product_units'] as $index => $unitData) {
-                $unitData['is_base_unit'] = $index === 0;
-                $unitData['conversion_factor'] = $index === 0 ? 1 : $unitData['conversion_factor'];
-                $unitData['is_default_selling_unit'] = $index === $defaultSellingIndex;
-                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
-                $product->product_units()->create($unitData);
-            }
+            $units = app(\App\Services\UnitCatalogService::class)->resolveRows($validated['product_units']);
+            $pricing->saveUnits($product, $units);
+            $pricing->refreshProduct($product, 'medicine_save', $request->user()->id);
         });
 
         return redirect()->back()->with('success', 'Medicine updated successfully.');

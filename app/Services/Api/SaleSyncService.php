@@ -70,6 +70,7 @@ class SaleSyncService
         }
 
         $sale = DB::transaction(function () use ($validated, $branchId, $user, $clientReference) {
+            app(\App\Services\AutomaticPricingService::class)->lock();
             $items = collect($validated['items'])->map(function ($item) {
                 $item['quantity'] = (float) $item['quantity'];
                 $item['foc_quantity'] = (float) ($item['foc_quantity'] ?? 0);
@@ -89,7 +90,7 @@ class SaleSyncService
             $products = Product::whereIn('id', $productIds)
                 ->with(['taxes:id,rate', 'product_units' => function ($query) use ($productUnitIds) {
                     $query->whereIn('id', $productUnitIds)
-                        ->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit');
+                        ->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit');
                 }])
                 ->get()
                 ->keyBy('id');
@@ -120,6 +121,7 @@ class SaleSyncService
                 $focConversionFactor = max((int) $focProductUnit->conversion_factor, 1);
                 $baseQuantity = (int) round($item['quantity'] * $conversionFactor);
                 $focBaseQuantity = (int) round($item['foc_quantity'] * $focConversionFactor);
+                app(\App\Services\AutomaticPricingService::class)->assertSellable($productUnit, $item['price_type'] === 'wholesale' ? 'wholesale_price' : 'selling_price');
                 $originalUnitPrice = $item['price_type'] === 'wholesale'
                     ? (float) ($productUnit->wholesale_price ?? $productUnit->selling_price)
                     : (float) $productUnit->selling_price;

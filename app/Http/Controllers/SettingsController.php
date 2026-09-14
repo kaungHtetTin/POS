@@ -71,6 +71,9 @@ class SettingsController extends Controller
         ];
 
         return Spa::render('Settings/Index', [
+            'initial_section' => request()->query('section', 'business'),
+            'pricing_rules' => \App\Models\PricingRule::orderBy('code')->get(),
+            'price_changes' => \Illuminate\Support\Facades\DB::table('price_changes')->orderByDesc('id')->limit(30)->get(),
             'pos_behavior' => $posBehavior,
             'branch_preferences' => $branchPreferences,
             'active_branch' => request()->user()->activeBranch()->select('id', 'name')->first()

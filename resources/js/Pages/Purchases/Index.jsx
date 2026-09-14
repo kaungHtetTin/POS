@@ -1,3 +1,4 @@
+import { automaticPrice, purchaseBuyingCost } from '@/Utils/automaticPricing';
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
@@ -74,7 +75,7 @@ const addDaysToInputDate = (dateString, days) => {
     return dateInputValue(date);
 };
 
-export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters }) {
+export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters, pricing_rules = [] }) {
     const [open, setOpen] = useState(false);
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentPurchase, setPaymentPurchase] = useState(null);
@@ -307,6 +308,21 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         setData('items', data.items.filter((_, itemIndex) => itemIndex !== index));
     };
 
+    const automaticFor = (item, field) => getUnitsForProduct(item.product_id).find((unit) => unit.unit_id === item.unit_id)?.[field + '_mode'] === 'automatic';
+    const recalculatePrices = (item) => {
+        const unit = getUnitsForProduct(item.product_id).find((candidate) => candidate.unit_id === item.unit_id);
+        if (!unit) return item;
+        const next = { ...item };
+        const cost = purchaseBuyingCost(String(unit.conversion_factor), String(item.unit_price || 0));
+        for (const field of ['selling_price', 'wholesale_price']) {
+            if (unit[field + '_mode'] === 'automatic') {
+                const rule = pricing_rules.find((candidate) => candidate.code === field);
+                next[field] = automaticPrice(cost, rule || {}, String(unit.conversion_factor)) ?? unit[field] ?? 0;
+            }
+        }
+        return next;
+    };
+
     const updateItem = (index, field, value) => {
         const updatedItems = [...data.items];
         const currentItem = updatedItems[index];
@@ -323,6 +339,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 wholesale_price: preferredUnit ? Number(preferredUnit.wholesale_price || preferredUnit.selling_price || 0) : 0,
             };
 
+            updatedItems[index] = recalculatePrices(updatedItems[index]);
             setData('items', updatedItems);
             return;
         }
@@ -338,6 +355,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 wholesale_price: selectedUnit ? Number(selectedUnit.wholesale_price || selectedUnit.selling_price || 0) : currentItem.wholesale_price,
             };
 
+            updatedItems[index] = recalculatePrices(updatedItems[index]);
             setData('items', updatedItems);
             return;
         }
@@ -346,6 +364,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
             ...currentItem,
             [field]: value,
         };
+        updatedItems[index] = recalculatePrices(updatedItems[index]);
         setData('items', updatedItems);
     };
 
@@ -769,6 +788,8 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     label="Selling Price"
                                                     type="number"
                                                     value={item.selling_price}
+                                                    disabled={automaticFor(item, 'selling_price')}
+                                                    helperText={automaticFor(item, 'selling_price') ? 'Automatic; latest purchase cost used on save' : ''}
                                                     onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
                                                     inputProps={{ min: 0.01, step: '0.01' }}
                                                     required
@@ -778,6 +799,8 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                     label="Wholesale Price"
                                                     type="number"
                                                     value={item.wholesale_price}
+                                                    disabled={automaticFor(item, 'wholesale_price')}
+                                                    helperText={automaticFor(item, 'wholesale_price') ? 'Automatic; latest purchase cost used on save' : ''}
                                                     onChange={(event) => updateItem(index, 'wholesale_price', event.target.value)}
                                                     inputProps={{ min: 0.01, step: '0.01' }}
                                                     required

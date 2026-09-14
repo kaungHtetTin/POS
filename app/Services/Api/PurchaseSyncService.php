@@ -53,8 +53,8 @@ class PurchaseSyncService
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01',
-            'items.*.selling_price' => 'required|numeric|min:0.01',
-            'items.*.wholesale_price' => 'nullable|numeric|min:0.01',
+            'items.*.selling_price' => 'required|numeric|min:0|max:999999999999.99',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0|max:999999999999.99',
         ])->validate();
 
         if (!$this->userCanAccessBranch($user, $validated['branch_id'])) {
@@ -64,6 +64,8 @@ class PurchaseSyncService
         }
 
         $purchase = DB::transaction(function () use ($validated, $user, $clientReference) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
             $items = collect($validated['items']);
             $productUnitRows = DB::table('product_units')
                 ->select('product_id', 'unit_id', 'conversion_factor')
@@ -176,19 +178,14 @@ class PurchaseSyncService
                 $inventory->quantity = ($inventory->quantity ?? 0) + $item['base_quantity'];
                 $inventory->save();
 
-                DB::table('product_units')
-                    ->where('product_id', $item['product_id'])
-                    ->where('unit_id', $item['unit_id'])
-                    ->update([
-                        'selling_price' => $item['selling_price'],
-                        'wholesale_price' => $item['wholesale_price'],
-                    ]);
+                $pricing->purchasePrices($item, $user->id);
             }
 
             $supplier->update([
                 'balance' => $projectedBalance,
             ]);
 
+            $pricing->refreshProducts(collect($preparedItems)->pluck('product_id'), 'purchase_sync', $user->id);
             return $purchase;
         });
 

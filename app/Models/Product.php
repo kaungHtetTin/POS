@@ -28,12 +28,16 @@ class Product extends Model
         'expiry_alert_days',
         'tax_method',
         'status',
+        'pricing_base_cost',
     ];
 
     protected $casts = [
         'min_stock_level' => 'integer',
         'expiry_alert_days' => 'integer',
         'discount_percentage' => 'decimal:2',
+        'pricing_base_cost' => 'decimal:6',
+        'pricing_buying_cost' => 'decimal:6',
+        'pricing_version' => 'integer',
     ];
 
     public function category()

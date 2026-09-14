@@ -1,3 +1,4 @@
+import { automaticPrice, purchaseBuyingCost } from '@/Utils/automaticPricing';
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
@@ -75,7 +76,7 @@ const addDaysToInputDate = (dateString, days) => {
     return dateInputValue(date);
 };
 
-export default function PurchaseCreate({ auth, suppliers, products, categories = [], branches }) {
+export default function PurchaseCreate({ auth, suppliers, products, categories = [], branches, pricing_rules = [] }) {
     const { settings = {}, ziggy = {} } = usePage().props;
     const currencySymbol = settings.app?.currency_symbol || '$';
     const [activeStep, setActiveStep] = useState(0);
@@ -190,6 +191,21 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
         ];
     }, [selectedCatalogProducts, filteredAvailableProducts, productPage, productPageCount]);
 
+    const automaticFor = (item, field) => getUnitsForProduct(item.product_id).find((unit) => unit.unit_id === item.unit_id)?.[field + '_mode'] === 'automatic';
+    const recalculatePrices = (item) => {
+        const unit = getUnitsForProduct(item.product_id).find((candidate) => candidate.unit_id === item.unit_id);
+        if (!unit) return item;
+        const next = { ...item };
+        const cost = purchaseBuyingCost(String(unit.conversion_factor), String(item.unit_price || 0));
+        for (const field of ['selling_price', 'wholesale_price']) {
+            if (unit[field + '_mode'] === 'automatic') {
+                const rule = pricing_rules.find((candidate) => candidate.code === field);
+                next[field] = automaticPrice(cost, rule || {}, String(unit.conversion_factor)) ?? unit[field] ?? 0;
+            }
+        }
+        return next;
+    };
+
     const updateItem = (index, field, value) => {
         const updatedItems = [...data.items];
         const currentItem = updatedItems[index];
@@ -210,6 +226,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
             };
         }
 
+        updatedItems[index] = recalculatePrices(updatedItems[index]);
         setData('items', updatedItems);
     };
 
@@ -759,9 +776,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                                 label="Selling Price"
                                 type="number"
                                 value={item.selling_price}
+                                disabled={automaticFor(item, 'selling_price')}
                                 onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
                                 error={!!errors[`items.${index}.selling_price`]}
-                                helperText={errors[`items.${index}.selling_price`]}
+                                helperText={errors[`items.${index}.selling_price`] || (automaticFor(item, 'selling_price') ? 'Automatic preview; server uses latest purchase cost' : '')}
                                 inputProps={{ min: 0.01, step: '0.01' }}
                                 required
                             />
@@ -770,9 +788,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                                 label="Wholesale Price"
                                 type="number"
                                 value={item.wholesale_price}
+                                disabled={automaticFor(item, 'wholesale_price')}
                                 onChange={(event) => updateItem(index, 'wholesale_price', event.target.value)}
                                 error={!!errors[`items.${index}.wholesale_price`]}
-                                helperText={errors[`items.${index}.wholesale_price`]}
+                                helperText={errors[`items.${index}.wholesale_price`] || (automaticFor(item, 'wholesale_price') ? 'Automatic preview; server uses latest purchase cost' : '')}
                                 inputProps={{ min: 0.01, step: '0.01' }}
                                 required
                             />

@@ -88,6 +88,8 @@ class StaffProductController extends Controller
         $validated = $this->validateProduct($request);
 
         $product = DB::transaction(function () use ($request, $validated) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
             $taxIds = $this->taxIdsFrom($validated);
             $payload = $this->productAttributes($validated);
             $payload['tax_id'] = $taxIds->first();
@@ -99,10 +101,12 @@ class StaffProductController extends Controller
             $product = Product::create($payload);
             $product->taxes()->sync($taxIds->all());
 
-            foreach ($validated['product_units'] as $unitData) {
-                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
-                $product->product_units()->create($unitData);
-            }
+            $units = app(\App\Services\UnitCatalogService::class)->resolveRows(
+                collect($validated['product_units'])->sortByDesc('is_base_unit')->values()->all()
+            );
+            $pricing->saveUnits($product, $units);
+            $pricing->refreshProduct($product, 'staff_medicine_save', $request->user()->id);
+            $product->refresh();
 
             return $product;
         });
@@ -135,6 +139,13 @@ class StaffProductController extends Controller
         $validated = $this->validateProduct($request, $product);
 
         DB::transaction(function () use ($request, $validated, $product) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
+            $product = Product::lockForUpdate()->findOrFail($product->id);
+            $automatic = $product->product_units()->where(function ($query) { $query->where('selling_price_mode', 'automatic')->orWhere('wholesale_price_mode', 'automatic'); })->exists();
+            if (($request->has('pricing_version') || $automatic) && (int) $request->input('pricing_version', 0) !== $product->pricing_version) {
+                throw ValidationException::withMessages(['pricing' => 'Medicine prices changed. Reload before saving and include pricing_version.']);
+            }
             $taxIds = $this->taxIdsFrom($validated);
             $payload = $this->productAttributes($validated);
             $payload['tax_id'] = $taxIds->first();
@@ -149,12 +160,13 @@ class StaffProductController extends Controller
 
             $product->update($payload);
             $product->taxes()->sync($taxIds->all());
-            $product->product_units()->delete();
 
-            foreach ($validated['product_units'] as $unitData) {
-                $unitData['wholesale_price'] = $unitData['wholesale_price'] ?? $unitData['selling_price'];
-                $product->product_units()->create($unitData);
-            }
+            $units = app(\App\Services\UnitCatalogService::class)->resolveRows(
+                collect($validated['product_units'])->sortByDesc('is_base_unit')->values()->all()
+            );
+            $pricing->saveUnits($product, $units);
+            $pricing->refreshProduct($product, 'staff_medicine_save', $request->user()->id);
+            $product->refresh();
         });
 
         $product->refresh()->load(['category:id,name', 'taxes:id,name,rate', 'product_units.unit:id,name,short_name']);
@@ -383,8 +395,15 @@ class StaffProductController extends Controller
             'status' => ['required', 'in:Active,Inactive'],
             'image' => ['nullable', 'image', 'max:250'],
             'product_units' => ['required', 'array', 'min:1'],
-            'product_units.*.unit_id' => ['required', 'exists:units,id'],
-            'product_units.*.conversion_factor' => ['required', 'numeric', 'min:1'],
+            'product_units.*.unit_id' => ['nullable', 'exists:units,id'],
+            'product_units.*.unit_name' => ['nullable', 'string', 'max:255'],
+            'product_units.*.unit_short_name' => ['nullable', 'string', 'max:50'],
+            'pricing_base_cost' => 'nullable|numeric|min:0|max:999999999999.999999',
+            'pricing_version' => 'sometimes|integer|min:1',
+            'product_units.*.selling_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.wholesale_price_mode' => 'sometimes|in:manual,automatic',
+            'product_units.*.is_default_selling_unit' => 'sometimes|boolean',
+            'product_units.*.conversion_factor' => ['required', 'integer', 'min:1', 'max:2147483647'],
             'product_units.*.selling_price' => ['required', 'numeric', 'min:0'],
             'product_units.*.wholesale_price' => ['nullable', 'numeric', 'min:0'],
             'product_units.*.is_base_unit' => ['required', 'boolean'],
@@ -393,7 +412,7 @@ class StaffProductController extends Controller
 
     private function productAttributes(array $validated): array
     {
-        return [
+        return (array_key_exists('pricing_base_cost', $validated) ? ['pricing_base_cost' => $validated['pricing_base_cost']] : []) + [
             'category_id' => $validated['category_id'],
             'name' => $validated['name'],
             'generic_name' => $validated['generic_name'] ?? null,
@@ -439,6 +458,9 @@ class StaffProductController extends Controller
     {
         return [
             'id' => $product->id,
+            'pricing_version' => $product->pricing_version,
+            'pricing_base_cost' => $product->pricing_base_cost,
+            'pricing_buying_cost' => app(\App\Services\AutomaticPricingService::class)->readCost($product),
             'category_id' => $product->category_id,
             'category' => $product->category ? [
                 'id' => $product->category->id,
@@ -475,6 +497,11 @@ class StaffProductController extends Controller
                     'selling_price' => $productUnit->selling_price,
                     'wholesale_price' => $productUnit->wholesale_price ?? $productUnit->selling_price,
                     'is_base_unit' => (bool) $productUnit->is_base_unit,
+                    'is_default_selling_unit' => (bool) $productUnit->is_default_selling_unit,
+                    'selling_price_mode' => $productUnit->selling_price_mode,
+                    'wholesale_price_mode' => $productUnit->wholesale_price_mode,
+                    'selling_price_status' => $productUnit->selling_price_status,
+                    'wholesale_price_status' => $productUnit->wholesale_price_status,
                 ];
             })->values(),
         ];

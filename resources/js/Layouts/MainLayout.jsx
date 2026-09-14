@@ -153,7 +153,6 @@ function MainLayoutShell({ children, header }) {
         inventory: { text: 'Stock Balance', icon: 'box', href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
         medicines: { text: 'Create New Items', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },
         categories: { text: 'Categories', icon: 'tag', href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_inventory' },
-        units: { text: 'Units', icon: 'ruler', href: route('units.index'), routePattern: 'units.*', permission: 'manage_inventory' },
         taxes: { text: 'Tax Calculation', icon: 'percent', href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_inventory' },
         lowBalanceReport: { text: 'Low Balance Report', icon: 'chart', href: route('reports.low-balance'), routePattern: 'reports.low-balance', permission: 'manage_inventory' },
 
@@ -188,7 +187,7 @@ function MainLayoutShell({ children, header }) {
 
     const menuGroups = [
         { label: 'Main', keys: ['dashboard', 'pos'] },
-        { label: 'Stock', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'units', 'taxes'] },
+        { label: 'Stock', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes'] },
         { label: 'Purchasing', keys: ['suppliers', 'purchases', 'purchasesReport'] },
         { label: 'Sales', keys: ['customers', 'sales', 'salesCustomerReport'] },
         { label: 'Finance', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },

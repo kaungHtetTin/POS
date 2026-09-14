@@ -1,8 +1,10 @@
 import React from 'react';
+import { automaticPrice } from '@/Utils/automaticPricing';
 import MainLayout from '@/Layouts/MainLayout';
 import { Head, useForm, router, usePage } from '@/spa';
 import { compressImage } from '@/Utils/compressImage';
 import {
+    Alert,
     Box,
     Paper,
     Typography,
@@ -30,8 +32,9 @@ import {
     Medication as ProductIcon,
 } from '@mui/icons-material';
 
-export default function ProductEdit({ auth, product = null, categories, taxes, units, default_tax_id: defaultTaxId = '', initial_barcode: initialBarcode = '' }) {
+export default function ProductEdit({ auth, product = null, categories, taxes, units, default_tax_id: defaultTaxId = '', initial_barcode: initialBarcode = '', pricing_rules = [] }) {
     const isCreating = !product;
+    const pricingRules = Object.fromEntries(pricing_rules.map((rule) => [rule.code, rule]));
     const medicine = product || {
         category_id: '',
         tax_id: defaultTaxId,
@@ -48,7 +51,7 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
         tax_method: 'Exclusive',
         status: 'Active',
         image_path: null,
-        product_units: [{ unit_id: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: true, is_default_selling_unit: true }],
+        product_units: [{ unit_id: '', unit_name: '', unit_short_name: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: true, is_default_selling_unit: true }],
     };
     const { ziggy = {} } = usePage().props;
     const appBase = ziggy?.base || '';
@@ -56,6 +59,8 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
     const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
 
     const { data, setData, post, errors, processing, setError, clearErrors } = useForm({
+        pricing_base_cost: medicine.pricing_base_cost ?? '',
+        pricing_version: medicine.pricing_version ?? 1,
         category_id: medicine.category_id,
         tax_id: (medicine.taxes?.[0]?.id) || medicine.tax_id || '',
         tax_ids: (medicine.taxes || []).map(t => t.id).length > 0
@@ -76,8 +81,12 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
             .sort((a, b) => Number(Boolean(b.is_base_unit)) - Number(Boolean(a.is_base_unit)))
             .map((pu, index) => ({
             unit_id: pu.unit_id,
+            unit_name: pu.unit?.name || pu.unit_name || '',
+            unit_short_name: pu.unit?.short_name || pu.unit_short_name || '',
             conversion_factor: pu.conversion_factor,
             selling_price: pu.selling_price,
+            selling_price_mode: pu.selling_price_mode ?? (isCreating ? pricingRules.selling_price?.pricing_mode : 'manual') ?? 'manual',
+            wholesale_price_mode: pu.wholesale_price_mode ?? (isCreating ? pricingRules.wholesale_price?.pricing_mode : 'manual') ?? 'manual',
             wholesale_price: pu.wholesale_price ?? pu.selling_price,
             is_base_unit: index === 0,
             is_default_selling_unit: pu.is_default_selling_unit === undefined
@@ -87,7 +96,7 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
     });
 
     const handleAddUnit = () => {
-        setData('product_units', [...data.product_units, { unit_id: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, is_base_unit: false, is_default_selling_unit: false }]);
+        setData('product_units', [...data.product_units, { unit_id: '', unit_name: '', unit_short_name: '', conversion_factor: 1, selling_price: 0, wholesale_price: 0, selling_price_mode: pricingRules.selling_price?.pricing_mode || 'manual', wholesale_price_mode: pricingRules.wholesale_price?.pricing_mode || 'manual', is_base_unit: false, is_default_selling_unit: false }]);
     };
 
     const handleRemoveUnit = (index) => {
@@ -101,13 +110,26 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
     const handleUnitChange = (index, field, value) => {
         if (index === 0 && field === 'conversion_factor') return;
         const newUnits = [...data.product_units];
-        newUnits[index][field] = value;
+        newUnits[index] = { ...newUnits[index], [field]: value };
+        if (field === 'unit_name' || field === 'unit_short_name') newUnits[index].unit_id = '';
         setData('product_units', newUnits);
     };
 
     const handleSetDefaultSellingUnit = (index) => {
         const newUnits = data.product_units.map((unit, i) => ({ ...unit, is_default_selling_unit: i === index }));
         setData('product_units', newUnits);
+    };
+
+    const pricingCost = medicine.pricing_has_purchase ? medicine.pricing_buying_cost : data.pricing_base_cost;
+    const priceField = (unit, index, field, label) => {
+        const automatic = unit[field + '_mode'] === 'automatic';
+        const calculated = automaticPrice(pricingCost, pricingRules[field] || {}, String(unit.conversion_factor));
+        return <Stack spacing={.75}>
+            <TextField select fullWidth size="small" label={`${label} mode`} value={unit[field + '_mode']} onChange={(event) => handleUnitChange(index, field + '_mode', event.target.value)}>
+                <MenuItem value="manual">Manual</MenuItem><MenuItem value="automatic" disabled={pricingRules[field]?.pricing_mode !== 'automatic'}>Automatic</MenuItem>
+            </TextField>
+            <TextField fullWidth size="small" label={label} type="number" value={automatic ? (calculated ?? unit[field]) : unit[field]} disabled={automatic} onChange={(event) => handleUnitChange(index, field, event.target.value)} inputProps={{ min: 0, step: '0.01' }} error={!!errors[`product_units.${index}.${field}`] || !!errors[`product_units.${index}.${field}_mode`]} helperText={errors[`product_units.${index}.${field}`] || errors[`product_units.${index}.${field}_mode`] || (automatic ? (calculated ? 'Calculated on save' : 'Cost required; saved price retained') : '')} />
+        </Stack>;
     };
 
     const generateBarcode = () => {
@@ -139,6 +161,7 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
 
                 <Paper sx={{ p: 3 }}>
                     <form onSubmit={submit}>
+                        {errors.pricing && <Alert severity="error" sx={{ mb: 2 }}>{errors.pricing}</Alert>}
                         <Stack spacing={3}>
                             <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
@@ -348,6 +371,10 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                     <Button size="small" startIcon={<AddUnitIcon />} onClick={handleAddUnit}>Add Unit</Button>
                                 </Stack>
 
+                                <Stack spacing={1} sx={{ mb: 2 }}>
+                                    <TextField size="small" type="number" label="Starting buying cost per base unit" value={data.pricing_base_cost} onChange={(event) => setData('pricing_base_cost', event.target.value)} error={!!errors.pricing_base_cost} helperText={errors.pricing_base_cost || 'Used for automatic pricing until the first purchase. Leave blank if unknown.'} inputProps={{ min: 0, step: '0.000001' }} sx={{ maxWidth: 400 }} />
+                                    <Typography variant="caption" color="text.secondary">Current pricing cost: {pricingCost || 'Not available'} per base unit. Purchase costs exclude free quantities. Automatic prices follow Settings ? Automatic Pricing.</Typography>
+                                </Stack>
                                 <Paper variant="outlined" sx={{ p: 1, overflowX: 'auto' }}>
                                     <Stack spacing={0.75}>
                                         {data.product_units.map((unit, index) => (
@@ -357,23 +384,19 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                                     display: 'grid',
                                                     gridTemplateColumns: {
                                                         xs: '1fr',
-                                                        sm: '150px 86px 108px 108px 92px 128px 64px',
+                                                        sm: '130px 80px 76px 175px 175px 92px 128px 64px',
                                                     },
                                                     gap: 0.75,
                                                     alignItems: 'center',
-                                                    minWidth: { sm: 772 },
+                                                    minWidth: { sm: 1000 },
                                                     py: 0.25,
                                                 }}
                                             >
-                                                <FormControl fullWidth size="small" sx={{ '& .MuiInputBase-root': { height: 34 } }}>
-                                                    <InputLabel>Unit</InputLabel>
-                                                    <Select value={unit.unit_id} label="Unit" onChange={e => handleUnitChange(index, 'unit_id', e.target.value)}>
-                                                        {units.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
-                                                    </Select>
-                                                </FormControl>
+                                                <TextField fullWidth size="small" label="Unit name" value={unit.unit_name} onChange={e => handleUnitChange(index, 'unit_name', e.target.value)} error={!!errors[`product_units.${index}.unit_name`]} helperText={errors[`product_units.${index}.unit_name`]} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
+                                                <TextField fullWidth size="small" label="Short name" value={unit.unit_short_name} onChange={e => handleUnitChange(index, 'unit_short_name', e.target.value)} error={!!errors[`product_units.${index}.unit_short_name`]} helperText={errors[`product_units.${index}.unit_short_name`]} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
                                                 <TextField fullWidth size="small" label="Factor" type="number" value={index === 0 ? 1 : unit.conversion_factor} disabled={index === 0} onChange={e => handleUnitChange(index, 'conversion_factor', e.target.value)} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
-                                                <TextField fullWidth size="small" label="Retail" type="number" value={unit.selling_price} onChange={e => handleUnitChange(index, 'selling_price', e.target.value)} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
-                                                <TextField fullWidth size="small" label="Wholesale" type="number" value={unit.wholesale_price} onChange={e => handleUnitChange(index, 'wholesale_price', e.target.value)} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
+                                                {priceField(unit, index, 'selling_price', 'Selling price')}
+                                                {priceField(unit, index, 'wholesale_price', 'Wholesale')}
                                                 <Button variant={index === 0 ? 'contained' : 'text'} size="small" disabled={index !== 0} sx={{ height: 34, px: 0.75, fontSize: 11, whiteSpace: 'nowrap' }}>
                                                     {index === 0 ? 'Base Unit' : 'Additional'}
                                                 </Button>

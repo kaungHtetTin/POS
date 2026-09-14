@@ -18,6 +18,10 @@ class ProductUnit extends Model
         'wholesale_price',
         'is_base_unit',
         'is_default_selling_unit',
+        'selling_price_mode',
+        'selling_price_status',
+        'wholesale_price_mode',
+        'wholesale_price_status',
     ];
 
     protected $casts = [

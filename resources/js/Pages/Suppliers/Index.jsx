@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
+    UploadFile as UploadFileIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
     LocalShipping as SupplierIcon,
@@ -45,6 +46,21 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
     const [editingSupplier, setEditingSupplier] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
     const supplierRows = suppliers?.data || suppliers || [];
+
+    useEffect(() => {
+        const normalizedSearch = search.trim();
+        if (normalizedSearch === (filters?.search || '')) return;
+
+        const timer = window.setTimeout(() => {
+            router.get(route('suppliers.index'), { search: normalizedSearch || undefined }, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 350);
+
+        return () => window.clearTimeout(timer);
+    }, [search, filters?.search]);
 
     const { data, setData, post, patch, delete: destroy, reset, errors, processing } = useForm({
         name: '',
@@ -87,9 +103,10 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
         setEditingSupplier(null);
     };
 
-    const handleSearch = (page = undefined) => {
-        router.get(route('suppliers.index'), { search: search || undefined, page }, {
+    const handlePageChange = (page) => {
+        router.get(route('suppliers.index'), { search: search.trim() || undefined, page }, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
         });
     };
@@ -122,17 +139,19 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 1.5 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                             SUPPLIER DIRECTORY
                         </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>Add Supplier</Button>
+                        <Stack direction="row" spacing={1}>
+                            <Button component={Link} href={route('suppliers.import')} variant="outlined" size="small" startIcon={<UploadFileIcon />}>Import CSV</Button>
+                            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>Add Supplier</Button>
+                        </Stack>
                     </Stack>
                     <ReportFilterToolbar
                         ariaLabel="Supplier filters"
                         fieldKinds={['search']}
-                        onSubmit={() => handleSearch()}
-                        actions={<><Button variant="outlined" size="small" type="submit">Search</Button><CsvExportButton source={suppliers} dataKey="suppliers" filename="suppliers.csv" /></>}
+                        actions={<CsvExportButton source={suppliers} dataKey="suppliers" filename="suppliers.csv" />}
                     >
                         <TextField
                             size="small"
@@ -265,7 +284,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                 size="small"
                                 count={suppliers.last_page}
                                 page={suppliers.current_page}
-                                onChange={(event, page) => handleSearch(page)}
+                                onChange={(event, page) => handlePageChange(page)}
                                 color="primary"
                             />
                         </Stack>

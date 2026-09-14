@@ -7,6 +7,42 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Automatic pricing
+
+Open **Settings → Automatic Pricing** using the existing settings permission (`manage_branches`). Selling and wholesale prices each have a Manual/Automatic rule, markup percentage, minimum profit per base unit, and upward rounding increment. Both rules and all existing unit prices start in Manual mode; installing this feature does not change catalog prices.
+
+The formula matches onlineshop: choose the larger of `base cost × (1 + markup / 100)` and `base cost + minimum profit`, round upward to the configured increment, then multiply by the unit conversion factor. For example, cost 950, markup 20%, minimum profit 100, and rounding 50 produces 1,150 per base unit and 11,500 for a strip of 10.
+
+- **Cost basis:** latest purchase date across all branches, then purchase creation time/ID and item creation time/ID. Cost uses the historical paid quantity and base quantity; free quantities do not dilute the pricing basis. Inventory valuation still uses its existing cost accounting. Before any purchase, use the medicine's optional starting buying cost.
+- **Applying rules:** preview the impact before saving Automatic mode. The optional bulk checkbox enrolls all units of active medicines, including manual overrides. Without it, only existing Automatic prices recalculate. New medicine units default to enabled rules. Inactive medicines already using Automatic mode continue to follow rule edits.
+- **Overrides:** medicine editing offers Manual/Automatic per unit for each price. Manual overrides survive automatic recalculation. CSV-entered prices explicitly become Manual overrides. Switching a global rule to Manual retains saved amounts and switches that price type's units to Manual.
+- **Recalculation:** medicine saves, rule saves, purchase creation/edit/deletion, and offline/staff purchase synchronization refresh automatic prices. Missing cost retains the saved amount and records `cost_required`; a zero Automatic price cannot be sold. Past sales and purchase costs are never repriced.
+- **Review and history:** previews are invalidated by intervening pricing/cost changes. Medicine edits use `pricing_version` to reject stale forms. Staff API clients receive that version and must send it on edits to automatic medicines. Settings shows the latest 30 recorded price changes; the database retains the audit rows, actor IDs and automatic rule snapshots.
+
+Deployment requires PHP BCMath (declared in Composer), the migration `2026_09_14_000001_add_automatic_pricing.php`, and `npm run build`. Tests: `php artisan test --filter=AutomaticPricingTest` against an isolated database, plus `node --test tests/js/automaticPricing.test.mjs` for browser calculation previews.
+
+## Supplier CSV import
+
+Open **Suppliers → Import CSV** (requires `manage_inventory`). Download the template, replace/delete its example row, and save as CSV UTF-8. Keep the columns `name,phone,email,address,payment_terms`; only name is required. Phone numbers should be formatted as text in Excel to preserve leading zeros.
+
+Each row creates a supplier with zero balance; existing suppliers are never updated. Nonempty phones and emails must be unique within the file and existing suppliers. Names may repeat, matching the supplier form. Blank optional values become null. Limits match the form: name/email 255 characters, phone 20, address/payment terms 500. Files allow 10,000 data rows / 10 MB, subject to server upload limits. Blank rows are skipped; any validation failure saves nothing and reports CSV record numbers including the header.
+
+No additional migration is needed. Coverage: `php artisan test --filter=SupplierCsvImportTest` using an isolated database (`RefreshDatabase`).
+
+## Medicine CSV imports
+
+Open **Medicines → Import CSV** (requires `manage_inventory`). No additional database migration is needed for this feature on an up-to-date installation.
+
+- **New medicines:** download the product template, replace/delete the example row, and save as CSV UTF-8. Each row creates one medicine and one base/default selling unit. `buying_cost` is required per base unit, supports up to six decimal places, and supplies automatic pricing until the medicine has a purchase. Missing categories can optionally be created; typed unit name/short-name pairs are created automatically. Existing barcodes, including archived medicines, are rejected; blank barcodes are generated. This import does not update existing medicines.
+- **Units and prices:** export the current unit/price template, keep `product_id` unchanged, edit both prices, and upload. Barcode and product name are reference columns. Copy a product ID into another row and enter any unit name/short-name pair to add it without initial Unit setup. Unit names and short names must each be unique within that medicine, matching onlineshop behavior. Existing unit IDs are preserved and omitted rows are unchanged. Existing base units and conversion factors cannot be changed through this import. To change the default selling unit, include both the old and new default rows.
+- Prices must be nonnegative plain numbers with at most two decimals; conversion factors must be positive whole numbers. Each medicine must finish with exactly one base unit (factor 1) and one default selling unit. Flags accept `yes/no`, `true/false`, or `1/0`.
+- New medicine defaults: wholesale price equals selling price, minimum stock 10, expiry alert 90 days, discount 0%, status Active, tax method Exclusive. `tax_names` accepts active tax names separated by `|`; blank uses the existing active **Tax Free** tax. Configure taxes before importing.
+- Units are managed inside each medicine and through medicine CSV imports. There is no separate Unit CRUD screen. The internal unit catalog remains in the database to preserve purchase, inventory, sale and pricing relationships.
+- Keep all template headers. Format barcodes as text in Excel to preserve leading zeros. Product imports allow 10,000 rows / 10 MB; unit/price imports allow 50,000 rows / 20 MB, subject to server upload limits. Row numbers refer to CSV records, including the header. Any validation failure rolls back the entire file, including newly created categories/units.
+- Stock quantities, batch numbers, batch expiry dates, and purchase costs remain part of purchases/inventory.
+
+Import coverage is in `tests/Feature/ProductCsvImportTest.php`. Run `php artisan test --filter=ProductCsvImportTest` with an isolated test database configured; the test uses `RefreshDatabase`.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

@@ -37,6 +37,7 @@ class PurchaseController extends Controller
         }
 
         return Spa::render('Purchases/Index', [
+            'pricing_rules' => \App\Models\PricingRule::all(),
             'purchases' => $query->latest()->paginate(15)->withQueryString(),
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
             'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level')
@@ -44,7 +45,7 @@ class PurchaseController extends Controller
                     'category:id,name',
                     'inventories:id,product_id,branch_id,quantity',
                     'product_units' => function ($unitQuery) {
-                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit')
                             ->with(['unit:id,name,short_name']);
                     },
                 ])
@@ -59,11 +60,12 @@ class PurchaseController extends Controller
     public function create()
     {
         return Spa::render('Purchases/Create', [
+            'pricing_rules' => \App\Models\PricingRule::all(),
             'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
             'products' => Product::select('id', 'name')
                 ->with([
                     'product_units' => function ($unitQuery) {
-                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'is_base_unit')
+                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit')
                             ->with(['unit:id,name,short_name']);
                     },
                 ])
@@ -176,8 +178,8 @@ class PurchaseController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
-            'items.*.selling_price' => 'required|numeric|min:0.01|max:999999999999.99',
-            'items.*.wholesale_price' => 'nullable|numeric|min:0.01|max:999999999999.99',
+            'items.*.selling_price' => 'required|numeric|min:0|max:999999999999.99',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
 
         $items = collect($validated['items']);
@@ -258,6 +260,9 @@ class PurchaseController extends Controller
         $supplier = Supplier::findOrFail($validated['supplier_id']);
 
         DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
+            $affectedProductIds = collect($preparedItems)->pluck('product_id');
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
                 'branch_id' => $validated['branch_id'],
@@ -336,18 +341,13 @@ class PurchaseController extends Controller
                     'quantity' => $inventory->quantity + $item['base_quantity'],
                 ]);
 
-                DB::table('product_units')
-                    ->where('product_id', $item['product_id'])
-                    ->where('unit_id', $item['unit_id'])
-                    ->update([
-                        'selling_price' => $item['selling_price'],
-                        'wholesale_price' => $item['wholesale_price'],
-                    ]);
+                $pricing->purchasePrices($item, auth()->id());
             }
 
             $supplier->update([
                 'balance' => (float) $supplier->balance + $dueAmount,
             ]);
+            $pricing->refreshProducts($affectedProductIds, 'purchase_create', auth()->id());
         });
 
         return redirect()->back()->with('success', 'Purchase order created and stock received successfully.');
@@ -377,8 +377,8 @@ class PurchaseController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.foc_quantity' => 'nullable|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0.01|max:999999999999.99',
-            'items.*.selling_price' => 'required|numeric|min:0.01|max:999999999999.99',
-            'items.*.wholesale_price' => 'nullable|numeric|min:0.01|max:999999999999.99',
+            'items.*.selling_price' => 'required|numeric|min:0|max:999999999999.99',
+            'items.*.wholesale_price' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
 
         $items = collect($validated['items']);
@@ -451,6 +451,8 @@ class PurchaseController extends Controller
         $supplier = Supplier::findOrFail($validated['supplier_id']);
 
         DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
             // 1. Reverse old inventory and supplier balance
             $oldSupplier = $purchase->supplier;
             $oldSupplier->update(['balance' => (float) $oldSupplier->balance - (float) $purchase->due_amount]);
@@ -466,6 +468,8 @@ class PurchaseController extends Controller
                     ->whereDate('expiry_date', $oldItem->expiry_date)
                     ->decrement('quantity', $oldItem->base_quantity);
             }
+
+            $affectedProductIds = $purchase->items->pluck('product_id')->merge(collect($preparedItems)->pluck('product_id'));
 
             // 2. Update Purchase record
             $purchase->update([
@@ -533,18 +537,13 @@ class PurchaseController extends Controller
                     ]);
                 }
 
-                DB::table('product_units')
-                    ->where('product_id', $item['product_id'])
-                    ->where('unit_id', $item['unit_id'])
-                    ->update([
-                        'selling_price' => $item['selling_price'],
-                        'wholesale_price' => $item['wholesale_price'],
-                    ]);
+                $pricing->purchasePrices($item, auth()->id());
             }
 
             // 4. Update new supplier balance
             $supplier->refresh();
             $supplier->update(['balance' => (float) $supplier->balance + $dueAmount]);
+            $pricing->refreshProducts($affectedProductIds, 'purchase_update', auth()->id());
         });
 
         return redirect()->back()->with('success', 'Purchase record updated and inventory synchronized successfully.');
@@ -557,6 +556,8 @@ class PurchaseController extends Controller
         }
 
         DB::transaction(function () use ($purchase) {
+            $pricing = app(\App\Services\AutomaticPricingService::class);
+            $pricing->lock();
             $supplier = $purchase->supplier;
             $dueAmount = (float) $purchase->due_amount;
 
@@ -590,8 +591,10 @@ class PurchaseController extends Controller
                 }
             }
 
+            $affectedProductIds = $purchase->items->pluck('product_id');
             $purchase->items()->delete();
             $purchase->delete();
+            $pricing->refreshProducts($affectedProductIds, 'purchase_delete', auth()->id());
         });
 
         return redirect()->back()->with('success', 'Purchase record deleted and inventory reversed successfully.');

@@ -9,11 +9,14 @@ import ReceiptLong from '@mui/icons-material/ReceiptLong';
 import QrCode2 from '@mui/icons-material/QrCode2';
 import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import Palette from '@mui/icons-material/Palette';
+import Pricing from './Pricing';
+import PriceChange from '@mui/icons-material/PriceChange';
 import Save from '@mui/icons-material/Save';
 import Undo from '@mui/icons-material/Undo';
 import { compressImage } from '@/Utils/compressImage';
 
 const sections = [
+    ['prices', 'Automatic Pricing', 'Selling and wholesale price rules', PriceChange],
     ['business', 'Business Profile', 'Identity used across the application', Business],
     ['regional', 'Regional & Currency', 'Language, time and money formats', Language],
     ['pos', 'POS & Branch Devices', 'Workflow defaults and branch hardware', PointOfSale],
@@ -47,11 +50,13 @@ function Group({ title, description, children }) {
     return <Box sx={{ '& + &': { mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' } }}><Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{title}</Typography>{description && <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>{description}</Typography>}{children}</Box>;
 }
 
-export default function Settings({ auth, pos_behavior = {}, branch_preferences = {}, active_branch, notifications = {}, localization = {}, invoice = {}, labels = {}, taxes = [] }) {
+export default function Settings({ auth, pos_behavior = {}, branch_preferences = {}, active_branch, notifications = {}, localization = {}, invoice = {}, labels = {}, taxes = [], pricing_rules = [], price_changes = [], initial_section = 'business' }) {
     const { translations = {}, ziggy = {} } = usePage().props;
     const __ = (key) => translations[key] || key;
     const mobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
-    const [section, setSection] = useState('business');
+    const [section, setSection] = useState(sections.some(([id]) => id === initial_section) ? initial_section : 'business');
+    const [pricingDirty, setPricingDirty] = useState(false);
+    useEffect(() => { if (initial_section === 'prices') setSection('prices'); }, [initial_section]);
     const storageUrl = (path) => `${ziggy?.base || ''}/storage/${String(path || '').replace(/^\/+/, '')}`.replace(/\/{2,}/g, '/');
 
     const business = useForm({ expiry_alert_days: notifications.expiry_alert_days ?? 90, low_stock_sound: !!branch_preferences.low_stock_sound, pharmacy_name: invoice.pharmacy_name ?? '', logo: null, theme_primary_color: localization.theme_primary_color ?? '#00796B' });
@@ -63,7 +68,7 @@ export default function Settings({ auth, pos_behavior = {}, branch_preferences =
     const alerts = useForm({ expiry_alert_days: notifications.expiry_alert_days ?? 90 });
     const appearance = useForm({ expiry_alert_days: notifications.expiry_alert_days ?? 90, low_stock_sound: !!branch_preferences.low_stock_sound, pharmacy_name: invoice.pharmacy_name ?? '', logo: null, theme_primary_color: localization.theme_primary_color ?? '#00796B' });
     const forms = { business, regional, pos, receipts, labels: label, alerts, appearance };
-    const anyDirty = [business, regional, pos, branch, receipts, label, alerts, appearance].some((form) => form.isDirty);
+    const anyDirty = pricingDirty || [business, regional, pos, branch, receipts, label, alerts, appearance].some((form) => form.isDirty);
 
     useEffect(() => {
         const warn = (event) => { if (anyDirty) { event.preventDefault(); event.returnValue = ''; } };
@@ -71,9 +76,10 @@ export default function Settings({ auth, pos_behavior = {}, branch_preferences =
     }, [anyDirty]);
 
     const changeSection = (next) => {
-        const dirty = forms[section]?.isDirty || (section === 'pos' && branch.isDirty);
+        const dirty = (section === 'prices' && pricingDirty) || forms[section]?.isDirty || (section === 'pos' && branch.isDirty);
         if (next !== section && dirty && !window.confirm(__('Discard unsaved changes in this section?'))) return;
         if (next !== section && dirty) { forms[section]?.reset(); if (section === 'pos') branch.reset(); }
+        if (next !== 'prices') setPricingDirty(false);
         setSection(next);
     };
     const fp = (form, name) => ({ size: 'small', fullWidth: true, value: form.data[name], onChange: (e) => form.setData(name, e.target.value), error: !!form.errors[name], helperText: form.errors[name] });
@@ -88,6 +94,7 @@ export default function Settings({ auth, pos_behavior = {}, branch_preferences =
                 })}
             </Paper>
             <Box sx={{ minWidth: 0 }}>
+                {section === 'prices' && <Pricing rules={pricing_rules} changes={price_changes} onDirtyChange={setPricingDirty} />}
                 {section === 'business' && panel(<><SectionHeader title={__('Business Profile')} description={__('Identity displayed throughout the application and on printed documents.')} scope={__('Organization-wide')} /><Grid container spacing={1.5}><Grid item xs={12} sm={7}><TextField {...fp(business, 'pharmacy_name')} label={__('Pharmacy Name')} required /></Grid><Grid item xs={12} sm={5}><Button component="label" variant="outlined" size="small" fullWidth sx={{ minHeight: 40 }}>{business.data.logo?.name || __('Choose Logo')}<input hidden type="file" accept="image/*" onChange={async (e) => { try { business.setData('logo', await compressImage(e.target.files?.[0])); business.clearErrors('logo'); } catch (error) { business.setError('logo', error.message); } }} /></Button>{business.errors.logo && <Typography variant="caption" color="error">{business.errors.logo}</Typography>}</Grid>{invoice.logo_path && <Grid item xs={12}><Box component="img" src={storageUrl(invoice.logo_path)} alt={__('Current logo')} sx={{ width: 64, height: 64, objectFit: 'contain', border: '1px solid', borderColor: 'divider', p: .5 }} /></Grid>}</Grid><Actions form={business} label={__('Save Business Profile')} save={() => business.post(route('settings.business-profile.update'))} /></>)}
 
                 {section === 'regional' && panel(<><SectionHeader title={__('Regional & Currency')} description={__('Organization defaults for language, dates, time and monetary values.')} scope={__('Organization-wide')} /><Alert severity="info" sx={{ mb: 2 }}>{__('Saving the default language also switches your current session. URLs remain locale-independent.')}</Alert><Grid container spacing={1.5}><Grid item xs={12} sm={6}><TextField select {...fp(regional, 'locale')} label={__('Default Language')}><MenuItem value="en">English</MenuItem><MenuItem value="my">မြန်မာ</MenuItem></TextField></Grid><Grid item xs={12} sm={6}><TextField select {...fp(regional, 'timezone')} label={__('Timezone')}><MenuItem value="UTC">UTC</MenuItem><MenuItem value="Asia/Yangon">Asia/Yangon</MenuItem></TextField></Grid><Grid item xs={12} sm={6}><TextField select {...fp(regional, 'date_format')} label={__('Date Format')}><MenuItem value="Y-m-d">YYYY-MM-DD</MenuItem><MenuItem value="d/m/Y">DD/MM/YYYY</MenuItem><MenuItem value="m/d/Y">MM/DD/YYYY</MenuItem></TextField></Grid><Grid item xs={12} sm={6}><TextField select {...fp(regional, 'time_format')} label={__('Time Format')}><MenuItem value="H:i:s">24 hour</MenuItem><MenuItem value="h:i A">12 hour</MenuItem></TextField></Grid><Grid item xs={12} sm={4}><TextField {...fp(regional, 'currency_code')} label={__('Currency Code')} /></Grid><Grid item xs={12} sm={4}><TextField {...fp(regional, 'currency_symbol')} label={__('Currency Symbol')} /></Grid><Grid item xs={12} sm={4}><TextField select {...fp(regional, 'week_start')} onChange={(e) => regional.setData('week_start', Number(e.target.value))} label={__('Week Starts On')}><MenuItem value={0}>{__('Sunday')}</MenuItem><MenuItem value={1}>{__('Monday')}</MenuItem><MenuItem value={6}>{__('Saturday')}</MenuItem></TextField></Grid></Grid><Actions form={regional} label={__('Save Regional Settings')} save={() => regional.patch(route('settings.localization.update'))} /></>)}

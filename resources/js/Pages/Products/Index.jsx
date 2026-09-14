@@ -46,7 +46,6 @@ import {
     PhotoCamera as PhotoCameraIcon,
     QrCode as BarcodeIcon,
     Search as SearchIcon,
-    FilterAlt as FilterIcon,
     Clear as ClearIcon,
     AddCircleOutline as AddUnitIcon,
     CheckCircle as BaseUnitIcon,
@@ -127,16 +126,28 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
     const [selectedCategory, setSelectedCategory] = useState(filters.category || '');
     const [selectedStatus, setSelectedStatus] = useState(filters.status || '');
 
-    const handleSearch = () => {
-        router.get(route('products.index'), {
-            search: search,
-            category: selectedCategory,
-            status: selectedStatus,
-        }, {
-            preserveState: true,
-            replace: true,
-        });
-    };
+    useEffect(() => {
+        const normalizedSearch = search.trim();
+        const currentSearch = filters.search || '';
+        const currentCategory = filters.category || '';
+        const currentStatus = filters.status || '';
+        if (normalizedSearch === currentSearch && selectedCategory === currentCategory && selectedStatus === currentStatus) return;
+
+        const searchChanged = normalizedSearch !== currentSearch;
+        const timer = window.setTimeout(() => {
+            router.get(route('products.index'), {
+                search: normalizedSearch || undefined,
+                category: selectedCategory || undefined,
+                status: selectedStatus || undefined,
+            }, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, searchChanged ? 350 : 0);
+
+        return () => window.clearTimeout(timer);
+    }, [search, selectedCategory, selectedStatus, filters.search, filters.category, filters.status]);
 
     const handleClearFilters = () => {
         setSearch('');
@@ -305,25 +316,28 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         </Stack>
                     }
                     actions={
-                        <Button
-                            variant="contained" 
-                            size="small" 
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit(route('products.create'))}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                        >
-                            Add New Medicine
-                        </Button>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                            <Button variant="outlined" size="small" onClick={() => router.visit(route('products.import.create'))} sx={{ height: 40, whiteSpace: 'nowrap' }}>
+                                Import CSV
+                            </Button>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<AddIcon />}
+                                onClick={() => router.visit(route('products.create'))}
+                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            >
+                                Add New Medicine
+                            </Button>
+                        </Stack>
                     }
                     filters={
                         <ReportFilterToolbar
                             ariaLabel="Medicine filters"
                             fieldKinds={['search', 'select', 'select']}
-                            onSubmit={handleSearch}
                             sx={{ mb: 0 }}
                             actions={(
                                 <>
-                                    <Button variant="contained" size="small" type="submit" startIcon={<FilterIcon />}>Filter</Button>
                                     <Button variant="outlined" size="small" onClick={handleClearFilters} color="inherit" startIcon={<ClearIcon />}>Clear</Button>
                                     <CsvExportButton source={products} dataKey="products" filename="medicines.csv" />
                                 </>
@@ -335,7 +349,6 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                 fullWidth
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                                 InputProps={{
                                     startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
                                 }}
