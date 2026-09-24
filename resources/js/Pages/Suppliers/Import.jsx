@@ -23,9 +23,9 @@ export default function SupplierImport({ auth }) {
                     <Stack spacing={2}>
                         <Typography variant="h6" fontWeight={700}>1. Prepare your file</Typography>
                         <Button component="a" href={route('suppliers.import.template')} variant="outlined" startIcon={<Download />} sx={{ alignSelf: 'flex-start' }}>Download supplier template</Button>
-                        <Typography variant="body2">Keep all five column names: <strong>name, phone, email, address, payment_terms</strong>. Replace or delete the example row.</Typography>
+                        <Typography variant="body2">Upload either the five-column supplier template or a suppliers.csv file created by Supplier Export. Keep its column names unchanged. Replace or delete the template example row.</Typography>
                         <Typography variant="body2" color="text.secondary">Name is required (up to 255 characters). Phone (20), email (255), address (500), and payment terms (500) are optional. Format phone numbers as text in Excel to preserve leading zeros.</Typography>
-                        <Alert severity="info">Each row creates a new supplier with zero outstanding balance. Existing suppliers are not updated. Nonempty phone numbers and emails must be unique across the file and existing suppliers. Names may repeat.</Alert>
+                        <Alert severity="info">An exported supplier with a matching Id is updated; other rows create suppliers. Outstanding balances and credit limits are preserved. Nonempty phone numbers and emails must remain unique. Names may repeat.</Alert>
                         <Typography variant="h6" fontWeight={700}>2. Upload and import</Typography>
                         <Typography variant="body2" color="text.secondary">Up to 10,000 suppliers per CSV, maximum 10 MB. Blank rows are skipped. If any row has an error, no suppliers are saved.</Typography>
                         <Box component="form" onSubmit={(event) => {

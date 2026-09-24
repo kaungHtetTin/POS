@@ -61,6 +61,126 @@ class ProductCsvImportTest extends TestCase
         $this->assertDatabaseCount('products', 1);
     }
 
+    public function test_legacy_product_export_format_can_be_imported(): void
+    {
+        Tax::create(['name' => 'VAT', 'rate' => 5, 'status' => true]);
+        $headers = [
+            'Id', 'Category Id', 'Tax Id', 'Name', 'Generic Name', 'Pricing Base Cost',
+            'Brand Name', 'Manufacturer', 'Strength', 'Barcode', 'Description', 'Min Stock Level',
+            'Discount Percentage', 'Expiry Alert Days', 'Tax Method', 'Status',
+            'Category / Name', 'Tax / Name', 'Taxes', 'Product Units', 'Created At', 'Updated At',
+        ];
+        $row = array_fill_keys($headers, '');
+        $row = array_replace($row, [
+            'Id' => 'ignored-product-id', 'Category Id' => 'ignored-category-id', 'Tax Id' => 'ignored-tax-id',
+            'Name' => 'Exported Brand', 'Generic Name' => 'Exported Generic', 'Pricing Base Cost' => '75.123456',
+            'Brand Name' => 'Exported Brand', 'Manufacturer' => 'Export Manufacturer', 'Strength' => '250mg',
+            'Barcode' => '000987', 'Description' => "Exported, with details", 'Min Stock Level' => '12',
+            'Discount Percentage' => '2.5', 'Expiry Alert Days' => '60', 'Tax Method' => 'Inclusive',
+            'Status' => 'Active', 'Category / Name' => 'Export Category', 'Tax / Name' => 'Tax Free',
+            'Taxes' => json_encode([['id' => 'ignored', 'name' => 'Tax Free'], ['id' => 'ignored', 'name' => 'VAT']]),
+            'Product Units' => json_encode([
+                [
+                    'id' => 'ignored-unit-id', 'conversion_factor' => 1, 'selling_price' => '120.00',
+                    'wholesale_price' => '100.00', 'is_base_unit' => true, 'is_default_selling_unit' => false,
+                    'unit' => ['id' => 'ignored', 'name' => 'Capsule', 'short_name' => 'cap'],
+                ],
+                [
+                    'id' => 'ignored-box-id', 'conversion_factor' => 10, 'selling_price' => '1150.00',
+                    'wholesale_price' => '950.00', 'is_base_unit' => false, 'is_default_selling_unit' => true,
+                    'unit' => ['id' => 'ignored', 'name' => 'Box', 'short_name' => 'box'],
+                ],
+            ]),
+        ]);
+
+        $this->post('/products/import', [
+            'file' => $this->csv($headers, [$row], true),
+            'create_missing_categories' => true,
+            'create_missing_units' => true,
+        ])->assertSessionHasNoErrors()->assertRedirect('/products');
+
+        $product = Product::where('barcode', '000987')->firstOrFail();
+        $this->assertSame('Exported Brand', $product->brand_name);
+        $this->assertSame('Export Category', $product->category->name);
+        $this->assertSame('75.123456', $product->pricing_base_cost);
+        $this->assertSame(['Tax Free', 'VAT'], $product->taxes()->orderBy('name')->pluck('name')->all());
+        $this->assertDatabaseCount('product_units', 2);
+        $baseUnit = $product->product_units()->with('unit')->where('is_base_unit', true)->sole();
+        $this->assertSame('Capsule', $baseUnit->unit->name);
+        $this->assertSame('cap', $baseUnit->unit->short_name);
+        $this->assertSame('120.00', $baseUnit->selling_price);
+        $this->assertSame('100.00', $baseUnit->wholesale_price);
+        $defaultUnit = $product->product_units()->with('unit')->where('is_default_selling_unit', true)->sole();
+        $this->assertSame('Box', $defaultUnit->unit->name);
+        $this->assertSame(10, $defaultUnit->conversion_factor);
+        $this->assertSame('1150.00', $defaultUnit->selling_price);
+    }
+
+    public function test_product_export_reimport_updates_the_matching_product_and_units(): void
+    {
+        [$product, $baseUnit] = $this->catalog();
+        $product->load('category');
+        $headers = [
+            'Id', 'Generic Name', 'Brand Name', 'Barcode', 'Pricing Base Cost', 'Min Stock Level',
+            'Discount Percentage', 'Expiry Alert Days', 'Tax Method', 'Status', 'Category / Name',
+            'Taxes', 'Product Units',
+        ];
+        $row = array_replace(array_fill_keys($headers, ''), [
+            'Id' => $product->id,
+            'Generic Name' => 'Updated Generic',
+            'Brand Name' => 'Updated Brand',
+            'Barcode' => $product->barcode,
+            'Pricing Base Cost' => '85.500000',
+            'Min Stock Level' => '20',
+            'Discount Percentage' => '3',
+            'Expiry Alert Days' => '45',
+            'Tax Method' => 'Inclusive',
+            'Status' => 'Active',
+            'Category / Name' => $product->category->name,
+            'Taxes' => json_encode([['name' => 'Tax Free']]),
+            'Product Units' => json_encode([[
+                'id' => $baseUnit->id,
+                'conversion_factor' => 1,
+                'selling_price' => '140.00',
+                'wholesale_price' => '125.00',
+                'is_base_unit' => true,
+                'is_default_selling_unit' => true,
+                'unit' => ['name' => $baseUnit->unit->name, 'short_name' => $baseUnit->unit->short_name],
+            ]]),
+        ]);
+
+        $response = $this->post('/products/import', [
+            'file' => $this->csv($headers, [$row], true),
+            'create_missing_categories' => true,
+            'create_missing_units' => true,
+        ])->assertSessionHasNoErrors()->assertRedirect('/products');
+
+        $response->assertSessionHas('success', fn ($message) => str_contains($message, '0 medicines created; 1 updated'));
+        $this->assertDatabaseCount('products', 1);
+        $this->assertDatabaseCount('product_units', 1);
+        $this->assertSame('Updated Brand', $product->fresh()->brand_name);
+        $this->assertSame('85.500000', $product->fresh()->pricing_base_cost);
+        $this->assertSame($baseUnit->id, $product->fresh()->product_units()->sole()->id);
+        $this->assertSame('140.00', $baseUnit->fresh()->selling_price);
+        $this->assertSame('125.00', $baseUnit->fresh()->wholesale_price);
+    }
+
+    public function test_malformed_legacy_product_export_is_rejected_without_changes(): void
+    {
+        $headers = ['Generic Name', 'Brand Name', 'Product Units'];
+        $this->post('/products/import', [
+            'file' => $this->csv($headers, [[
+                'Generic Name' => 'Generic', 'Brand Name' => 'Brand', 'Product Units' => 'not-json',
+            ]]),
+            'create_missing_categories' => true,
+            'create_missing_units' => true,
+        ])->assertSessionHasErrors('file');
+
+        $this->assertDatabaseCount('products', 0);
+        $this->assertDatabaseCount('categories', 0);
+        $this->assertDatabaseCount('units', 0);
+    }
+
     public function test_later_catalog_error_rolls_back_products_categories_and_units(): void
     {
         $this->importProducts([$this->productRow(), $this->productRow([
@@ -300,11 +420,15 @@ class ProductCsvImportTest extends TestCase
             'unit_price_file' => $this->csv(ProductUnitPriceCsvService::HEADERS, $rows), 'create_missing_units' => $units]);
     }
 
-    private function csv(array $headers, array $rows): UploadedFile
+    private function csv(array $headers, array $rows, bool $quoteHeaders = false): UploadedFile
     {
         $output = fopen('php://temp', 'w+');
         fwrite($output, "\xEF\xBB\xBF");
-        fputcsv($output, $headers, ',', '"', '');
+        if ($quoteHeaders) {
+            fwrite($output, implode(',', array_map(fn ($header) => '"'.str_replace('"', '""', $header).'"', $headers))."\n");
+        } else {
+            fputcsv($output, $headers, ',', '"', '');
+        }
         foreach ($rows as $row) fputcsv($output, array_map(fn ($header) => $row[$header], $headers), ',', '"', '');
         rewind($output);
         $content = stream_get_contents($output);

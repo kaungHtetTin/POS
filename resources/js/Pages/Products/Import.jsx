@@ -44,7 +44,7 @@ export default function ProductImport({ auth, categories, taxes }) {
                         <Typography variant="body2" color="text.secondary">Download a template, edit it in Excel, then save as CSV UTF-8.</Typography></Box>
                     <Button startIcon={<ArrowBack />} onClick={() => router.visit(route('products.index'))} sx={{ flexShrink: 0 }}>Medicines</Button>
                 </Stack>
-                <Alert severity="info">Keep the column names unchanged. Format barcodes as text to preserve leading zeros. If any row fails validation, the entire import is rolled back.</Alert>
+                <Alert severity="info">You can upload the downloaded product template or a medicines.csv file created by Product Export. Exported products with a matching Id are updated; other rows create products. Keep the column names unchanged. Format barcodes as text to preserve leading zeros. If any row fails validation, the entire import is rolled back.</Alert>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, alignItems: 'start' }}>
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Stack spacing={2}>

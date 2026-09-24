@@ -214,8 +214,15 @@ class FinanceController extends Controller
             $baseQuery->where('sales.branch_id', $branchScope['branch_id']);
         }
 
-        if (in_array($filters['payment_status'], ['Partial', 'Due'], true)) {
-            $baseQuery->where('sales.payment_status', $filters['payment_status']);
+        if ($filters['payment_status'] === 'Overdue') {
+            $baseQuery->whereDate('sales.due_date', '<', today());
+        } elseif (in_array($filters['payment_status'], ['Credit', 'Partial', 'Due'], true)) {
+            $baseQuery->where(fn ($q) => $q->whereNull('sales.due_date')->orWhereDate('sales.due_date', '>=', today()));
+            if ($filters['payment_status'] === 'Partial') {
+                $baseQuery->where('sales.amount_received', '>', 0);
+            } else {
+                $baseQuery->whereRaw('COALESCE(sales.amount_received, 0) <= 0');
+            }
         }
 
         if (in_array($filters['payment_method'], ['Cash', 'Card', 'Mobile', 'Wallet'], true)) {
@@ -284,7 +291,8 @@ class FinanceController extends Controller
                     'invoice_number' => $sale->invoice_number,
                     'sale_date' => optional($sale->sale_date)->toDateTimeString(),
                     'payment_method' => $sale->payment_method,
-                    'payment_status' => $sale->payment_status,
+                    'payment_status' => $sale->receivable_status,
+                    'due_date' => optional($sale->due_date)->toDateString(),
                     'grand_total' => (float) $sale->grand_total,
                     'amount_received' => (float) $sale->amount_received,
                     'receivable_amount' => (float) $sale->receivable_amount,

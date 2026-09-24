@@ -39,10 +39,60 @@ class SupplierCsvImportTest extends TestCase
             ['Name only', '', '', '', ''],
             ['Name only', '', '', '', ''],
             ['', '', '', '', ''],
-        ]))->assertSessionHasNoErrors()->assertSessionHas('success', 'Import complete: 3 suppliers created; 1 blank rows skipped.');
+        ]))->assertSessionHasNoErrors()->assertSessionHas('success', 'Import complete: 3 suppliers created; 0 updated; 1 blank rows skipped.');
         $this->assertDatabaseCount('suppliers', 3);
         $this->assertDatabaseHas('suppliers', ['name' => $name, 'phone' => '001234', 'address' => $address, 'balance' => 0, 'credit_limit' => 0]);
         $this->assertDatabaseHas('suppliers', ['name' => 'Name only', 'phone' => null, 'email' => null, 'payment_terms' => null]);
+    }
+
+    public function test_supplier_export_format_can_create_a_new_supplier(): void
+    {
+        $this->upload($this->exportCsv([[
+            'Id' => 'external-supplier-id',
+            'Name' => 'Exported Supplier',
+            'Phone' => '00951',
+            'Email' => 'exported@example.test',
+            'Address' => 'Exported address',
+            'Payment Terms' => 'Net 45',
+            'Credit Limit' => '1000.00',
+            'Balance' => '500.00',
+        ]]))->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Import complete: 1 suppliers created; 0 updated; 0 blank rows skipped.');
+
+        $this->assertDatabaseHas('suppliers', [
+            'name' => 'Exported Supplier', 'phone' => '00951', 'email' => 'exported@example.test',
+            'address' => 'Exported address', 'payment_terms' => 'Net 45', 'balance' => 0, 'credit_limit' => 0,
+        ]);
+    }
+
+    public function test_supplier_export_reimport_updates_matching_supplier_and_preserves_financial_values(): void
+    {
+        $supplier = Supplier::create([
+            'name' => 'Original Supplier', 'phone' => '001', 'email' => 'original@example.test',
+            'address' => 'Old address', 'payment_terms' => 'Net 15', 'balance' => 1250, 'credit_limit' => 3000,
+        ]);
+
+        $this->upload($this->exportCsv([[
+            'Id' => $supplier->id,
+            'Name' => 'Updated Supplier',
+            'Phone' => '002',
+            'Email' => 'updated@example.test',
+            'Address' => 'New address',
+            'Payment Terms' => 'Net 30',
+            'Credit Limit' => '0.00',
+            'Balance' => '0.00',
+        ]]))->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Import complete: 0 suppliers created; 1 updated; 0 blank rows skipped.');
+
+        $this->assertDatabaseCount('suppliers', 1);
+        $supplier->refresh();
+        $this->assertSame('Updated Supplier', $supplier->name);
+        $this->assertSame('002', $supplier->phone);
+        $this->assertSame('updated@example.test', $supplier->email);
+        $this->assertSame('New address', $supplier->address);
+        $this->assertSame('Net 30', $supplier->payment_terms);
+        $this->assertSame('1250.00', $supplier->balance);
+        $this->assertSame('3000.00', $supplier->credit_limit);
     }
 
     public function test_duplicate_contacts_in_file_reject_entire_import_with_row_numbers(): void
@@ -128,5 +178,19 @@ class SupplierCsvImportTest extends TestCase
         $csv = stream_get_contents($stream);
         fclose($stream);
         return $csv;
+    }
+
+    private function exportCsv(array $rows): string
+    {
+        $headers = [
+            'Id', 'Name', 'Phone', 'Email', 'Address', 'Payment Terms', 'Credit Limit', 'Balance',
+            'Created At', 'Updated At', 'Purchases Count',
+        ];
+        $quote = fn ($value) => '"'.str_replace('"', '""', (string) $value).'"';
+        $lines = [implode(',', array_map($quote, $headers))];
+        foreach ($rows as $row) {
+            $lines[] = implode(',', array_map(fn ($header) => $quote($row[$header] ?? ''), $headers));
+        }
+        return "\xEF\xBB\xBF".implode("\r\n", $lines);
     }
 }

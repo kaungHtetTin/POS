@@ -5,6 +5,7 @@ import CsvExportButton from '@/Components/CsvExportButton';
 import { Head, Link, useForm, router, usePage } from '@/spa';
 import {
     Box,
+    Chip,
     Paper,
     Typography,
     Divider,
@@ -38,7 +39,7 @@ import {
 } from '@mui/icons-material';
 
 export default function CustomerIndex({ auth, customers, filters }) {
-    const { translations = {} } = usePage().props;
+    const { translations = {}, settings = {} } = usePage().props;
     const __ = (key) => translations[key] || key;
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
@@ -164,6 +165,8 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Customer')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Contact')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Current balance')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>{__('Status')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Actions')}</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -190,6 +193,14 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                                     <Typography variant="caption" color="text.secondary">{customer.email || __('No email')}</Typography>
                                                 </Stack>
                                             </Stack>
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+                                            {settings.app?.currency_symbol || '$'}{Number(customer.current_balance || 0).toFixed(2)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip size="small" variant="outlined"
+                                                label={__(customer.has_overdue ? 'Overdue' : Number(customer.current_balance || 0) > 0 ? 'Credit' : 'Paid')}
+                                                color={customer.has_overdue ? 'error' : Number(customer.current_balance || 0) > 0 ? 'info' : 'success'} />
                                         </TableCell>
                                         <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
                                             <Stack
@@ -228,7 +239,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                 ))}
                                 {customerRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary" fontStyle="italic">
                                                 {__('No customers found. Click "Add Customer" to create your first customer.')}
                                             </Typography>

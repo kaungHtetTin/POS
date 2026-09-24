@@ -35,7 +35,7 @@ class PosController extends Controller
         return Spa::render('POS/Index', [
             'pageTitle' => 'POS Interface',
             'paymentMethods' => ['Cash', 'Card', 'Mobile', 'Wallet'],
-            'paymentStatuses' => ['Paid', 'Partial', 'Due'],
+            'paymentStatuses' => ['Paid', 'Credit'],
             'posDefaults' => [
                 'default_view' => Setting::get('pos.default_view', 'table'),
                 'default_payment_method' => Setting::get('pos.default_payment_method', 'Cash'),
@@ -350,7 +350,8 @@ class PosController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'amount_received' => 'nullable|numeric|min:0|max:999999999999.99',
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
-            'payment_status' => 'required|in:Paid,Partial,Due',
+            'payment_status' => 'required|in:Paid,Credit,Partial,Due',
+            'due_date' => 'nullable|required_if:payment_status,Credit|date_format:Y-m-d|after_or_equal:today',
             'sale_channel' => 'nullable|in:retail,wholesale',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -360,12 +361,6 @@ class PosController extends Controller
             'items.*.foc_unit_id' => 'nullable|exists:units,id',
             'items.*.price_type' => 'nullable|in:retail,wholesale',
         ]);
-
-        if (empty($validated['customer_id']) && ($validated['payment_status'] ?? 'Paid') !== 'Paid') {
-            return redirect()->back()->withErrors([
-                'payment_status' => 'Partial and due payments require a selected customer.',
-            ]);
-        }
 
         $branchId = $request->user()->currentBranchId();
         
@@ -519,17 +514,11 @@ class PosController extends Controller
 
         $saleDiscount = $productDiscountTotal;
         $grandTotal = max($totalAmount + $taxAmount, 0);
-        $amountReceived = 0.0;
-        $changeDue = 0.0;
-        if ($validated['payment_method'] === 'Cash') {
-            $amountReceived = max((float) ($validated['amount_received'] ?? 0), 0);
-            if ($validated['payment_status'] === 'Paid' && $amountReceived < $grandTotal) {
-                return redirect()->back()->withErrors([
-                    'amount_received' => 'Cash received must be at least equal to the grand total for paid cash sales.',
-                ]);
-            }
-            $changeDue = max($amountReceived - $grandTotal, 0);
-        }
+        $payment = app(\App\Services\CustomerCreditService::class)->payment($validated, $grandTotal);
+        $amountReceived = $payment['amount_received'];
+        $changeDue = $payment['change_due'];
+        $validated['payment_status'] = $payment['payment_status'];
+        $validated['due_date'] = $payment['due_date'];
 
         $createdSale = null;
         DB::transaction(function () use ($validated, $branchId, $userId, $lineComputations, $totalAmount, $taxAmount, $saleDiscount, $grandTotal, $amountReceived, $changeDue, $activeSession, &$createdSale) {
@@ -565,6 +554,7 @@ class PosController extends Controller
                 'change_due' => $changeDue,
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => $validated['payment_status'],
+                'due_date' => $validated['due_date'],
                 'sale_date' => now(),
                 'is_synced' => false,
             ]);
@@ -677,7 +667,8 @@ class PosController extends Controller
             'sale_date' => optional($createdSale?->sale_date)->toDateTimeString(),
             'customer_name' => $customerName,
             'payment_method' => $validated['payment_method'],
-            'payment_status' => $validated['payment_status'],
+            'payment_status' => $createdSale?->payment_status === 'Paid' ? 'Paid' : 'Credit',
+            'due_date' => optional($createdSale?->due_date)->toDateString(),
             'subtotal' => (float) $totalAmount,
             'tax' => (float) $taxAmount,
             'discount' => (float) $saleDiscount,
@@ -830,7 +821,9 @@ class PosController extends Controller
             })
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'phone', 'email', 'address']);
+            ->select(['id', 'name', 'phone', 'email', 'address'])
+            ->withCreditSummary()
+            ->get();
 
         return response()->json($customers);
     }

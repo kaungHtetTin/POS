@@ -85,7 +85,7 @@ class CustomerController extends Controller
 
     public function index(Request $request)
     {
-        $query = Customer::query()->withCount('sales');
+        $query = Customer::query()->withCount('sales')->withCreditSummary();
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {

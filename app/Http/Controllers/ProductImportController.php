@@ -61,7 +61,7 @@ class ProductImportController extends Controller
         ]);
         $result = $importer->import($validated['file'], (bool) $validated['create_missing_categories'], (bool) $validated['create_missing_units']);
         return redirect()->route('products.index')->with('success',
-            "Import complete: {$result['products']} medicines created; {$result['categories']} categories and {$result['units']} shared units created; {$result['skipped_rows']} blank rows skipped.");
+            "Import complete: {$result['created']} medicines created; {$result['updated']} updated; {$result['categories']} categories and {$result['units']} shared units created; {$result['skipped_rows']} blank rows skipped.");
     }
 
     public function storeUnitPrices(Request $request, ProductUnitPriceCsvService $importer)

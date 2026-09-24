@@ -34,6 +34,6 @@ class SupplierImportController extends Controller
         $result = $importer->import($validated['file']);
 
         return redirect()->route('suppliers.index')->with('success',
-            "Import complete: {$result['suppliers']} suppliers created; {$result['skipped_rows']} blank rows skipped.");
+            "Import complete: {$result['created']} suppliers created; {$result['updated']} updated; {$result['skipped_rows']} blank rows skipped.");
     }
 }

@@ -42,7 +42,8 @@ class SaleSyncService
             'cash_session_id' => 'nullable|exists:cash_sessions,id',
             'invoice_number' => 'nullable|string|max:255|unique:sales,invoice_number',
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
-            'payment_status' => 'required|in:Paid,Partial,Due',
+            'payment_status' => 'required|in:Paid,Credit,Partial,Due',
+            'due_date' => 'nullable|required_if:payment_status,Credit|date_format:Y-m-d',
             'amount_received' => 'required|numeric|min:0',
             'sale_date' => 'nullable|date',
             'items' => 'required|array|min:1',
@@ -161,8 +162,9 @@ class SaleSyncService
             }
 
             $grandTotal = max($subTotal + $totalTax, 0);
-            $amountReceived = (float) $validated['amount_received'];
-            $changeDue = max($amountReceived - $grandTotal, 0);
+            $payment = app(\App\Services\CustomerCreditService::class)->payment($validated, $grandTotal);
+            $amountReceived = $payment['amount_received'];
+            $changeDue = $payment['change_due'];
             $cashSession = $this->resolveCashSession($validated, $branchId, $user);
             $saleStaffId = $cashSession->user_id;
 
@@ -181,7 +183,8 @@ class SaleSyncService
                 'amount_received' => $amountReceived,
                 'change_due' => $changeDue,
                 'payment_method' => $validated['payment_method'],
-                'payment_status' => $validated['payment_status'],
+                'payment_status' => $payment['payment_status'],
+                'due_date' => $payment['due_date'],
                 'sale_date' => $validated['sale_date'] ?? now(),
                 'is_synced' => true,
                 'synced_at' => now(),

@@ -31,12 +31,14 @@ class Sale extends Model
         'voided_at',
         'void_reason',
         'sale_date',
+        'due_date',
         'is_synced',
         'synced_at',
     ];
 
     protected $casts = [
         'sale_date' => 'datetime',
+        'due_date' => 'date',
         'total_amount' => 'decimal:2',
         'discount' => 'decimal:2',
         'tax' => 'decimal:2',
@@ -47,6 +49,24 @@ class Sale extends Model
         'is_synced' => 'boolean',
         'synced_at' => 'datetime',
     ];
+
+    public function scopeOutstanding($query)
+    {
+        return $query->whereIn('payment_status', ['Partial', 'Due'])
+            ->whereRaw('grand_total > COALESCE(amount_received, 0)')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'Voided'));
+    }
+
+    public function getReceivableStatusAttribute(): string
+    {
+        if ($this->payment_status === 'Paid' || (float) $this->amount_received >= (float) $this->grand_total) {
+            return 'Paid';
+        }
+        if ($this->due_date && $this->due_date->lt(today())) {
+            return 'Overdue';
+        }
+        return (float) $this->amount_received > 0 ? 'Partial' : 'Credit';
+    }
 
     public function branch()
     {

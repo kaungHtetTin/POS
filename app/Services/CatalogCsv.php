@@ -12,17 +12,31 @@ class CatalogCsv
 {
     public static function read(UploadedFile $file, array $headers, string $field, int $limit): array
     {
+        [$header, $rows, $skipped] = self::readRows($file, $field, $limit);
+
+        if (count($header) !== count($headers) || array_diff($headers, $header)) {
+            self::fail($field, ['Use all columns from the downloaded template, with no extra or duplicate columns. Save as CSV UTF-8.']);
+        }
+
+        return [$rows, $skipped];
+    }
+
+    /** Read a structurally valid CSV while leaving schema selection to the caller. */
+    public static function readRows(UploadedFile $file, string $field, int $limit): array
+    {
         $handle = fopen($file->getRealPath(), 'rb');
         if ($handle === false) self::fail($field, ['The CSV file could not be read.']);
 
         try {
+            // Consume the UTF-8 BOM before CSV parsing. If it remains in front of a
+            // quoted first heading, fgetcsv treats the quote as literal text.
+            $prefix = fread($handle, 3);
+            if ($prefix !== "\xEF\xBB\xBF") rewind($handle);
             $header = fgetcsv($handle, 0, ',', '"', '');
             if ($header === false) self::fail($field, ['The CSV file is empty.']);
-            $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $header[0]);
             $header = array_map(fn ($value) => self::key((string) $value), $header);
-            if (count($header) !== count(array_unique($header)) || count($header) !== count($headers)
-                || array_diff($headers, $header)) {
-                self::fail($field, ['Use all columns from the downloaded template, with no extra or duplicate columns. Save as CSV UTF-8.']);
+            if (count($header) !== count(array_unique($header))) {
+                self::fail($field, ['CSV column names must not be duplicated.']);
             }
 
             $rows = [];
@@ -55,7 +69,7 @@ class CatalogCsv
             }
             if (!$rows && !$errors) $errors[] = 'The CSV file has no data rows.';
             self::fail($field, $errors);
-            return [$rows, $skipped];
+            return [$header, $rows, $skipped];
         } finally {
             fclose($handle);
         }

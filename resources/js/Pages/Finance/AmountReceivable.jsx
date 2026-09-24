@@ -78,14 +78,13 @@ export default function AmountReceivable({
 
     const money = (value) => Number(value || 0).toFixed(2);
 
-    const formatDate = (value) => {
+    const formatDate = (value, dateOnly = false) => {
         if (!value) return '-';
         return new Intl.DateTimeFormat('en-GB', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
+            ...(dateOnly ? {} : { hour: '2-digit', minute: '2-digit' }),
         }).format(new Date(value));
     };
 
@@ -214,7 +213,8 @@ export default function AmountReceivable({
                             <InputLabel>{__('Status')}</InputLabel>
                             <Select value={paymentStatus} label={__('Status')} onChange={(event) => setPaymentStatus(event.target.value)}>
                                 <MenuItem value="all">{__('All unpaid')}</MenuItem>
-                                <MenuItem value="Due">{__('Due')}</MenuItem>
+                                <MenuItem value="Credit">{__('Credit')}</MenuItem>
+                                <MenuItem value="Overdue">{__('Overdue')}</MenuItem>
                                 <MenuItem value="Partial">{__('Partial')}</MenuItem>
                             </Select>
                         </FormControl>
@@ -311,6 +311,7 @@ export default function AmountReceivable({
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255,255,255,0.05)' }}>
                                     <TableCell sx={{ fontWeight: 700 }}>{__('Sale Date')}</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }}>{__('Due Date')}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>{__('Invoice')}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>{__('Customer')}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>{__('Branch')}</TableCell>
@@ -325,6 +326,7 @@ export default function AmountReceivable({
                                 {rows.map((sale) => (
                                     <TableRow key={sale.id} hover>
                                         <TableCell>{formatDate(sale.sale_date)}</TableCell>
+                                        <TableCell>{formatDate(sale.due_date, true)}</TableCell>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>{sale.invoice_number}</Typography>
                                             <Typography variant="caption" color="text.secondary">{sale.payment_method}</Typography>
@@ -351,7 +353,7 @@ export default function AmountReceivable({
                                             <Chip
                                                 size="small"
                                                 label={__(sale.payment_status)}
-                                                color={sale.payment_status === 'Partial' ? 'warning' : 'error'}
+                                                color={sale.payment_status === 'Overdue' ? 'error' : sale.payment_status === 'Partial' ? 'warning' : 'info'}
                                                 variant="outlined"
                                             />
                                         </TableCell>
@@ -387,7 +389,7 @@ export default function AmountReceivable({
                                 ))}
                                 {rows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">{__('No customer receivables found for selected filters.')}</Typography>
                                         </TableCell>
                                     </TableRow>

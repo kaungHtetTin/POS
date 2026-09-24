@@ -51,6 +51,12 @@ import {
     ViewModule as GridViewIcon,
 } from '@mui/icons-material';
 
+const inputDate = (days = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export default function PosIndex({
@@ -123,6 +129,7 @@ export default function PosIndex({
         amount_received: 0,
         payment_method: paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'),
         payment_status: paymentStatuses?.[0] || 'Paid',
+        due_date: inputDate(7),
         sale_channel: 'retail',
         items: [],
     });
@@ -188,16 +195,16 @@ export default function PosIndex({
     }, [selectedCustomer, setData]);
 
     useEffect(() => {
-        if (!selectedCustomer?.id && data.payment_status !== 'Paid') {
+        if ((!selectedCustomer?.id || selectedCustomer?.has_overdue) && data.payment_status !== 'Paid') {
             setData('payment_status', 'Paid');
         }
     }, [selectedCustomer, data.payment_status, setData]);
 
     useEffect(() => {
-        if (data.payment_method !== 'Cash' && Number(data.amount_received || 0) !== 0) {
+        if (data.payment_method !== 'Cash' && data.payment_status === 'Paid' && Number(data.amount_received || 0) !== 0) {
             setData('amount_received', 0);
         }
-    }, [data.payment_method, data.amount_received, setData]);
+    }, [data.payment_method, data.payment_status, data.amount_received, setData]);
 
     useEffect(() => {
         if (activeSession?.id) {
@@ -279,6 +286,7 @@ export default function PosIndex({
                 return;
             }
             setSelectedCustomer(data);
+            setCustomerSearchInput(data.name || '');
             setCustomerOptions((prev) => (prev.some((c) => c.id === data.id) ? prev : [data, ...prev]));
             closeNewCustomer();
         } catch {
@@ -578,6 +586,33 @@ export default function PosIndex({
     const cashShortageValue = isCashPayment ? Math.max(totals.grandTotal - amountReceivedValue, 0) : 0;
     const isPaidCashSale = isCashPayment && data.payment_status === 'Paid';
     const isWalkInCustomer = !selectedCustomer?.id;
+    const creditDetails = (
+        <Stack spacing={1} sx={{ mt: 1 }}>
+            {selectedCustomer && (
+                <Typography variant="body2">
+                    {__('Current balance')}: {currencySymbol}{Number(selectedCustomer.current_balance || 0).toFixed(2)}
+                </Typography>
+            )}
+            {selectedCustomer?.has_overdue && (
+                <Alert severity="warning">{__('This customer has an overdue balance. Full payment is required.')}</Alert>
+            )}
+            {data.payment_status === 'Credit' && (
+                <TextField
+                    label={__('Overdue limit (due date)')}
+                    type="date"
+                    size="small"
+                    fullWidth
+                    required
+                    value={data.due_date}
+                    onChange={(event) => setData('due_date', event.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: inputDate() }}
+                    error={!!errors.due_date}
+                    helperText={errors.due_date || __('Defaults to 7 days from today. Any unpaid balance becomes overdue after this date.')}
+                />
+            )}
+        </Stack>
+    );
     const hasActiveSession = Boolean(activeSession?.id);
     const activeSessionExpected = Number(activeSession?.expected_amount || 0);
     const activeSessionDifference = activeSession?.difference == null ? null : Number(activeSession.difference || 0);
@@ -867,6 +902,7 @@ export default function PosIndex({
                 setData('amount_received', 0);
                 setData('payment_method', paymentMethods?.includes(behavior.default_payment_method) ? behavior.default_payment_method : (paymentMethods?.[0] || 'Cash'));
                 setData('payment_status', paymentStatuses?.[0] || 'Paid');
+                setData('due_date', inputDate(7));
                 setData('sale_channel', salePriceType);
                 setPaymentDialogOpen(false);
                 setMobileStep('products');
@@ -1930,9 +1966,10 @@ export default function PosIndex({
                                                 fullWidth
                                                 options={customerOptions}
                                                 value={selectedCustomer}
-                                                onChange={(e, value) => setSelectedCustomer(value)}
+                                                onChange={(e, value) => { setSelectedCustomer(value); setCustomerSearchInput(value?.name || ''); }}
                                                 inputValue={customerSearchInput}
-                                                onInputChange={(e, value) => setCustomerSearchInput(value || '')}
+                                                onInputChange={(e, value, reason) => { if (reason === 'input' || reason === 'clear') setCustomerSearchInput(value || ''); }}
+                                            filterOptions={(options) => options}
                                                 getOptionLabel={(option) => (option?.name ?? '') || ''}
                                                 renderOption={(props, option) => (
                                                     <li {...props} key={option.id}>
@@ -1973,7 +2010,7 @@ export default function PosIndex({
                                         </Typography>
                                         <Stack spacing={0}>
                                             {(paymentStatuses || []).map((status) => {
-                                                const disabled = isWalkInCustomer && status !== 'Paid';
+                                                const disabled = (isWalkInCustomer || selectedCustomer?.has_overdue) && status !== 'Paid';
                                                 return (
                                                     <FormControlLabel
                                                         key={status}
@@ -1986,6 +2023,10 @@ export default function PosIndex({
                                                                 onChange={(event) => {
                                                                     if (event.target.checked && !disabled) {
                                                                         setData('payment_status', status);
+                                                                        if (status === 'Credit') {
+                                                                            setData('due_date', inputDate(7));
+                                                                            setData('amount_received', 0);
+                                                                        }
                                                                     }
                                                                 }}
                                                             />
@@ -1997,9 +2038,10 @@ export default function PosIndex({
                                         </Stack>
                                         {(errors.payment_status || isWalkInCustomer) && (
                                             <Typography variant="caption" color={errors.payment_status ? 'error' : 'text.secondary'}>
-                                                {errors.payment_status || __('Partial and Due are only available after selecting a customer.')}
+                                                {errors.payment_status || __('Credit is only available after selecting a customer.')}
                                             </Typography>
                                         )}
+                                        {creditDetails}
                                     </Box>
                                 </Stack>
                             </Box>
@@ -2025,7 +2067,7 @@ export default function PosIndex({
                                 </ToggleButtonGroup>
                             </Box>
 
-                            {isCashPayment && (
+                            {(isCashPayment || data.payment_status === 'Credit') && (
                                 <Stack spacing={1}>
                                     <TextField
                                         size="small"
@@ -2047,8 +2089,8 @@ export default function PosIndex({
                                     <TextField
                                         size="small"
                                         fullWidth
-                                        label={__('Change')}
-                                        value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
+                                        label={__(data.payment_status === 'Credit' ? 'Remaining balance' : 'Change')}
+                                        value={`${currencySymbol}${(data.payment_status === 'Credit' ? Math.max(totals.grandTotal - amountReceivedValue, 0) : changeDueValue).toFixed(2)}`}
                                         InputProps={{ readOnly: true }}
                                     />
                                 </Stack>
@@ -2257,9 +2299,10 @@ export default function PosIndex({
                                             fullWidth
                                             options={customerOptions}
                                             value={selectedCustomer}
-                                            onChange={(e, value) => setSelectedCustomer(value)}
+                                            onChange={(e, value) => { setSelectedCustomer(value); setCustomerSearchInput(value?.name || ''); }}
                                             inputValue={customerSearchInput}
-                                            onInputChange={(e, value) => setCustomerSearchInput(value || '')}
+                                            onInputChange={(e, value, reason) => { if (reason === 'input' || reason === 'clear') setCustomerSearchInput(value || ''); }}
+                                            filterOptions={(options) => options}
                                             getOptionLabel={(option) => (option?.name ?? '') || ''}
                                             renderOption={(props, option) => (
                                                 <li {...props} key={option.id}>
@@ -2299,7 +2342,7 @@ export default function PosIndex({
                                     </Typography>
                                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0, sm: 1.5 }}>
                                         {(paymentStatuses || []).map((status) => {
-                                            const disabled = isWalkInCustomer && status !== 'Paid';
+                                            const disabled = (isWalkInCustomer || selectedCustomer?.has_overdue) && status !== 'Paid';
                                             return (
                                                 <FormControlLabel
                                                     key={status}
@@ -2312,6 +2355,10 @@ export default function PosIndex({
                                                             onChange={(event) => {
                                                                 if (event.target.checked && !disabled) {
                                                                     setData('payment_status', status);
+                                                                        if (status === 'Credit') {
+                                                                            setData('due_date', inputDate(7));
+                                                                            setData('amount_received', 0);
+                                                                        }
                                                                 }
                                                             }}
                                                         />
@@ -2323,9 +2370,10 @@ export default function PosIndex({
                                     </Stack>
                                     {(errors.payment_status || isWalkInCustomer) && (
                                         <Typography variant="caption" color={errors.payment_status ? 'error' : 'text.secondary'}>
-                                            {errors.payment_status || __('Partial and Due are only available after selecting a customer.')}
+                                            {errors.payment_status || __('Credit is only available after selecting a customer.')}
                                         </Typography>
                                     )}
+                                    {creditDetails}
                                 </Box>
                             </Box>
 
@@ -2350,7 +2398,7 @@ export default function PosIndex({
                                 </ToggleButtonGroup>
                             </Box>
 
-                            {isCashPayment && (
+                            {(isCashPayment || data.payment_status === 'Credit') && (
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                                     <TextField
                                         size="small"
@@ -2372,8 +2420,8 @@ export default function PosIndex({
                                     <TextField
                                         size="small"
                                         fullWidth
-                                        label={__('Change')}
-                                        value={`${currencySymbol}${changeDueValue.toFixed(2)}`}
+                                        label={__(data.payment_status === 'Credit' ? 'Remaining balance' : 'Change')}
+                                        value={`${currencySymbol}${(data.payment_status === 'Credit' ? Math.max(totals.grandTotal - amountReceivedValue, 0) : changeDueValue).toFixed(2)}`}
                                         InputProps={{ readOnly: true }}
                                     />
                                 </Stack>

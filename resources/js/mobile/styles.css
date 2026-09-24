@@ -225,6 +225,7 @@ body.modal-open { overflow: hidden; }
 .checkout-section { margin-top: 15px; }
 .checkout-section > label { display: block; margin-bottom: 7px; color: #43524f; font-size: .72rem; font-weight: 800; }
 .segmented { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 4px; border-radius: 11px; background: #edf2f0; }
+.segmented--two { grid-template-columns: repeat(2, 1fr); }
 .segmented--three { grid-template-columns: repeat(3, 1fr); }
 .segmented button { min-width: 0; min-height: 48px; padding: 0 4px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: .68rem; font-weight: 750; }
 .segmented button.active { color: var(--brand-dark); background: #fff; box-shadow: 0 2px 8px rgba(24,55,49,.1); }

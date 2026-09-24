@@ -130,7 +130,7 @@ class CashierPosController extends Controller
             });
         }
 
-        $customers = $query->select('id', 'name', 'phone', 'address', 'credit_limit', 'balance')
+        $customers = $query->select('id', 'name', 'phone', 'address')->withCreditSummary()
             ->orderBy('name')
             ->limit(50)
             ->get();
@@ -355,7 +355,8 @@ class CashierPosController extends Controller
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
-            'payment_status' => 'required|in:Paid,Partial,Due',
+            'payment_status' => 'required|in:Paid,Credit,Partial,Due',
+            'due_date' => 'nullable|required_if:payment_status,Credit|date_format:Y-m-d',
             'amount_received' => 'required|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -490,8 +491,9 @@ class CashierPosController extends Controller
             $manualDiscount = 0.0;
             $saleDiscount = $productDiscountTotal;
             $grandTotal = max($subTotal + $totalTax, 0);
-            $amountReceived = (float) $validated['amount_received'];
-            $changeDue = max($amountReceived - $grandTotal, 0);
+            $payment = app(\App\Services\CustomerCreditService::class)->payment($validated, $grandTotal);
+            $amountReceived = $payment['amount_received'];
+            $changeDue = $payment['change_due'];
             $saleStaffId = $activeSession->user_id ?: $userId;
 
             $sale = Sale::create([
@@ -508,7 +510,8 @@ class CashierPosController extends Controller
                 'amount_received' => $amountReceived,
                 'change_due' => $changeDue,
                 'payment_method' => $validated['payment_method'],
-                'payment_status' => $validated['payment_status'],
+                'payment_status' => $payment['payment_status'],
+                'due_date' => $payment['due_date'],
                 'sale_date' => now(),
             ]);
 
