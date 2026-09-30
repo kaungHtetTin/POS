@@ -253,6 +253,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
         permissions: { text: 'Permission', icon: 'shieldCheck', href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_roles_permissions' },
         activityLogs: { text: 'Activity Logs', icon: 'history', href: route('activity-logs.index'), routePattern: 'activity-logs.*', permission: 'monitor_activity' },
         settings: { text: 'Settings', icon: 'settings', href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_settings' },
+        profile: { text: 'Profile', icon: 'user', href: route('profile.edit'), routePattern: 'profile.*', permission: null },
         manual: { text: 'SOP Manual', icon: 'book', href: route('manual.index'), routePattern: 'manual.index', permission: null },
     };
 
@@ -263,7 +264,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
         { label: 'Sales', keys: ['customers', 'sales', 'returns', 'salesCustomerReport'] },
         { label: 'Finance', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },
         { label: 'Administration', keys: ['administration', 'roles', 'branches', 'permissions', 'activityLogs', 'manual'] },
-        { label: 'Setting', keys: ['settings'] },
+        { label: 'Setting', keys: ['profile', 'settings'] },
     ];
 
     const canSee = (item) => {
