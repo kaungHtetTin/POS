@@ -11,6 +11,7 @@ use App\Models\ReturnEntry;
 use App\Models\Sale;
 use App\Models\Setting;
 use App\Models\StockTransfer;
+use App\Support\PharmacyAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Tightenco\Ziggy\Ziggy;
@@ -38,7 +39,7 @@ class HandleSpaRequests
             'auth' => [
                 'user' => $request->user() ? array_merge($request->user()->toArray(), [
                     'roles' => $request->user()->roles->pluck('name'),
-                    'permissions' => $request->user()->roles->flatMap->permissions->pluck('slug')->unique()->values(),
+                    'permissions' => $this->getPermissionSlugs($request),
                     'current_branch_id' => $request->user()->currentBranchId(),
                     'accessible_branches' => $this->getAccessibleBranches($request),
                 ]) : null,
@@ -119,6 +120,20 @@ class HandleSpaRequests
         }
     }
 
+    protected function getPermissionSlugs(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return collect();
+
+        // Owner/legacy Root authorization bypasses individual permission rows in
+        // User::hasPermission(). Keep the navigation payload consistent with it.
+        if ($user->hasRole(PharmacyAccess::OWNER) || $user->hasRole('Root')) {
+            return collect(PharmacyAccess::permissionSlugs());
+        }
+
+        return $user->roles->flatMap->permissions->pluck('slug')->unique()->values();
+    }
+
     protected function getNavigationCounts(Request $request): array
     {
         try {
@@ -128,7 +143,7 @@ class HandleSpaRequests
             if ($branchIds->isEmpty()) return [];
 
             $counts = [];
-            $permissions = $user->roles->flatMap->permissions->pluck('slug')->unique();
+            $permissions = $this->getPermissionSlugs($request);
             if ($permissions->contains('manage_inventory')) {
                 $expiryAlertDays = (int) Setting::get('inventory.expiry_alert_days', '90');
                 $today = now()->toDateString();

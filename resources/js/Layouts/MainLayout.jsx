@@ -221,7 +221,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
         pos: { text: 'POS', icon: 'card', href: route('pos.index'), routePattern: 'pos.index', permission: 'process_sale' },
 
         inventory: { text: 'Stock Balance', icon: 'box', href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
-        medicines: { text: 'Create New Items', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_products' },
+        medicines: { text: 'Products', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_products' },
         categories: { text: 'Categories', icon: 'tag', href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_products' },
         taxes: { text: 'Tax Calculation', icon: 'percent', href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_products' },
         lowBalanceReport: { text: 'Low Balance Report', icon: 'chart', href: route('reports.low-balance'), routePattern: 'reports.low-balance', permission: 'manage_inventory' },
