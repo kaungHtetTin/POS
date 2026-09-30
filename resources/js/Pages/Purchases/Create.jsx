@@ -2,7 +2,9 @@ import { automaticPrice, purchaseBuyingCost } from '@/Utils/automaticPricing';
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
-import { Head, Link, router, useForm, usePage } from '@/spa';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { AppBarBack } from '@/Components/AppBarPortal';
+import { Head, router, useForm, usePage } from '@/spa';
 import {
     Alert,
     Autocomplete,
@@ -30,7 +32,6 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    ArrowBack as ArrowBackIcon,
     CheckCircle as CheckCircleIcon,
     Delete as DeleteIcon,
     Inventory as InventoryIcon,
@@ -488,18 +489,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
             </Box>
 
             {selectedSupplier && (
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
-                    <Paper variant="outlined" sx={{ p: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">Current Balance</Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(selectedSupplier.balance)}</Typography>
-                    </Paper>
-                    <Paper variant="outlined" sx={{ p: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">Projected Balance</Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary' }}>
-                            {money(projectedBalance)}
-                        </Typography>
-                    </Paper>
-                </Box>
+                <StatCardGrid items={[
+                    { label: 'Current Balance', value: money(selectedSupplier.balance) },
+                    { label: 'Projected Balance', value: money(projectedBalance), tone: 'warning' },
+                ]} sx={{ mb: 0 }} />
             )}
         </Stack>
     );
@@ -507,7 +500,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
     const renderProductSelection = () => (
         <Stack spacing={2.5}>
             {renderStepErrors()}
-            <ReportFilterToolbar
+            <ReportFilterToolbar appBar
                 ariaLabel="Purchase product filters"
                 fieldKinds={['search', 'wide']}
                 actions={(
@@ -555,16 +548,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                 </TextField>
             </ReportFilterToolbar>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary">Selected</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{data.items.length}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                    <Typography variant="caption" color="text.secondary">Matching Products</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{filteredAvailableProducts.length + selectedCatalogProducts.length}</Typography>
-                </Paper>
-            </Stack>
+            <StatCardGrid items={[
+                { label: 'Selected', value: data.items.length },
+                { label: 'Matching Products', value: filteredAvailableProducts.length + selectedCatalogProducts.length },
+            ]} sx={{ mb: 0 }} />
 
             <Stack spacing={1.2}>
                 {visibleCatalogProducts.length === 0 ? (
@@ -837,28 +824,13 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                 </Alert>
             )}
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(5, 1fr)' }, gap: 1.5 }}>
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Supplier</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{selectedSupplier?.name || '-'}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Invoice</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{data.invoice_number || '-'}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Payment Due Date</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{data.due_date || '-'}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Total</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{money(totalAmount)}</Typography>
-                </Paper>
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Due</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{money(dueAmount)}</Typography>
-                </Paper>
-            </Box>
+            <StatCardGrid items={[
+                { label: 'Supplier', value: selectedSupplier?.name || '-' },
+                { label: 'Invoice', value: data.invoice_number || '-' },
+                { label: 'Payment Due Date', value: data.due_date || '-' },
+                { label: 'Total', value: money(totalAmount), tone: 'success' },
+                { label: 'Due', value: money(dueAmount), tone: 'warning' },
+            ]} sx={{ mb: 0 }} />
 
             <TableContainer>
                 <Table size="small">
@@ -926,19 +898,10 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
     return (
         <MainLayout auth={auth} header="Create Purchase">
             <Head title="Create Purchase" />
+            <AppBarBack href={route('purchases.index')} label="Back to Purchases" />
 
             <Box sx={{ flexGrow: 1 }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                    <Button
-                        component={Link}
-                        href={route('purchases.index')}
-                        variant="outlined"
-                        size="small"
-                        startIcon={<ArrowBackIcon />}
-                        sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
-                    >
-                        Back
-                    </Button>
                     <Chip icon={<PurchaseIcon />} label="New Purchase Wizard" variant="outlined" sx={{ height: 36 }} />
                 </Stack>
 
@@ -968,7 +931,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                             startIcon={<NavigateBeforeIcon />}
                             onClick={goBack}
                             disabled={activeStep === 0 || processing}
-                            sx={{ height: 40, minWidth: 120 }}
+                            sx={{ minWidth: 120 }}
                         >
                             Previous
                         </Button>
@@ -981,7 +944,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                                 endIcon={<NavigateNextIcon />}
                                 onClick={goNext}
                                 disabled={processing}
-                                sx={{ height: 40, minWidth: 120 }}
+                                sx={{ minWidth: 120 }}
                             >
                                 Next
                             </Button>
@@ -994,7 +957,7 @@ export default function PurchaseCreate({ auth, suppliers, products, categories =
                                 startIcon={<CheckCircleIcon />}
                                 onClick={submit}
                                 disabled={processing}
-                                sx={{ height: 40, minWidth: 198 }}
+                                sx={{ minWidth: 198 }}
                             >
                                 Confirm & Receive Stock
                             </Button>

@@ -17,19 +17,22 @@ export default function MergedTablePanel({
     children,
     sx = {},
     contentSx = {},
+    hideHeader = true,
 }) {
+    const filtersInAppBar = React.isValidElement(filters) && Boolean(filters.props.appBar);
+
     return (
         <Paper
             elevation={0}
             sx={{
                 border: 1,
                 borderColor: 'divider',
-                borderRadius: 1.5,
+                borderRadius: '6px',
                 overflow: 'hidden',
                 ...sx,
             }}
         >
-            <Box sx={{ px: { xs: 1.5, md: 2 }, pt: { xs: 1.5, md: 2 }, pb: filters ? 1.25 : 2 }}>
+            {!hideHeader && <Box sx={{ minHeight: 38, px: 1.25, py: 1, display: 'flex', alignItems: 'center' }}>
                 <Stack
                     direction={{ xs: 'column', md: 'row' }}
                     justifyContent="space-between"
@@ -44,7 +47,8 @@ export default function MergedTablePanel({
                                     display: 'block',
                                     color: 'primary.main',
                                     fontWeight: 800,
-                                    letterSpacing: '0.11em',
+                                    fontSize: 9,
+                                    letterSpacing: '0.07em',
                                     textTransform: 'uppercase',
                                     mb: 0.35,
                                 }}
@@ -54,7 +58,7 @@ export default function MergedTablePanel({
                         )}
                         <Stack direction="row" spacing={1} alignItems="center">
                             {icon}
-                            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                            <Typography variant="h6" sx={{ fontSize: 15, fontWeight: 600, lineHeight: 1.2 }}>
                                 {title}
                             </Typography>
                         </Stack>
@@ -72,17 +76,19 @@ export default function MergedTablePanel({
                         </Stack>
                     )}
                 </Stack>
-            </Box>
+            </Box>}
 
-            {filters && (
-                <Box sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
+            {filtersInAppBar && filters}
+
+            {filters && !filtersInAppBar && (
+                <Box sx={{ px: 1.25, pb: 1.25 }}>
                     {filters}
                 </Box>
             )}
 
-            <Divider />
+            {!hideHeader && <Divider />}
 
-            <Box sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 2 }, ...contentSx }}>
+            <Box sx={{ p: 0, ...contentSx }}>
                 {children}
             </Box>
         </Paper>

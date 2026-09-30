@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PosLayout from '@/Layouts/PosLayout';
-import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import { usePage, Head, useForm, router } from '@/spa';
 import {
     Alert,
@@ -9,7 +8,6 @@ import {
     Button,
     Card,
     CardActionArea,
-    CardContent,
     Checkbox,
     Chip,
     Dialog,
@@ -22,8 +20,6 @@ import {
     InputAdornment,
     MenuItem,
     Paper,
-    Radio,
-    RadioGroup,
     Stack,
     Table,
     TableBody,
@@ -39,13 +35,12 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    ChevronLeft as ChevronLeftIcon,
-    ChevronRight as ChevronRightIcon,
     PersonAdd as PersonAddIcon,
     Delete as DeleteIcon,
     Close as CloseIcon,
     QrCodeScanner as ScanIcon,
     Search as SearchIcon,
+    ShoppingCart as ShoppingCartIcon,
     ShoppingCartCheckout as CheckoutIcon,
     ViewList as ListViewIcon,
     ViewModule as GridViewIcon,
@@ -121,7 +116,7 @@ export default function PosIndex({
     const scanBuffer = useRef('');
     const lastScanTime = useRef(0);
     const searchInputRef = useRef(null);
-    const categoryScrollRef = useRef(null);
+    const catalogLoadingRef = useRef(false);
     const silentPrintFallbackRef = useRef(false);
 
     const { data, setData, post, processing, errors } = useForm({
@@ -365,6 +360,25 @@ export default function PosIndex({
         }
     };
 
+    const searchRequestRef = useRef(0);
+
+    useEffect(() => {
+        const requestId = ++searchRequestRef.current;
+        const timer = window.setTimeout(() => {
+            if (!searchQuery.trim()) {
+                fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
+                return;
+            }
+            fetchSearch({ categoryId: selectedCategoryId });
+        }, 250);
+
+        return () => {
+            window.clearTimeout(timer);
+            // Mark pending responses stale when the query changes before they finish.
+            searchRequestRef.current = requestId + 1;
+        };
+    }, [searchQuery]);
+
     const fetchCategories = async () => {
         try {
             const response = await fetch(route('pos.categories'));
@@ -376,10 +390,13 @@ export default function PosIndex({
     };
 
     const fetchCatalog = async ({ categoryId, page, append }) => {
+        if (catalogLoadingRef.current) return;
+
+        catalogLoadingRef.current = true;
         setScanError('');
         setCatalogLoading(true);
         try {
-            const response = await fetch(route('pos.catalog', { category_id: categoryId || null, page, per_page: 60 }));
+            const response = await fetch(route('pos.catalog', { category_id: categoryId || null, page, per_page: 30 }));
             const payload = await response.json();
             const items = Array.isArray(payload?.data) ? payload.data : [];
             const meta = payload?.meta || {};
@@ -389,7 +406,22 @@ export default function PosIndex({
             setCatalogPage(Number(meta.current_page || page || 1));
             setSearchResults((prev) => (append ? [...prev, ...items] : items));
         } finally {
+            catalogLoadingRef.current = false;
             setCatalogLoading(false);
+        }
+    };
+
+    const handleCatalogScroll = (event) => {
+        const container = event.currentTarget;
+        const remaining = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+        if (
+            remaining <= 180
+            && !searchQuery.trim()
+            && catalogHasMore
+            && !catalogLoadingRef.current
+        ) {
+            fetchCatalog({ categoryId: selectedCategoryId, page: catalogPage + 1, append: true });
         }
     };
 
@@ -414,13 +446,6 @@ export default function PosIndex({
         if (resultsView !== 'grid' || searchQuery.trim()) return;
         fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
     }, [resultsView]);
-
-    const scrollCategories = (direction) => {
-        categoryScrollRef.current?.scrollBy({
-            left: direction * 240,
-            behavior: 'smooth',
-        });
-    };
 
     const handleBarcodeScan = async (barcode) => {
         setScanError('');
@@ -966,7 +991,16 @@ export default function PosIndex({
         <PosLayout header={__(pageTitle)}>
             <Head title={pageTitle} />
 
-            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
+            <Box
+                sx={{
+                    p: { xs: 1, md: 0.75 },
+                    height: { md: 'calc(100vh - 44px)' },
+                    minHeight: 0,
+                    overflow: { md: 'hidden' },
+                    display: { md: 'flex' },
+                    flexDirection: { md: 'column' },
+                }}
+            >
                 {displayError && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                         {displayError}
@@ -1005,11 +1039,20 @@ export default function PosIndex({
                     ))}
                 </Box>
 
-                <Box sx={{ display: { xs: mobileStep === 'checkout' ? 'none' : 'flex', md: 'flex' }, flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'flex-start' }}>
-                    <Paper sx={{ p: 2, flex: { xs: '1 1 auto', md: '0 1 42%' }, width: '100%', display: { xs: mobileStep === 'products' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: 'primary.main' }}>
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                            <ScanIcon color="primary" fontSize="small" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                <Box
+                    sx={{
+                        display: { xs: mobileStep === 'checkout' ? 'none' : 'flex', md: 'flex' },
+                        flexDirection: { xs: 'column', md: 'row' },
+                        gap: { xs: 2, md: 0.75 },
+                        alignItems: { xs: 'flex-start', md: 'stretch' },
+                        flex: { md: 1 },
+                        minHeight: 0,
+                    }}
+                >
+                    <Paper sx={{ p: { xs: 1.5, md: 0.75 }, flex: { xs: '1 1 auto', md: '1 1 48%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'products' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: { xs: 1, md: 0.35 } }}>
+                            <ScanIcon color="primary" sx={{ fontSize: { md: 18 } }} />
+                            <Typography variant="subtitle2" sx={{ fontSize: { md: 12 }, fontWeight: 800 }}>
                                 {__('Product Search / Barcode Scan')}
                             </Typography>
                             <Box sx={{ flex: 1 }} />
@@ -1020,6 +1063,7 @@ export default function PosIndex({
                                 onChange={(e, next) => {
                                     if (next) setResultsView(next);
                                 }}
+                                sx={{ '& .MuiToggleButton-root': { width: 28, height: 26, p: 0.35 } }}
                             >
                                 <ToggleButton value="table">
                                     <ListViewIcon fontSize="small" />
@@ -1028,165 +1072,94 @@ export default function PosIndex({
                                     <GridViewIcon fontSize="small" />
                                 </ToggleButton>
                             </ToggleButtonGroup>
-                            <Chip size="small" label={`${__('Branch')}: ${branchName || branchId || '-'}`} variant="outlined" />
+                            <Chip size="small" label={`${__('Branch')}: ${branchName || branchId || '-'}`} variant="outlined" sx={{ height: 24, '& .MuiChip-label': { px: 0.75, fontSize: 10, fontWeight: 700 } }} />
                         </Stack>
 
                         {scanError && (
-                            <Alert severity="error" sx={{ mb: 1.5 }}>
+                            <Alert severity="error" sx={{ mb: 0.5, py: 0 }}>
                                 {scanError}
                             </Alert>
                         )}
 
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                {__('Price mode')}
-                            </Typography>
-                            <ToggleButtonGroup
-                                size="small"
-                                exclusive
-                                value={salePriceType}
-                                onChange={(event, next) => changeSalePriceType(next)}
-                            >
-                                <ToggleButton value="retail" sx={{ textTransform: 'none' }}>
-                                    {__('Retail')}
-                                </ToggleButton>
-                                <ToggleButton value="wholesale" sx={{ textTransform: 'none' }}>
-                                    {__('Wholesale')}
-                                </ToggleButton>
-                            </ToggleButtonGroup>
-                        </Stack>
-
-                        <ReportFilterToolbar
-                            ariaLabel={__('Product filters')}
-                            fieldKinds={['search']}
-                            sx={{ mb: 1.25 }}
-                            actions={(
-                                <Button variant="contained" size="small" type="button" onClick={() => fetchSearch()} disabled={searchLoading || catalogLoading}>
-                                    {__('Search')}
-                                </Button>
-                            )}
-                        >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                inputRef={searchInputRef}
-                                placeholder={__('Search by name, generic name, or barcode...')}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        fetchSearch({ autoAddFromBarcode: true, clearInputAfterSearch: true });
-                                    }
-                                }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                        </ReportFilterToolbar>
-
-                        <Stack
-                            direction="row"
-                            spacing={0.5}
+                        <Box
                             sx={{
-                                mt: 1.25,
-                                mb: 0.35,
-                                alignItems: 'center',
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 180px' },
+                                gap: 0.5,
+                                p: 0.45,
+                                mb: 0.4,
+                                bgcolor: 'action.hover',
+                                borderRadius: 1,
                             }}
                         >
-                            <IconButton
-                                size="small"
-                                aria-label={__('Scroll categories left')}
-                                onClick={() => scrollCategories(-1)}
-                                sx={{
-                                    width: 30,
-                                    height: 34,
-                                    flexShrink: 0,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'background.paper',
-                                }}
-                            >
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <Box
-                                ref={categoryScrollRef}
-                                sx={{
-                                    flex: 1,
-                                    minWidth: 0,
-                                    px: 0.5,
-                                    pt: 0.35,
-                                    pb: 0.9,
-                                    overflowX: 'auto',
-                                    overflowY: 'hidden',
-                                    scrollbarWidth: 'none',
-                                    msOverflowStyle: 'none',
-                                    '&::-webkit-scrollbar': { display: 'none' },
-                                }}
-                            >
-                                <RadioGroup
-                                    row
+                            <Box sx={{ minWidth: 0 }}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    inputRef={searchInputRef}
+                                    placeholder={__('Search name, SKU, or scan barcode')}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            fetchSearch({ autoAddFromBarcode: true, clearInputAfterSearch: true });
+                                        }
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon fontSize="small" />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                    sx={{ '& .MuiInputBase-root': { height: 32, bgcolor: 'background.paper', fontSize: 11.5 } }}
+                                />
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                                <TextField
+                                    select
+                                    fullWidth
+                                    size="small"
                                     value={String(selectedCategoryId)}
                                     onChange={(event) => setSelectedCategoryId(event.target.value)}
-                                    sx={{
-                                        flexWrap: 'nowrap',
-                                        gap: 0.85,
-                                        minWidth: 'max-content',
-                                        width: 'max-content',
-                                        '& .MuiFormControlLabel-root': {
-                                            mr: 0,
-                                            ml: 0,
-                                            px: 1,
-                                            pr: 1.25,
-                                            height: 34,
-                                            minWidth: 'fit-content',
-                                            flexShrink: 0,
-                                            border: '1px solid',
-                                            borderColor: 'divider',
-                                            bgcolor: 'background.paper',
-                                            borderRadius: 1,
-                                        },
-                                        '& .MuiFormControlLabel-root:has(.Mui-checked)': {
-                                            borderColor: 'primary.main',
-                                            bgcolor: 'rgba(10, 23, 91, 0.06)',
-                                        },
-                                        '& .MuiFormControlLabel-label': {
-                                            fontSize: 13,
-                                            fontWeight: 700,
-                                            whiteSpace: 'nowrap',
-                                        },
-                                        '& .MuiRadio-root': {
-                                            p: 0.25,
-                                            mr: 0.25,
-                                        },
-                                    }}
+                                    sx={{ '& .MuiInputBase-root': { height: 32, bgcolor: 'background.paper', fontSize: 11.5 } }}
                                 >
-                                    <FormControlLabel value="" control={<Radio size="small" />} label={__('All')} />
+                                    <MenuItem value="">{__('All categories')}</MenuItem>
                                     {catalogCategories.map((cat) => (
-                                        <FormControlLabel key={cat.id} value={String(cat.id)} control={<Radio size="small" />} label={cat.name} />
+                                        <MenuItem key={cat.id} value={String(cat.id)}>{cat.name}</MenuItem>
                                     ))}
-                                </RadioGroup>
+                                </TextField>
                             </Box>
-                            <IconButton
-                                size="small"
-                                aria-label={__('Scroll categories right')}
-                                onClick={() => scrollCategories(1)}
-                                sx={{
-                                    width: 30,
-                                    height: 34,
-                                    flexShrink: 0,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'background.paper',
-                                }}
-                            >
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
+                        </Box>
+
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            fullWidth
+                            value={salePriceType}
+                            onChange={(event, next) => changeSalePriceType(next)}
+                            sx={{
+                                mb: 0.4,
+                                p: 0.2,
+                                bgcolor: 'action.hover',
+                                '& .MuiToggleButton-root': {
+                                    height: 28,
+                                    border: 0,
+                                    borderRadius: '5px !important',
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    textTransform: 'none',
+                                },
+                                '& .Mui-selected': {
+                                    bgcolor: 'primary.main !important',
+                                    color: 'primary.contrastText !important',
+                                },
+                            }}
+                        >
+                            <ToggleButton value="retail">{__('Retail')}</ToggleButton>
+                            <ToggleButton value="wholesale">{__('Wholesale')}</ToggleButton>
+                        </ToggleButtonGroup>
 
                         {cart.length > 0 && (
                             <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 0.75 }}>
@@ -1274,14 +1247,14 @@ export default function PosIndex({
                             </Box>
                         )}
 
-                        <Divider sx={{ my: 2 }} />
+                        <Divider sx={{ my: { xs: 1, md: 0.5 } }} />
 
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                            {__('RESULTS')}
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: { md: 11 }, fontWeight: 700 }}>
+                            {searchResults.length} {searchResults.length === 1 ? __('product') : __('products')}
                         </Typography>
 
                         {resultsView === 'table' ? (
-                            <TableContainer sx={{ mt: 1 }}>
+                            <TableContainer onScroll={handleCatalogScroll} sx={{ mt: 0.75, flex: 1, minHeight: 0, overflow: 'auto', scrollbarGutter: 'stable' }}>
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
@@ -1350,11 +1323,19 @@ export default function PosIndex({
                             </TableContainer>
                         ) : (
                             <Box
+                                onScroll={handleCatalogScroll}
                                 sx={{
-                                    mt: 1,
+                                    mt: { xs: 0.75, md: 0.5 },
                                     display: 'grid',
-                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, 1fr)' },
-                                    gap: 1.5,
+                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' },
+                                    gap: { xs: 1, md: 0.5 },
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflowY: { md: 'auto' },
+                                    alignContent: 'start',
+                                    pr: { md: 0.5 },
+                                    pb: 0.5,
+                                    scrollbarGutter: 'stable',
                                 }}
                             >
                                 {searchResults.map((p) => {
@@ -1375,74 +1356,97 @@ export default function PosIndex({
                                                 overflow: 'hidden',
                                                 borderColor: outOfStock ? 'error.main' : undefined,
                                                 bgcolor: outOfStock ? 'error.lighter' : undefined,
+                                                minHeight: 116,
+                                                borderLeft: '3px solid',
+                                                borderLeftColor: outOfStock ? 'error.main' : 'success.light',
                                             }}
                                         >
-                                            <CardActionArea onClick={() => addProductToCart(p)} disabled={outOfStock}>
-                                                <Box
-                                                    sx={{
-                                                        height: 120,
-                                                        bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.100' : 'rgba(255, 255, 255, 0.06)',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        overflow: 'hidden',
-                                                    }}
-                                                >
-                                                    {imageUrl ? (
-                                                        <Box
-                                                            component="img"
-                                                            src={imageUrl}
-                                                            alt={getProductDisplayName(p)}
-                                                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                        />
-                                                    ) : (
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {__('No Image')}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                <CardContent sx={{ py: 1.25 }}>
-                                                    <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap title={getProductDisplayName(p)}>
-                                                        {getProductDisplayName(p)}
-                                                    </Typography>
-                                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {unitLabel ? `${__('Unit')}: ${unitLabel}` : __('Unit')}
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                            {currencySymbol}{discountedPrice.toFixed(2)}
-                                                        </Typography>
-                                                    </Stack>
-                                                    {discountPercentage > 0 && (
-                                                        <Typography variant="caption" color="success.main" sx={{ fontWeight: 700 }}>
-                                                            {discountPercentage}% {__('off')}
-                                                        </Typography>
-                                                    )}
-                                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {__('Stock')}
-                                                        </Typography>
-                                                        {outOfStock ? (
-                                                            <Chip
-                                                                size="small"
-                                                                color="error"
-                                                                label={__('Out of stock')}
-                                                                sx={{
-                                                                    height: 20,
-                                                                    '& .MuiChip-label': {
-                                                                        px: 0.75,
-                                                                        fontSize: '0.68rem',
-                                                                        fontWeight: 600,
-                                                                    },
-                                                                }}
-                                                            />
+                                            <CardActionArea
+                                                onClick={() => addProductToCart(p)}
+                                                disabled={outOfStock}
+                                                sx={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'stretch',
+                                                    height: '100%',
+                                                    p: 0.65,
+                                                    textAlign: 'left',
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr)', gap: 0.65, alignItems: 'center', minWidth: 0 }}>
+                                                    <Box
+                                                        sx={{
+                                                            width: 52,
+                                                            height: 52,
+                                                            aspectRatio: '1 / 1',
+                                                            bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.100' : 'rgba(255, 255, 255, 0.06)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            overflow: 'hidden',
+                                                            border: '1px solid',
+                                                            borderColor: 'divider',
+                                                            borderRadius: 1,
+                                                        }}
+                                                    >
+                                                        {imageUrl ? (
+                                                            <Box component="img" src={imageUrl} alt={getProductDisplayName(p)} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                         ) : (
-                                                            <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                                                                {p.stock_quantity}
+                                                            <Typography variant="caption" color="text.secondary" sx={{ px: 0.5, fontSize: 9.5, textAlign: 'center' }}>
+                                                                {__('No Image')}
                                                             </Typography>
                                                         )}
-                                                    </Stack>
-                                                </CardContent>
+                                                    </Box>
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography
+                                                            variant="body2"
+                                                            title={getProductDisplayName(p)}
+                                                            sx={{
+                                                                minHeight: '2.25em',
+                                                                fontSize: 12,
+                                                                fontWeight: 900,
+                                                                lineHeight: 1.18,
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical',
+                                                                overflow: 'hidden',
+                                                            }}
+                                                        >
+                                                            {getProductDisplayName(p)}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" title={p.generic_name || ''} sx={{ display: 'block', mt: 0.2, fontSize: 9.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {p.generic_name || unitLabel || __('Uncategorized')}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+
+                                                <Stack direction="row" alignItems="baseline" spacing={0.4} sx={{ mt: 0.5, minWidth: 0 }}>
+                                                    <Typography variant="subtitle2" sx={{ minWidth: 0, fontSize: 12.5, fontWeight: 900, color: 'primary.main', whiteSpace: 'nowrap' }}>
+                                                        {currencySymbol}{discountedPrice.toFixed(2)} / {unitLabel || __('Unit')}
+                                                    </Typography>
+                                                    {discountPercentage > 0 && (
+                                                        <Typography variant="caption" color="success.main" sx={{ flexShrink: 0, fontSize: 9.5, fontWeight: 800 }}>
+                                                            -{discountPercentage}%
+                                                        </Typography>
+                                                    )}
+                                                </Stack>
+
+                                                <Box
+                                                    sx={{
+                                                        alignSelf: 'flex-start',
+                                                        mt: 0.45,
+                                                        px: 0.65,
+                                                        py: 0.2,
+                                                        borderRadius: 4,
+                                                        bgcolor: outOfStock ? 'error.lighter' : 'success.lighter',
+                                                        color: outOfStock ? 'error.main' : 'success.dark',
+                                                        fontSize: 9.5,
+                                                        fontWeight: 800,
+                                                        lineHeight: 1.25,
+                                                    }}
+                                                >
+                                                    {outOfStock ? __('Out of stock') : `${__('Stock')} ${p.stock_quantity} ${unitLabel || ''}`}
+                                                </Box>
                                             </CardActionArea>
                                         </Card>
                                     );
@@ -1454,16 +1458,11 @@ export default function PosIndex({
                                         </Typography>
                                     </Paper>
                                 )}
-                                {searchResults.length > 0 && catalogHasMore && (
-                                    <Box sx={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center' }}>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            disabled={catalogLoading}
-                                            onClick={() => fetchCatalog({ categoryId: selectedCategoryId, page: catalogPage + 1, append: true })}
-                                        >
-                                            {__('Load more')}
-                                        </Button>
+                                {searchResults.length > 0 && catalogLoading && (
+                                    <Box sx={{ gridColumn: '1 / -1', py: 0.75, textAlign: 'center' }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                                            {__('Loading more products...')}
+                                        </Typography>
                                     </Box>
                                 )}
                             </Box>
@@ -1482,29 +1481,61 @@ export default function PosIndex({
                         </Box>
                     </Paper>
 
-                    <Paper sx={{ p: { xs: 1.25, md: 1.5 }, flex: { xs: '1 1 auto', md: '1 1 58%' }, width: '100%', display: { xs: mobileStep === 'cart' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, borderTop: '3px solid', borderTopColor: hasActiveSession ? 'success.main' : 'warning.main' }}>
-                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Paper sx={{ p: { xs: 1.25, md: 0 }, flex: { xs: '1 1 auto', md: '1 1 52%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'cart' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{
+                                p: { md: 1 },
+                                minHeight: { md: 52 },
+                                bgcolor: { md: 'primary.main' },
+                                color: { md: 'primary.contrastText' },
+                            }}
+                        >
                             <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                                    {__('Current Sale')}
+                                <Typography variant="h6" sx={{ fontSize: { md: 17 }, fontWeight: 800, lineHeight: 1.1 }}>
+                                    {__('Cart')}
                                 </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                <Typography variant="caption" sx={{ display: 'block', fontSize: { md: 10.5 }, color: { md: 'inherit' }, opacity: 0.82 }}>
                                     {cart.length} {cart.length === 1 ? __('item') : __('items')}
                                 </Typography>
                             </Box>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                color={hasActiveSession ? 'success' : 'warning'}
-                                onClick={() => setShiftDialogOpen(true)}
-                            >
-                                {hasActiveSession ? __('Shift Active') : __('Start Shift')}
-                            </Button>
+                            <Stack direction="row" spacing={0.5}>
+                                {cart.length > 0 && (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="inherit"
+                                        onClick={() => setCart([])}
+                                        sx={{ minHeight: { md: 30 }, px: { md: 1.25 }, fontSize: { md: 11.5 }, bgcolor: { md: 'background.paper' }, color: { md: 'error.main' }, borderColor: { md: 'rgba(255,255,255,0.55)' } }}
+                                    >
+                                        {__('Clear')}
+                                    </Button>
+                                )}
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="inherit"
+                                    onClick={() => setShiftDialogOpen(true)}
+                                    sx={{
+                                        minHeight: { md: 30 },
+                                        px: { md: 1.25 },
+                                        fontSize: { md: 11.5 },
+                                        color: { md: '#fff' },
+                                        borderColor: { md: 'rgba(255,255,255,0.5)' },
+                                        bgcolor: { md: 'rgba(255,255,255,0.08)' },
+                                        '&:hover': { bgcolor: { md: 'rgba(255,255,255,0.16)' }, borderColor: { md: '#fff' } },
+                                    }}
+                                >
+                                    {hasActiveSession ? __('Shift Active') : __('Start Shift')}
+                                </Button>
+                            </Stack>
                         </Stack>
 
-                        <Divider sx={{ my: 1.5 }} />
+                        <Divider sx={{ my: { xs: 1.5, md: 0 } }} />
 
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ display: { xs: 'block', md: 'none' }, fontWeight: 700, mb: 1 }}>
                             {__('Cart')}
                         </Typography>
 
@@ -1629,55 +1660,142 @@ export default function PosIndex({
                             </Stack>
                         </Box>
 
-                        <TableContainer sx={{ display: { xs: 'none', md: 'block' }, minHeight: 220, overflowX: 'hidden' }}>
+                        {cart.length === 0 ? (
+                            <Box
+                                sx={{
+                                    display: { xs: 'none', md: 'flex' },
+                                    flex: 1,
+                                    minHeight: 0,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    color: 'text.disabled',
+                                }}
+                            >
+                                <ShoppingCartIcon sx={{ fontSize: 42 }} />
+                                <Typography variant="body1" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                                    {__('Cart is empty')}
+                                </Typography>
+                            </Box>
+                        ) : (
+                        <TableContainer
+                            sx={{
+                                display: { xs: 'none', md: 'block' },
+                                flex: 1,
+                                minHeight: 0,
+                                overflowX: 'hidden',
+                                overflowY: 'auto',
+                                scrollbarGutter: 'stable',
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                            }}
+                        >
                             <Table
                                 size="small"
                                 stickyHeader
                                 sx={{
                                     tableLayout: 'fixed',
+                                    width: '100%',
+                                    maxWidth: '100%',
                                     minWidth: 0,
                                     '& .MuiTableCell-root': {
-                                        px: 0.75,
-                                        py: 0.7,
+                                        px: 0.35,
+                                        py: 0,
+                                        height: 34,
                                         verticalAlign: 'middle',
+                                        borderRight: '1px solid',
+                                        borderBottom: '1px solid',
+                                        borderColor: 'divider',
+                                        boxSizing: 'border-box',
+                                        overflow: 'hidden',
+                                        '&:last-of-type': {
+                                            minWidth: '0 !important',
+                                            maxWidth: 'none !important',
+                                            pr: '0 !important',
+                                            pl: '0 !important',
+                                            borderRight: 0,
+                                            textAlign: 'center',
+                                        },
+                                        '&:last-of-type .MuiIconButton-root': {
+                                            width: '24px !important',
+                                            height: '24px !important',
+                                            minWidth: '24px !important',
+                                            minHeight: '24px !important',
+                                            m: '0 !important',
+                                            p: '2px !important',
+                                        },
                                     },
                                     '& .MuiTableCell-head': {
-                                        py: 0.65,
-                                        fontSize: 12,
-                                        letterSpacing: '0.04em',
+                                        height: 26,
+                                        py: 0,
+                                        bgcolor: 'action.hover',
+                                        fontSize: 9.5,
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                        letterSpacing: '0.035em',
+                                        textTransform: 'uppercase',
                                     },
                                     '& .MuiInputBase-root': {
-                                        height: 34,
-                                        fontSize: 13,
+                                        height: 25,
+                                        width: '100%',
+                                        minWidth: 0,
+                                        borderRadius: 0,
+                                        bgcolor: 'transparent',
+                                        fontSize: 10.5,
                                     },
                                     '& .MuiInputBase-input': {
-                                        px: 0.75,
-                                        py: 0.5,
+                                        px: 0.35,
+                                        py: 0.25,
+                                        fontWeight: 700,
                                     },
                                     '& .MuiSelect-select': {
-                                        py: '6px',
-                                        pr: '24px !important',
+                                        py: '3px',
+                                        pr: '19px !important',
+                                        minWidth: '0 !important',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    },
+                                    '& .MuiFormControl-root, & .MuiStack-root': {
+                                        minWidth: 0,
+                                    },
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'transparent',
+                                    },
+                                    '& .MuiInputBase-root:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'divider',
+                                    },
+                                    '& .MuiInputBase-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderWidth: 1,
+                                        borderColor: 'primary.main',
+                                    },
+                                    '& .MuiInputBase-root.Mui-error .MuiOutlinedInput-notchedOutline': {
+                                        borderWidth: 1,
+                                        borderColor: 'error.main',
+                                    },
+                                    '& input[type=number]': {
+                                        MozAppearance: 'textfield',
+                                    },
+                                    '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
+                                        WebkitAppearance: 'none',
+                                        m: 0,
                                     },
                                     '& .MuiFormHelperText-root': {
-                                        m: 0,
-                                        mt: 0.25,
-                                        fontSize: 10,
-                                        lineHeight: 1.1,
+                                        display: 'none',
                                     },
                                 }}
                             >
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
-                                        <TableCell sx={{ fontWeight: 700, width: '23%' }}>{__('Item')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, width: '13%' }}>{__('Unit')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, width: '12%' }}>{__('Price')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '28%' }}>{__('Item')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '19%' }}>{__('Unit / Price')}</TableCell>
                                         <TableCell sx={{ fontWeight: 700, width: '10%' }} align="right">
                                             {__('Qty')}
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 700, width: '22%' }}>
                                             {__('FOC')}
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, width: '14%' }} align="right">
+                                        <TableCell sx={{ fontWeight: 700, width: '15%' }} align="right">
                                             {__('Total')}
                                         </TableCell>
                                         <TableCell sx={{ width: '6%' }} />
@@ -1685,9 +1803,7 @@ export default function PosIndex({
                                 </TableHead>
                                 <TableBody>
                                     {cart.map((line) => {
-                                        const qty = Number(line.quantity || 0);
                                         const unitPrice = Number(line.unit_price || 0);
-                                        const lineDiscount = resolveLineDiscount(line);
                                         const lineTotal = resolveDiscountedLineTotal(line);
                                         const maxQty = Math.floor((Number(line.stock_quantity || 0) || 0) / (Number(line.conversion_factor || 1) || 1));
                                         const requestedBase = resolveRequestedBaseQuantity(line);
@@ -1696,43 +1812,51 @@ export default function PosIndex({
 
                                         return (
                                             <TableRow key={line.id} hover>
-                                                <TableCell>
-                                                    <Typography variant="body2" title={line.name} sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                                                <TableCell sx={{ py: '2px !important' }}>
+                                                    <Typography
+                                                        variant="body2"
+                                                        title={line.name}
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            fontSize: 11,
+                                                            lineHeight: 1.15,
+                                                            whiteSpace: 'nowrap',
+                                                            textOverflow: 'ellipsis',
+                                                            overflow: 'hidden',
+                                                        }}
+                                                    >
                                                         {line.name}
                                                     </Typography>
-                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }} noWrap>
-                                                        {line.barcode || '-'}
-                                                    </Typography>
-                                                    {Number(line.discount_percentage || 0) > 0 && (
-                                                        <Typography variant="caption" color="success.main" sx={{ display: 'block', fontWeight: 700, lineHeight: 1.1 }} noWrap>
-                                                            {Number(line.discount_percentage || 0)}% {__('off')} ({currencySymbol}{lineDiscount.toFixed(2)})
+                                                    <Stack direction="row" spacing={0.35} alignItems="center" sx={{ mt: 0.15, minWidth: 0 }}>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0, fontSize: 9, lineHeight: 1 }} noWrap>
+                                                            {line.barcode || '-'}
                                                         </Typography>
-                                                    )}
+                                                        {Number(line.discount_percentage || 0) > 0 && (
+                                                            <Typography variant="caption" color="success.main" sx={{ flexShrink: 0, fontSize: 9, fontWeight: 800, lineHeight: 1 }} noWrap>
+                                                                -{Number(line.discount_percentage || 0)}%
+                                                            </Typography>
+                                                        )}
+                                                    </Stack>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <TextField
-                                                        select
-                                                        size="small"
-                                                        value={line.unit_id}
-                                                        onChange={(e) => updateCartLine(line.id, { unit_id: e.target.value })}
-                                                        sx={{ width: '100%', minWidth: 0 }}
-                                                    >
-                                                        {(line.units || []).map((u) => (
-                                                            <MenuItem key={u.unit_id} value={u.unit_id}>
-                                                                {u.short_name || u.name}
-                                                            </MenuItem>
-                                                        ))}
-                                                    </TextField>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {salePriceType === 'wholesale' && (
-                                                        <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 800, lineHeight: 1 }}>
-                                                            {__('Wholesale')}
+                                                    <Stack direction="row" alignItems="center" spacing={0.25}>
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            value={line.unit_id}
+                                                            onChange={(e) => updateCartLine(line.id, { unit_id: e.target.value })}
+                                                            sx={{ flex: 1, minWidth: 0 }}
+                                                        >
+                                                            {(line.units || []).map((u) => (
+                                                                <MenuItem key={u.unit_id} value={u.unit_id}>
+                                                                    {u.short_name || u.name}
+                                                                </MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, pr: 0.15, fontSize: 9.5, fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                                            {currencySymbol}{unitPrice.toFixed(2)}
                                                         </Typography>
-                                                    )}
-                                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }} noWrap>
-                                                        {currencySymbol}{unitPrice.toFixed(2)}
-                                                    </Typography>
+                                                    </Stack>
                                                 </TableCell>
                                                 <TableCell align="right">
                                                     <TextField
@@ -1747,14 +1871,14 @@ export default function PosIndex({
                                                     />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                                                    <Stack direction="row" spacing={0.25} alignItems="center">
                                                         <TextField
                                                             size="small"
                                                             type="number"
                                                             value={line.foc_quantity || 0}
                                                             onChange={(e) => updateCartLine(line.id, { foc_quantity: e.target.value })}
                                                             inputProps={{ min: 0, step: '0.01' }}
-                                                            sx={{ width: 62 }}
+                                                            sx={{ width: 42 }}
                                                             error={exceedsStock}
                                                         />
                                                         <TextField
@@ -1762,7 +1886,7 @@ export default function PosIndex({
                                                             size="small"
                                                             value={line.foc_unit_id || line.unit_id}
                                                             onChange={(e) => updateCartLine(line.id, { foc_unit_id: e.target.value })}
-                                                            sx={{ width: 82, minWidth: 0 }}
+                                                            sx={{ flex: 1, minWidth: 0 }}
                                                             error={exceedsStock}
                                                         >
                                                             {(line.units || []).map((u) => (
@@ -1772,18 +1896,13 @@ export default function PosIndex({
                                                             ))}
                                                         </TextField>
                                                     </Stack>
-                                                    {exceedsStock && (
-                                                        <Typography variant="caption" color="error" sx={{ display: 'block', lineHeight: 1.1 }}>
-                                                            {__('Stock exceeded')}
-                                                        </Typography>
-                                                    )}
                                                 </TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                                <TableCell align="right" sx={{ px: 0.35, fontSize: 11.5, fontWeight: 900, whiteSpace: 'nowrap', color: 'primary.main' }}>
                                                     {currencySymbol}{lineTotal.toFixed(2)}
                                                 </TableCell>
-                                                <TableCell align="right">
-                                                    <IconButton size="small" color="error" onClick={() => removeCartLine(line.id)} sx={{ p: 0.25 }}>
-                                                        <DeleteIcon fontSize="small" />
+                                                <TableCell align="center">
+                                                    <IconButton size="small" color="error" aria-label={`${__('Remove item')} ${line.name}`} onClick={() => removeCartLine(line.id)}>
+                                                        <DeleteIcon sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </TableCell>
                                             </TableRow>
@@ -1791,7 +1910,7 @@ export default function PosIndex({
                                     })}
                                     {cart.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
+                                            <TableCell colSpan={6} align="center" sx={{ py: 2 }}>
                                                 <Typography variant="body2" color="text.secondary italic">
                                                     {__('Cart is empty.')}
                                                 </Typography>
@@ -1801,51 +1920,52 @@ export default function PosIndex({
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        )}
 
-                        <Divider sx={{ my: 2 }} />
+                        <Divider sx={{ my: { xs: 2, md: 0 } }} />
 
-                        <Box sx={{ p: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
-                        <Stack spacing={1}>
+                        <Box sx={{ p: { xs: 1.5, md: 0.75 }, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderInline: { md: 0 } }}>
+                        <Stack spacing={0.3}>
                             <Stack direction="row" justifyContent="space-between">
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { md: 11 } }}>
                                     {__('Subtotal')}
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                <Typography variant="body2" sx={{ fontSize: { md: 11 }, fontWeight: 700 }}>
                                     {currencySymbol}{totals.totalAmount.toFixed(2)}
                                 </Typography>
                             </Stack>
                             <Stack direction="row" justifyContent="space-between">
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { md: 11 } }}>
                                     {__('Tax')}
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                <Typography variant="body2" sx={{ fontSize: { md: 11 }, fontWeight: 700 }}>
                                     {currencySymbol}{totals.tax.toFixed(2)}
                                 </Typography>
                             </Stack>
                             {totals.productDiscount > 0 && (
                                 <Stack direction="row" justifyContent="space-between">
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { md: 11 } }}>
                                         {__('Product Discount')}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main' }}>
+                                    <Typography variant="body2" sx={{ fontSize: { md: 11 }, fontWeight: 700, color: 'success.main' }}>
                                         -{currencySymbol}{totals.productDiscount.toFixed(2)}
                                     </Typography>
                                 </Stack>
                             )}
                             <Stack direction="row" justifyContent="space-between" alignItems="baseline">
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                <Typography variant="subtitle2" sx={{ fontSize: { md: 12 }, fontWeight: 800 }}>
                                     {__('Grand Total')}
                                 </Typography>
-                                <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main', lineHeight: 1 }}>
+                                <Typography variant="h6" sx={{ fontSize: { md: 17 }, fontWeight: 800, color: 'primary.main', lineHeight: 1 }}>
                                     {currencySymbol}{totals.grandTotal.toFixed(2)}
                                 </Typography>
                             </Stack>
                         </Stack>
                         </Box>
 
-                        <Divider sx={{ my: 2 }} />
+                        <Divider sx={{ my: { xs: 2, md: 0 } }} />
 
-                        <Stack spacing={1.5}>
+                        <Stack spacing={0.5} sx={{ p: { xs: 0, md: 0.75 } }}>
                             {!hasActiveSession && (
                                 <Alert severity="warning">
                                     {__('Start your shift before completing sales.')}
@@ -1883,10 +2003,10 @@ export default function PosIndex({
                                 disabled={processing || (hasActiveSession && (cart.length === 0 || hasStockIssue))}
                                 fullWidth
                                 onClick={hasActiveSession ? openPaymentDialog : () => setShiftDialogOpen(true)}
-                                sx={{ display: { xs: 'none', md: 'flex' }, minHeight: 46, fontWeight: 800, letterSpacing: '0.02em' }}
+                                sx={{ display: { xs: 'none', md: 'flex' }, minHeight: 36, py: 0.5, fontSize: 12.5, fontWeight: 800, letterSpacing: '0.02em' }}
                             >
                                 {hasActiveSession
-                                    ? `${__('Pay')} ${currencySymbol}${totals.grandTotal.toFixed(2)}`
+                                    ? __('Checkout')
                                     : __('Start Shift')}
                             </Button>
                         </Stack>
@@ -2177,7 +2297,13 @@ export default function PosIndex({
                                         {__('Change Given')}: {currencySymbol}{Number(activeSession?.change_given_total || 0).toFixed(2)}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        {__('Net Cash Sales')}: {currencySymbol}{Number(activeSession?.net_cash_sales || 0).toFixed(2)}
+                                        {__('Supplier Refunds Received')}: {currencySymbol}{Number(activeSession?.cash_return_received || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Customer Refunds Paid')}: {currencySymbol}{Number(activeSession?.cash_return_paid || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {__('Net Cash Movement')}: {currencySymbol}{Number(activeSession?.net_cash_sales || 0).toFixed(2)}
                                     </Typography>
                                 </Stack>
                                 <Divider />

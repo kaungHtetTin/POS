@@ -17,6 +17,23 @@ class ProductController extends Controller
     {
         $query = Product::with(['category', 'tax', 'taxes', 'product_units.unit']);
 
+        $stockByProduct = Product::query()
+            ->leftJoin('inventories', 'inventories.product_id', '=', 'products.id')
+            ->select('products.id', 'products.min_stock_level')
+            ->selectRaw('COALESCE(SUM(inventories.quantity), 0) as stock_quantity')
+            ->groupBy('products.id', 'products.min_stock_level')
+            ->get();
+
+        $productSummary = [
+            'total_products' => $stockByProduct->count(),
+            'total_stock_units' => (int) $stockByProduct->sum('stock_quantity'),
+            'low_stock' => $stockByProduct->filter(function ($product) {
+                $quantity = (int) $product->stock_quantity;
+                return $quantity > 0 && $quantity <= (int) $product->min_stock_level;
+            })->count(),
+            'out_of_stock' => $stockByProduct->where('stock_quantity', '<=', 0)->count(),
+        ];
+
         // Search by name, generic name, brand name, or barcode
         if ($request->search) {
             $query->where(function($q) use ($request) {
@@ -46,6 +63,7 @@ class ProductController extends Controller
             'units' => Unit::all(),
             'filters' => $request->only(['search', 'category', 'status']),
             'default_tax_id' => $defaultTaxId,
+            'summary' => $productSummary,
         ]);
     }
 

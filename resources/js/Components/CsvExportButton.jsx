@@ -120,6 +120,7 @@ export default function CsvExportButton({
             onClick={handleExport}
             disabled={exporting}
             sx={sx}
+            title={label}
         >
             {exporting ? 'Exporting…' : label}
         </Button>

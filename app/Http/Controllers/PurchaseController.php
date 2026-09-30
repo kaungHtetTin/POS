@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
-use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\Product;
@@ -12,20 +11,32 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use App\Support\Spa;
 
 class PurchaseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Purchase::with([
-            'supplier:id,name,credit_limit,balance', 
+        $accessibleBranchIds = $this->accessibleBranchIds($request->user());
+        $purchaseRelations = [
+            'supplier:id,name,credit_limit',
             'branch:id,name',
             'items' => function($q) {
                 $q->with(['product:id,name', 'unit:id,name,short_name']);
             }
-        ])
-            ->withCount(['items', 'payments']);
+        ];
+
+        $query = Purchase::with($purchaseRelations)
+            ->withCount(['items', 'payments'])
+            ->whereIn('branch_id', $accessibleBranchIds);
+
+        $editPurchase = $request->filled('edit')
+            ? Purchase::with($purchaseRelations)
+                ->withCount(['items', 'payments'])
+                ->whereIn('branch_id', $accessibleBranchIds)
+                ->find($request->input('edit'))
+            : null;
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -39,11 +50,18 @@ class PurchaseController extends Controller
         return Spa::render('Purchases/Index', [
             'pricing_rules' => \App\Models\PricingRule::all(),
             'purchases' => $query->latest()->paginate(15)->withQueryString(),
-            'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
-            'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level')
+            'suppliers' => Supplier::select('id', 'name', 'credit_limit')
+                ->withSum([
+                    'purchases as balance' => fn ($query) => $query->whereIn('branch_id', $accessibleBranchIds),
+                ], 'due_amount')
+                ->orderBy('name')
+                ->get(),
+            'products' => Product::select('id', 'category_id', 'name', 'generic_name', 'barcode', 'image_path', 'min_stock_level', 'pricing_buying_cost')
                 ->with([
                     'category:id,name',
-                    'inventories:id,product_id,branch_id,quantity',
+                'inventories' => fn ($query) => $query
+                    ->select('id', 'product_id', 'branch_id', 'quantity')
+                    ->whereIn('branch_id', $accessibleBranchIds),
                     'product_units' => function ($unitQuery) {
                         $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit')
                             ->with(['unit:id,name,short_name']);
@@ -52,35 +70,27 @@ class PurchaseController extends Controller
                 ->where('status', 'Active')
                 ->orderBy('name')
                 ->get(),
-            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
+            'branches' => Branch::select('id', 'name')
+                ->whereIn('id', $accessibleBranchIds)
+                ->orderBy('name')
+                ->get(),
             'filters' => $request->only(['search']),
+            'open_purchase_modal' => $request->boolean('create'),
+            'edit_purchase' => $editPurchase,
         ]);
     }
 
     public function create()
     {
-        return Spa::render('Purchases/Create', [
-            'pricing_rules' => \App\Models\PricingRule::all(),
-            'suppliers' => Supplier::select('id', 'name', 'credit_limit', 'balance')->orderBy('name')->get(),
-            'products' => Product::select('id', 'name')
-                ->with([
-                    'product_units' => function ($unitQuery) {
-                        $unitQuery->select('id', 'product_id', 'unit_id', 'conversion_factor', 'selling_price', 'wholesale_price', 'selling_price_mode', 'wholesale_price_mode', 'is_base_unit')
-                            ->with(['unit:id,name,short_name']);
-                    },
-                ])
-                ->where('status', 'Active')
-                ->orderBy('name')
-                ->get(),
-            'categories' => Category::select('id', 'name')->orderBy('name')->get(),
-            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
-        ]);
+        return redirect()->route('purchases.index', ['create' => 1]);
     }
 
-    public function show(Purchase $purchase)
+    public function show(Request $request, Purchase $purchase)
     {
+        $this->authorizeBranch($request->user(), $purchase->branch_id);
+
         $purchase->load([
-            'supplier:id,name,phone,email,address,credit_limit,balance',
+            'supplier:id,name,phone,email,address,credit_limit',
             'branch:id,name,address,phone,email',
             'payments:id,purchase_id,payment_date,amount,payment_method,reference_number,notes,user_id',
             'payments.user:id,name',
@@ -109,6 +119,7 @@ class PurchaseController extends Controller
                 'payment_status' => $purchase->payment_status,
                 'total_amount' => (float) $purchase->total_amount,
                 'paid_amount' => (float) $purchase->paid_amount,
+                'return_credit_amount' => (float) $purchase->return_credit_amount,
                 'due_amount' => (float) $purchase->due_amount,
                 'created_at' => optional($purchase->created_at)->toISOString(),
                 'updated_at' => optional($purchase->updated_at)->toISOString(),
@@ -181,6 +192,8 @@ class PurchaseController extends Controller
             'items.*.selling_price' => 'required|numeric|min:0|max:999999999999.99',
             'items.*.wholesale_price' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
+
+        $this->authorizeBranch($request->user(), $validated['branch_id']);
 
         $items = collect($validated['items']);
         $productIds = $items->pluck('product_id')->unique()->values();
@@ -257,11 +270,10 @@ class PurchaseController extends Controller
 
         $dueAmount = $totalAmount - $paidAmount;
         $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
-        $supplier = Supplier::findOrFail($validated['supplier_id']);
-
-        DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
+        DB::transaction(function () use ($validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate) {
             $pricing = app(\App\Services\AutomaticPricingService::class);
             $pricing->lock();
+            $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
             $affectedProductIds = collect($preparedItems)->pluck('product_id');
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
@@ -294,6 +306,7 @@ class PurchaseController extends Controller
                     ->where('product_id', $item['product_id'])
                     ->where('batch_number', $item['batch_number'])
                     ->whereDate('expiry_date', $item['expiry_date'])
+                    ->lockForUpdate()
                     ->first();
 
                 if ($batch) {
@@ -337,9 +350,7 @@ class PurchaseController extends Controller
                     ['quantity' => 0]
                 );
 
-                $inventory->update([
-                    'quantity' => $inventory->quantity + $item['base_quantity'],
-                ]);
+                $inventory->increment('quantity', $item['base_quantity']);
 
                 $pricing->purchasePrices($item, auth()->id());
             }
@@ -355,9 +366,11 @@ class PurchaseController extends Controller
 
     public function update(Request $request, Purchase $purchase)
     {
-        if ($purchase->payments()->exists()) {
+        $this->authorizeBranch($request->user(), $purchase->branch_id);
+
+        if ($purchase->payments()->exists() || \App\Models\ReturnEntry::where('type', 'Supplier')->where('reference_id', $purchase->id)->exists()) {
             return redirect()->back()->withErrors([
-                'purchase_id' => 'Purchase cannot be edited after supplier payments have been recorded.',
+                'purchase_id' => 'Purchase cannot be edited after supplier payments or returns have been recorded.',
             ]);
         }
 
@@ -380,6 +393,8 @@ class PurchaseController extends Controller
             'items.*.selling_price' => 'required|numeric|min:0|max:999999999999.99',
             'items.*.wholesale_price' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
+
+        $this->authorizeBranch($request->user(), $validated['branch_id']);
 
         $items = collect($validated['items']);
         $productIds = $items->pluck('product_id')->unique()->values();
@@ -448,26 +463,24 @@ class PurchaseController extends Controller
 
         $dueAmount = $totalAmount - $paidAmount;
         $dueDate = $this->paymentDueDate($validated['purchase_date'], $validated['due_date'] ?? null);
-        $supplier = Supplier::findOrFail($validated['supplier_id']);
-
-        DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate, $supplier) {
+        DB::transaction(function () use ($purchase, $validated, $preparedItems, $totalAmount, $paidAmount, $dueAmount, $dueDate) {
             $pricing = app(\App\Services\AutomaticPricingService::class);
             $pricing->lock();
+            Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+            if ($purchase->payments()->exists() || \App\Models\ReturnEntry::where('type', 'Supplier')->where('reference_id', $purchase->id)->exists()) {
+                throw ValidationException::withMessages(['purchase_id' => 'This purchase has payments or returns and can no longer be edited.']);
+            }
+            $purchase->refresh();
+            $lockedSuppliers = Supplier::whereIn('id', collect([$purchase->supplier_id, $validated['supplier_id']])->unique())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
             // 1. Reverse old inventory and supplier balance
-            $oldSupplier = $purchase->supplier;
+            $oldSupplier = $lockedSuppliers->get($purchase->supplier_id);
             $oldSupplier->update(['balance' => (float) $oldSupplier->balance - (float) $purchase->due_amount]);
 
-            foreach ($purchase->items as $oldItem) {
-                Inventory::where('branch_id', $purchase->branch_id)
-                    ->where('product_id', $oldItem->product_id)
-                    ->decrement('quantity', $oldItem->base_quantity);
-
-                InventoryBatch::where('branch_id', $purchase->branch_id)
-                    ->where('product_id', $oldItem->product_id)
-                    ->where('batch_number', $oldItem->batch_number)
-                    ->whereDate('expiry_date', $oldItem->expiry_date)
-                    ->decrement('quantity', $oldItem->base_quantity);
-            }
+            $this->reversePurchaseInventory($purchase);
 
             $affectedProductIds = $purchase->items->pluck('product_id')->merge(collect($preparedItems)->pluck('product_id'));
 
@@ -541,6 +554,7 @@ class PurchaseController extends Controller
             }
 
             // 4. Update new supplier balance
+            $supplier = $lockedSuppliers->get($validated['supplier_id']);
             $supplier->refresh();
             $supplier->update(['balance' => (float) $supplier->balance + $dueAmount]);
             $pricing->refreshProducts($affectedProductIds, 'purchase_update', auth()->id());
@@ -551,14 +565,21 @@ class PurchaseController extends Controller
 
     public function destroy(Purchase $purchase)
     {
-        if ($purchase->payments()->exists()) {
-            return redirect()->back()->with('error', 'Purchase cannot be deleted after supplier payments have been recorded.');
+        $this->authorizeBranch(request()->user(), $purchase->branch_id);
+
+        if ($purchase->payments()->exists() || \App\Models\ReturnEntry::where('type', 'Supplier')->where('reference_id', $purchase->id)->exists()) {
+            return redirect()->back()->with('error', 'Purchase cannot be deleted after supplier payments or returns have been recorded.');
         }
 
         DB::transaction(function () use ($purchase) {
             $pricing = app(\App\Services\AutomaticPricingService::class);
             $pricing->lock();
-            $supplier = $purchase->supplier;
+            Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+            if ($purchase->payments()->exists() || \App\Models\ReturnEntry::where('type', 'Supplier')->where('reference_id', $purchase->id)->exists()) {
+                throw ValidationException::withMessages(['purchase_id' => 'This purchase has payments or returns and can no longer be deleted.']);
+            }
+            $purchase->refresh();
+            $supplier = Supplier::whereKey($purchase->supplier_id)->lockForUpdate()->firstOrFail();
             $dueAmount = (float) $purchase->due_amount;
 
             if ($dueAmount > 0) {
@@ -567,29 +588,7 @@ class PurchaseController extends Controller
                 ]);
             }
 
-            foreach ($purchase->items as $item) {
-                $inventory = Inventory::where('branch_id', $purchase->branch_id)
-                    ->where('product_id', $item->product_id)
-                    ->first();
-
-                if ($inventory) {
-                    $inventory->update([
-                        'quantity' => max(0, $inventory->quantity - $item->base_quantity),
-                    ]);
-                }
-
-                $batch = InventoryBatch::where('branch_id', $purchase->branch_id)
-                    ->where('product_id', $item->product_id)
-                    ->where('batch_number', $item->batch_number)
-                    ->whereDate('expiry_date', $item->expiry_date)
-                    ->first();
-
-                if ($batch) {
-                    $batch->update([
-                        'quantity' => max(0, $batch->quantity - $item->base_quantity),
-                    ]);
-                }
-            }
+            $this->reversePurchaseInventory($purchase);
 
             $affectedProductIds = $purchase->items->pluck('product_id');
             $purchase->items()->delete();
@@ -635,5 +634,77 @@ class PurchaseController extends Controller
         }
 
         return Carbon::parse($purchaseDate)->addDays(7)->toDateString();
+    }
+
+    protected function accessibleBranchIds($user)
+    {
+        if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+            return Branch::pluck('id');
+        }
+
+        $branchIds = collect([$user->branch_id, $user->active_branch_id])->filter();
+
+        try {
+            $branchIds = $branchIds->merge($user->branches()->pluck('branches.id'));
+        } catch (\Throwable $e) {
+            // Keep direct branch assignments when the optional relation is unavailable.
+        }
+
+        return $branchIds->unique()->values();
+    }
+
+    protected function authorizeBranch($user, string $branchId): void
+    {
+        if (!$this->accessibleBranchIds($user)->contains($branchId)) {
+            abort(403);
+        }
+    }
+
+    protected function reversePurchaseInventory(Purchase $purchase): void
+    {
+        $purchase->loadMissing('items');
+
+        foreach ($purchase->items->groupBy('product_id') as $productId => $items) {
+            $requiredQuantity = (int) $items->sum('base_quantity');
+            $inventory = Inventory::where('branch_id', $purchase->branch_id)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$inventory || (int) $inventory->quantity < $requiredQuantity) {
+                throw ValidationException::withMessages([
+                    'purchase_id' => 'This purchase cannot be changed because some received stock has already been consumed.',
+                ]);
+            }
+
+            $inventory->decrement('quantity', $requiredQuantity);
+        }
+
+        $batchGroups = $purchase->items->groupBy(function ($item) {
+            return implode('|', [
+                $item->product_id,
+                $item->batch_number,
+                optional($item->expiry_date)->format('Y-m-d'),
+            ]);
+        });
+
+        foreach ($batchGroups as $items) {
+            $firstItem = $items->first();
+            $requiredQuantity = (int) $items->sum('base_quantity');
+            $batch = InventoryBatch::where('branch_id', $purchase->branch_id)
+                ->where('product_id', $firstItem->product_id)
+                ->where('batch_number', $firstItem->batch_number)
+                ->whereDate('expiry_date', $firstItem->expiry_date)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$batch || (int) $batch->quantity < $requiredQuantity) {
+                throw ValidationException::withMessages([
+                    'purchase_id' => 'This purchase cannot be changed because some received stock has already been consumed.',
+                ]);
+            }
+
+            $batch->decrement('quantity', $requiredQuantity);
+        }
     }
 }

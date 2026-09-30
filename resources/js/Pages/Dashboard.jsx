@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import StatCardGrid from '@/Components/StatCardGrid';
 import { Head } from '@/spa';
 import { 
     Grid, 
     Paper, 
     Typography, 
     Box, 
-    Card, 
-    CardContent, 
     Button,
     Table,
     TableBody,
@@ -35,7 +34,6 @@ import {
     AttachMoney as MoneyIcon,
     ErrorOutline as LowStockIcon,
     NotificationImportant as ExpiryAlertIcon,
-    ArrowForward as ViewIcon,
     AssignmentReturn as ReturnIcon
 } from '@mui/icons-material';
 import { router, Link } from '@/spa';
@@ -82,7 +80,7 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                 {/* Branch Filter */}
                 {branches && branches.length > 1 && (
                     <Paper sx={{ p: 1.5, mb: 2 }}>
-                        <ReportFilterToolbar
+                        <ReportFilterToolbar appBar
                             ariaLabel="Dashboard filters"
                             fieldKinds={['wide']}
                             onSubmit={() => handleBranchFilter(branchId)}
@@ -97,50 +95,22 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                     </Paper>
                 )}
 
-                {/* Statistics Cards */}
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                    {statCards.map((stat, index) => (
-                        <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card sx={{ height: '100%', borderLeft: '3px solid', borderLeftColor: 'primary.main' }}>
-                                <CardContent sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}>
-                                    <Box sx={{ 
-                                        p: 1,
-                                        borderRadius: 0.75,
-                                        bgcolor: 'action.hover',
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        mr: 1.5,
-                                        display: 'flex',
-                                    }}>
-                                        {stat.icon}
-                                    </Box>
-                                    <Box sx={{ flexGrow: 1 }}>
-                                        <Typography color="text.secondary" variant="caption" sx={{ fontWeight: 500 }}>
-                                            {stat.title}
-                                        </Typography>
-                                        <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-                                            {stat.value}
-                                        </Typography>
-                                    </Box>
-                                    {stat.link !== '#' && (
-                                        <IconButton component={Link} href={stat.link} size="small">
-                                            <ViewIcon fontSize="inherit" />
-                                        </IconButton>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    ))}
-                </Grid>
+                <StatCardGrid items={statCards.map((stat) => ({
+                    label: stat.title,
+                    value: stat.value,
+                    icon: stat.icon,
+                    component: Link,
+                    href: stat.link,
+                }))} />
 
-                <Grid container spacing={2}>
+                <Grid container spacing={1.25}>
                     {/* Low Stock Alerts */}
                     <Grid item xs={12} md={6}>
-                        <Paper sx={{ p: 2, height: '100%', borderTop: '3px solid', borderColor: 'warning.main' }}>
+                        <Paper sx={{ p: 1.5, height: '100%' }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <LowStockIcon color="warning" fontSize="small" />
-                                    LOW STOCK ALERTS
+                                    Low stock alerts
                                 </Typography>
                                 <Stack direction="row" spacing={1} alignItems="center"><Chip label={`${lowStockAlerts.length} Items`} size="small" color="warning" variant="outlined" /><CsvExportButton source={lowStockAlerts} filename="low-stock-alerts.csv" /></Stack>
                             </Stack>
@@ -190,11 +160,11 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
 
                     {/* Expiry Alerts */}
                     <Grid item xs={12} md={6}>
-                        <Paper sx={{ p: 2, height: '100%', borderTop: '3px solid', borderColor: 'error.main' }}>
+                        <Paper sx={{ p: 1.5, height: '100%' }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <ExpiryAlertIcon color="error" fontSize="small" />
-                                    NEAR EXPIRY ALERTS
+                                    Near expiry alerts
                                 </Typography>
                                 <Stack direction="row" spacing={1} alignItems="center"><Chip label={`${expiryAlerts.length} Batches`} size="small" color="error" variant="outlined" /><CsvExportButton source={expiryAlerts} filename="expiry-alerts.csv" /></Stack>
                             </Stack>
@@ -246,12 +216,23 @@ export default function Dashboard({ auth, stats, lowStockAlerts, expiryAlerts, b
                 </Grid>
 
                 {/* Quick Actions */}
-                <Paper sx={{ mt: 2, p: 2 }}>
+                <Paper sx={{ mt: 1.5, p: 1.5 }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        QUICK ACTIONS
+                        Quick actions
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                        {auth.user?.permissions?.includes('process_sale') && (
+                            <Button
+                                variant="contained"
+                                startIcon={<POSIcon />}
+                                component={Link}
+                                href={route('pos.index')}
+                                size="small"
+                            >
+                                Open POS
+                            </Button>
+                        )}
                         <Button 
                             variant="outlined" 
                             startIcon={<StockIcon />} 

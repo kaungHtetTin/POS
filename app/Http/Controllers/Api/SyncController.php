@@ -27,7 +27,7 @@ class SyncController extends Controller
 
     public function purchases(Request $request, PurchaseSyncService $purchaseSyncService)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

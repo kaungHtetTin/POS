@@ -1,6 +1,7 @@
 import React from 'react';
 import { automaticPrice } from '@/Utils/automaticPricing';
 import MainLayout from '@/Layouts/MainLayout';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import { Head, useForm, router, usePage } from '@/spa';
 import { compressImage } from '@/Utils/compressImage';
 import {
@@ -24,7 +25,6 @@ import {
     ToggleButton,
 } from '@mui/material';
 import {
-    ArrowBack as BackIcon,
     Save as SaveIcon,
     PhotoCamera as PhotoCameraIcon,
     QrCode as BarcodeIcon,
@@ -121,17 +121,47 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
     };
 
     const pricingCost = medicine.pricing_has_purchase ? medicine.pricing_buying_cost : data.pricing_base_cost;
-    const priceField = (unit, index, field, label) => {
-        const automatic = unit[field + '_mode'] === 'automatic';
-        const calculated = automaticPrice(pricingCost, pricingRules[field] || {}, String(unit.conversion_factor));
-        return <Stack spacing={.75}>
-            <TextField select fullWidth size="small" label={`${label} mode`} value={unit[field + '_mode']} onChange={(event) => handleUnitChange(index, field + '_mode', event.target.value)}>
-                <MenuItem value="manual">Manual</MenuItem><MenuItem value="automatic" disabled={pricingRules[field]?.pricing_mode !== 'automatic'}>Automatic</MenuItem>
-            </TextField>
-            <TextField fullWidth size="small" label={label} type="number" value={automatic ? (calculated ?? unit[field]) : unit[field]} disabled={automatic} onChange={(event) => handleUnitChange(index, field, event.target.value)} inputProps={{ min: 0, step: '0.01' }} error={!!errors[`product_units.${index}.${field}`] || !!errors[`product_units.${index}.${field}_mode`]} helperText={errors[`product_units.${index}.${field}`] || errors[`product_units.${index}.${field}_mode`] || (automatic ? (calculated ? 'Calculated on save' : 'Cost required; saved price retained') : '')} />
-        </Stack>;
+    const unitGridColumns = 'minmax(132px, 1fr) 64px 52px 96px 82px 102px 82px 58px 76px 50px';
+    const unitCellSx = {
+        minWidth: 0,
+        px: 0.25,
+        py: 0.15,
+        position: 'relative',
+        borderRight: '1px solid',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        display: 'flex',
+        alignItems: 'center',
+        transition: 'background-color 120ms ease, box-shadow 120ms ease',
+        '&:focus-within': {
+            zIndex: 1,
+            bgcolor: 'background.paper',
+            boxShadow: (theme) => `inset 0 0 0 2px ${theme.palette.primary.main}`,
+        },
+        '&:has(.Mui-error)': {
+            zIndex: 1,
+            boxShadow: (theme) => `inset 0 0 0 1px ${theme.palette.error.main}`,
+        },
+        '&:has(.Mui-error):focus-within': {
+            boxShadow: (theme) => `inset 0 0 0 2px ${theme.palette.error.main}`,
+        },
+        '&:last-of-type': { borderRight: 0 },
     };
-
+    const unitInputSx = {
+        width: '100%',
+        minWidth: 0,
+        '& .MuiInputBase-root': { height: 26, minHeight: '26px !important', borderRadius: 0, fontSize: 10.5 },
+        '& .MuiInputBase-input': { px: 0.4, py: 0.15, fontWeight: 700 },
+        '& .MuiSelect-select': { py: '3px', pr: '18px !important' },
+        '& .MuiSelect-icon': { right: 1, fontSize: 17 },
+        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
+        '& .MuiInputBase-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+        '& .MuiInputBase-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
+        '& .MuiInputBase-root.Mui-error .MuiOutlinedInput-notchedOutline': { borderWidth: 1, borderColor: 'error.main' },
+        '& .MuiFormHelperText-root': { display: 'none' },
+        '& input[type=number]': { MozAppearance: 'textfield' },
+        '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', m: 0 },
+    };
     const generateBarcode = () => {
         const timestamp = Date.now().toString().slice(-6);
         const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
@@ -150,21 +180,23 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
     return (
         <MainLayout auth={auth} header={isCreating ? 'Add New Medicine' : 'Edit Medicine'}>
             <Head title={isCreating ? 'Add New Medicine' : `Edit ${medicine.name}`} />
+            <AppBarBack href={route('products.index')} label="Back to Medicines" />
 
-            <Box sx={{ maxWidth: 1180, mx: 'auto', p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                    <IconButton onClick={() => router.visit(route('products.index'))}>
-                        <BackIcon />
-                    </IconButton>
-                    <Typography variant="h5" fontWeight={600}>{isCreating ? 'Add New Medicine' : 'Edit Medicine'}</Typography>
-                </Stack>
-
-                <Paper sx={{ p: 3 }}>
+            <Box sx={{ maxWidth: 1440, mx: 'auto' }}>
+                <Paper
+                    sx={{
+                        p: { xs: 1.5, md: 1.25 },
+                        '& .MuiInputBase-root:not(.MuiInputBase-multiline)': { minHeight: 36, fontSize: 12.5 },
+                        '& .MuiInputLabel-root': { fontSize: 12 },
+                        '& .MuiFormHelperText-root': { mt: 0.25, mx: 0.25, fontSize: 10, lineHeight: 1.15 },
+                        '& .MuiButton-root': { minHeight: 32, fontSize: 11.5 },
+                    }}
+                >
                     <form onSubmit={submit}>
-                        {errors.pricing && <Alert severity="error" sx={{ mb: 2 }}>{errors.pricing}</Alert>}
-                        <Stack spacing={3}>
+                        {errors.pricing && <Alert severity="error" sx={{ mb: 1, py: 0 }}>{errors.pricing}</Alert>}
+                        <Stack spacing={1.5}>
                             <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontSize: 12, fontWeight: 'bold', color: 'primary.main', mb: 0.75 }}>
                                     MEDICINE IDENTITY
                                 </Typography>
                                 <Box
@@ -172,20 +204,20 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                         display: 'grid',
                                         gridTemplateColumns: {
                                             xs: '1fr',
-                                            md: '220px repeat(4, minmax(0, 1fr))',
+                                            md: '160px repeat(4, minmax(0, 1fr))',
                                         },
-                                        gap: 2,
+                                        gap: 1,
                                         alignItems: 'start',
                                     }}
                                 >
                                     <Stack
                                         alignItems="center"
-                                        spacing={1.5}
+                                        spacing={0.75}
                                         sx={{
                                             gridColumn: { xs: '1', md: '1 / 2' },
                                             gridRow: { md: '1 / span 3' },
                                             height: '100%',
-                                            p: 2,
+                                            p: 1,
                                             border: '1px solid',
                                             borderColor: 'divider',
                                             borderRadius: 1,
@@ -195,9 +227,9 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                         <Avatar
                                             src={data.image ? URL.createObjectURL(data.image) : (medicine.image_path ? storageUrl(medicine.image_path) : null)}
                                             variant="rounded"
-                                            sx={{ width: 128, height: 128, border: '1px solid', borderColor: 'divider' }}
+                                            sx={{ width: 92, height: 92, border: '1px solid', borderColor: 'divider' }}
                                         >
-                                            <ProductIcon sx={{ fontSize: 60 }} />
+                                            <ProductIcon sx={{ fontSize: 42 }} />
                                         </Avatar>
                                         <Button variant="outlined" component="label" size="small" fullWidth startIcon={<PhotoCameraIcon />}>
                                             {isCreating ? 'Upload Photo' : 'Change Photo'}
@@ -279,7 +311,7 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                             </Box>
 
                             <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontSize: 12, fontWeight: 'bold', color: 'primary.main', mb: 0.75 }}>
                                     TAX, STOCK & STATUS
                                 </Typography>
                                 <Box
@@ -291,7 +323,7 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                             md: 'repeat(4, minmax(0, 1fr))',
                                             lg: 'repeat(5, minmax(0, 1fr))',
                                         },
-                                        gap: 2,
+                                        gap: 1,
                                     }}
                                 >
                                     <FormControl fullWidth size="small" error={!!errors.tax_ids}>
@@ -357,74 +389,202 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                             </Box>
 
                             <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontSize: 12, fontWeight: 'bold', color: 'primary.main', mb: 0.75 }}>
                                     NOTES
                                 </Typography>
-                                <TextField fullWidth multiline rows={3} label="Description" value={data.description} onChange={e => setData('description', e.target.value)} />
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    minRows={2}
+                                    maxRows={8}
+                                    label="Description"
+                                    value={data.description}
+                                    onChange={(event) => setData('description', event.target.value)}
+                                />
                             </Box>
 
                             <Box>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+                                    <Typography variant="subtitle2" sx={{ fontSize: 12, fontWeight: 'bold', color: 'primary.main' }}>
                                         UNITS & PRICING
                                     </Typography>
                                     <Button size="small" startIcon={<AddUnitIcon />} onClick={handleAddUnit}>Add Unit</Button>
                                 </Stack>
 
-                                <Stack spacing={1} sx={{ mb: 2 }}>
+                                <Stack spacing={0.5} sx={{ mb: 1 }}>
                                     <TextField size="small" type="number" label="Starting buying cost per base unit" value={data.pricing_base_cost} onChange={(event) => setData('pricing_base_cost', event.target.value)} error={!!errors.pricing_base_cost} helperText={errors.pricing_base_cost || 'Used for automatic pricing until the first purchase. Leave blank if unknown.'} inputProps={{ min: 0, step: '0.000001' }} sx={{ maxWidth: 400 }} />
                                     <Typography variant="caption" color="text.secondary">Current pricing cost: {pricingCost || 'Not available'} per base unit. Purchase costs exclude free quantities. Automatic prices follow Settings ? Automatic Pricing.</Typography>
                                 </Stack>
-                                <Paper variant="outlined" sx={{ p: 1, overflowX: 'auto' }}>
-                                    <Stack spacing={0.75}>
-                                        {data.product_units.map((unit, index) => (
-                                            <Box
-                                                key={index}
-                                                sx={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: {
-                                                        xs: '1fr',
-                                                        sm: '130px 80px 76px 175px 175px 92px 128px 64px',
-                                                    },
-                                                    gap: 0.75,
-                                                    alignItems: 'center',
-                                                    minWidth: { sm: 1000 },
-                                                    py: 0.25,
-                                                }}
-                                            >
-                                                <TextField fullWidth size="small" label="Unit name" value={unit.unit_name} onChange={e => handleUnitChange(index, 'unit_name', e.target.value)} error={!!errors[`product_units.${index}.unit_name`]} helperText={errors[`product_units.${index}.unit_name`]} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
-                                                <TextField fullWidth size="small" label="Short name" value={unit.unit_short_name} onChange={e => handleUnitChange(index, 'unit_short_name', e.target.value)} error={!!errors[`product_units.${index}.unit_short_name`]} helperText={errors[`product_units.${index}.unit_short_name`]} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
-                                                <TextField fullWidth size="small" label="Factor" type="number" value={index === 0 ? 1 : unit.conversion_factor} disabled={index === 0} onChange={e => handleUnitChange(index, 'conversion_factor', e.target.value)} sx={{ '& .MuiInputBase-root': { height: 34 } }} />
-                                                {priceField(unit, index, 'selling_price', 'Selling price')}
-                                                {priceField(unit, index, 'wholesale_price', 'Wholesale')}
-                                                <Button variant={index === 0 ? 'contained' : 'text'} size="small" disabled={index !== 0} sx={{ height: 34, px: 0.75, fontSize: 11, whiteSpace: 'nowrap' }}>
-                                                    {index === 0 ? 'Base Unit' : 'Additional'}
-                                                </Button>
-                                                <ToggleButton
-                                                    value={index}
-                                                    selected={unit.is_default_selling_unit}
-                                                    size="small"
-                                                    onClick={() => handleSetDefaultSellingUnit(index)}
-                                                    aria-label={`Use row ${index + 1} as default selling unit`}
-                                                    sx={{ height: 34, px: 0.75, gap: 0.5, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}
+                                <Box
+                                    sx={{
+                                        overflowX: 'auto',
+                                        pb: 0.5,
+                                        scrollbarWidth: 'thin',
+                                        '&::-webkit-scrollbar': { height: 7 },
+                                        '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 4 },
+                                    }}
+                                >
+                                    <Paper variant="outlined" sx={{ p: 0, minWidth: 900, overflow: 'hidden' }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: unitGridColumns, bgcolor: 'action.hover' }}>
+                                            {['Unit name', 'Short', 'Factor', 'Selling mode', 'Selling price', 'Wholesale mode', 'Wholesale', 'Type', 'Default', ''].map((label) => (
+                                                <Box
+                                                    key={label || 'actions'}
+                                                    sx={{
+                                                        ...unitCellSx,
+                                                        minHeight: 27,
+                                                        py: 0,
+                                                        fontSize: 9,
+                                                        lineHeight: 1.05,
+                                                        fontWeight: 800,
+                                                        color: 'text.secondary',
+                                                        textTransform: 'uppercase',
+                                                        overflowWrap: 'anywhere',
+                                                    }}
                                                 >
-                                                    <Radio checked={unit.is_default_selling_unit} size="small" sx={{ p: 0 }} />
-                                                    Selling
-                                                </ToggleButton>
-                                                <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                                                    {!unit.is_base_unit && (
-                                                        <Button color="error" size="small" onClick={() => handleRemoveUnit(index)} sx={{ minWidth: 0, height: 34, px: 0.5, fontSize: 10 }}>Remove</Button>
-                                                    )}
+                                                    {label}
                                                 </Box>
-                                            </Box>
-                                        ))}
-                                    </Stack>
-                                </Paper>
+                                            ))}
+                                        </Box>
+                                        {data.product_units.map((unit, index) => {
+                                            const sellingAutomatic = unit.selling_price_mode === 'automatic';
+                                            const wholesaleAutomatic = unit.wholesale_price_mode === 'automatic';
+                                            const sellingCalculated = automaticPrice(pricingCost, pricingRules.selling_price || {}, String(unit.conversion_factor));
+                                            const wholesaleCalculated = automaticPrice(pricingCost, pricingRules.wholesale_price || {}, String(unit.conversion_factor));
+
+                                            return (
+                                                <Box
+                                                    key={index}
+                                                    sx={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: unitGridColumns,
+                                                        '&:last-of-type > *': { borderBottom: 0 },
+                                                        '&:last-of-type > *:first-of-type': {
+                                                            borderBottomLeftRadius: 1,
+                                                            overflow: 'hidden',
+                                                        },
+                                                        '&:last-of-type > *:last-of-type': {
+                                                            borderBottomRightRadius: 1,
+                                                            overflow: 'hidden',
+                                                        },
+                                                    }}
+                                                >
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            size="small"
+                                                            placeholder="Unit name"
+                                                            value={unit.unit_name}
+                                                            onChange={(event) => handleUnitChange(index, 'unit_name', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.unit_name`]}
+                                                            sx={unitInputSx}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            size="small"
+                                                            placeholder="Short"
+                                                            value={unit.unit_short_name}
+                                                            onChange={(event) => handleUnitChange(index, 'unit_short_name', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.unit_short_name`]}
+                                                            sx={unitInputSx}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            value={index === 0 ? 1 : unit.conversion_factor}
+                                                            disabled={index === 0}
+                                                            onChange={(event) => handleUnitChange(index, 'conversion_factor', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.conversion_factor`]}
+                                                            inputProps={{ min: 1 }}
+                                                            sx={unitInputSx}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            value={unit.selling_price_mode}
+                                                            onChange={(event) => handleUnitChange(index, 'selling_price_mode', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.selling_price_mode`]}
+                                                            sx={unitInputSx}
+                                                        >
+                                                            <MenuItem value="manual">Manual</MenuItem>
+                                                            <MenuItem value="automatic" disabled={pricingRules.selling_price?.pricing_mode !== 'automatic'}>Automatic</MenuItem>
+                                                        </TextField>
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            value={sellingAutomatic ? (sellingCalculated ?? unit.selling_price) : unit.selling_price}
+                                                            disabled={sellingAutomatic}
+                                                            onChange={(event) => handleUnitChange(index, 'selling_price', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.selling_price`]}
+                                                            inputProps={{ min: 0, step: '0.01' }}
+                                                            sx={unitInputSx}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            value={unit.wholesale_price_mode}
+                                                            onChange={(event) => handleUnitChange(index, 'wholesale_price_mode', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.wholesale_price_mode`]}
+                                                            sx={unitInputSx}
+                                                        >
+                                                            <MenuItem value="manual">Manual</MenuItem>
+                                                            <MenuItem value="automatic" disabled={pricingRules.wholesale_price?.pricing_mode !== 'automatic'}>Automatic</MenuItem>
+                                                        </TextField>
+                                                    </Box>
+                                                    <Box sx={unitCellSx}>
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            value={wholesaleAutomatic ? (wholesaleCalculated ?? unit.wholesale_price) : unit.wholesale_price}
+                                                            disabled={wholesaleAutomatic}
+                                                            onChange={(event) => handleUnitChange(index, 'wholesale_price', event.target.value)}
+                                                            error={!!errors[`product_units.${index}.wholesale_price`]}
+                                                            inputProps={{ min: 0, step: '0.01' }}
+                                                            sx={unitInputSx}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={{ ...unitCellSx, justifyContent: 'center' }}>
+                                                        <Typography variant="caption" sx={{ fontSize: 9, lineHeight: 1, fontWeight: 800, color: index === 0 ? 'primary.main' : 'text.secondary' }}>
+                                                            {index === 0 ? 'Base' : 'Additional'}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ ...unitCellSx, justifyContent: 'center' }}>
+                                                        <ToggleButton
+                                                            value={index}
+                                                            selected={unit.is_default_selling_unit}
+                                                            size="small"
+                                                            onClick={() => handleSetDefaultSellingUnit(index)}
+                                                            aria-label={`Use row ${index + 1} as default selling unit`}
+                                                            sx={{ width: '100%', height: 25, minHeight: '25px !important', px: 0.15, gap: 0.15, border: 0, borderRadius: 0, fontSize: 8.5, fontWeight: 800 }}
+                                                        >
+                                                            <Radio checked={unit.is_default_selling_unit} size="small" sx={{ p: 0, '& .MuiSvgIcon-root': { fontSize: 15 } }} />
+                                                            Selling
+                                                        </ToggleButton>
+                                                    </Box>
+                                                    <Box sx={{ ...unitCellSx, justifyContent: 'center' }}>
+                                                        {!unit.is_base_unit && (
+                                                            <Button color="error" size="small" onClick={() => handleRemoveUnit(index)} sx={{ minWidth: 0, height: 25, minHeight: '25px !important', px: 0.15, fontSize: 8 }}>
+                                                                Remove
+                                                            </Button>
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        })}
+                                    </Paper>
+                                </Box>
                                 {errors.product_units && <Typography color="error" variant="caption">{errors.product_units}</Typography>}
                             </Box>
                         </Stack>
 
-                        <Stack direction="row" spacing={2} sx={{ mt: 4 }} justifyContent="flex-end">
+                        <Stack direction="row" spacing={1} sx={{ mt: 2 }} justifyContent="flex-end">
                             <Button variant="outlined" onClick={() => router.visit(route('products.index'))}>Cancel</Button>
                             <Button type="submit" variant="contained" startIcon={<SaveIcon />} disabled={processing}>
                                 {isCreating ? 'Create Medicine' : 'Save Changes'}

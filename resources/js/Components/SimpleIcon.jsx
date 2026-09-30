@@ -119,6 +119,11 @@ const icons = {
     menu: [
         ['path', { d: 'M4 7h16M4 12h16M4 17h16' }],
     ],
+    sidebar: [
+        ['rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }],
+        ['path', { d: 'M9 4v16' }],
+        ['path', { d: 'm15 9-3 3 3 3' }],
+    ],
     logout: [
         ['path', { d: 'M10 4H5v16h5' }],
         ['path', { d: 'M14 16l4-4-4-4' }],

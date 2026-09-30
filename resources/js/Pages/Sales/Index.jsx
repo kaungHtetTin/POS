@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router, usePage } from '@/spa';
+import { Head, router, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -11,12 +14,10 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    Divider,
     FormControl,
     IconButton,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -36,7 +37,6 @@ import {
     Receipt as SalesIcon,
     FilterAlt as FilterIcon,
     Print as PrintIcon,
-    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function SalesIndex({ auth, sales, summary = {}, branches, salesStaff = [], filters }) {
@@ -259,7 +259,7 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                         </Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Sale history filters"
                         fieldKinds={['search', 'wide', 'wide', 'select', 'date', 'date']}
                         onSubmit={() => applyFilters()}
@@ -344,8 +344,6 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
 
                     </ReportFilterToolbar>
 
-                    <Divider sx={{ mb: 2 }} />
-
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
                         <Chip size="small" variant="outlined" label={`Entries: ${summary?.sales_count ?? sales?.total ?? saleRows.length}`} />
                         <Chip size="small" variant="outlined" label={`Active Total: ${money(totalGrand)}`} color="primary" />
@@ -378,12 +376,12 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                                         Grand
                                     </TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Payment</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="right">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {saleRows.map((s) => (
-                                    <TableRow key={s.id} hover>
+                                    <ClickableTableRow key={s.id} href={route('sales.show', { sale: s.id })} label={`View sale ${s.invoice_number}`}>
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 800 }}>
                                                 {s.invoice_number}
@@ -437,19 +435,8 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                                                 {s.payment_method} / {s.payment_status}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell align="right">
-                                            <Stack direction="row" spacing={0} justifyContent="flex-end" sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}>
-                                                <Tooltip title="View sale details">
-                                                    <IconButton
-                                                        component={Link}
-                                                        href={route('sales.show', { sale: s.id })}
-                                                        size="small"
-                                                        color="info"
-                                                        aria-label={`View sale ${s.invoice_number}`}
-                                                    >
-                                                        <ViewIcon fontSize="inherit" />
-                                                    </IconButton>
-                                                </Tooltip>
+                                        <TableActionCell>
+                                            <TableRowActions label={s.invoice_number}>
                                                 <Tooltip title="Print invoice">
                                                     <IconButton
                                                         size="small"
@@ -472,9 +459,9 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                                                         </IconButton>
                                                     </Tooltip>
                                                 )}
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
 
                                 {saleRows.length === 0 && (
@@ -489,17 +476,7 @@ export default function SalesIndex({ auth, sales, summary = {}, branches, salesS
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(sales?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={sales.last_page}
-                                page={sales.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={sales} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
 

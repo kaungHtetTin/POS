@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import ClickableTableRow from '@/Components/ClickableTableRow';
 import MergedTablePanel from '@/Components/MergedTablePanel';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router } from '@/spa';
+import DataTableFooter from '@/Components/DataTableFooter';
+import { Head, router } from '@/spa';
 import {
     Box,
     Stack,
@@ -19,9 +21,6 @@ import {
     TableRow,
     Chip,
     Button,
-    IconButton,
-    Pagination,
-    Tooltip,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -31,7 +30,6 @@ import {
     Category as CategoryIcon,
     InfoOutlined as StatusIcon,
     Refresh as ResetIcon,
-    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function InventoryIndex({ auth, inventory, branches, categories, filters }) {
@@ -85,7 +83,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                         </Typography>
                     }
                     filters={
-                        <ReportFilterToolbar
+                        <ReportFilterToolbar appBar
                             ariaLabel="Inventory filters"
                             fieldKinds={['search', 'wide', 'wide', 'select', 'select']}
                             onSubmit={handleSearch}
@@ -202,12 +200,15 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Current Stock</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Stock Status</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Product Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Action</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {inventoryRows.map((item) => (
-                                    <TableRow key={item.id} hover>
+                                    <ClickableTableRow
+                                        key={item.id}
+                                        href={detailUrl(item.id)}
+                                        label={`View ${item.name} batch details`}
+                                    >
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.name}</Typography>
                                             <Typography variant="caption" color="text.secondary">{item.generic_name || '-'}</Typography>
@@ -241,18 +242,11 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                                 sx={{ height: 20, fontSize: '11px' }}
                                             />
                                         </TableCell>
-                                        <TableCell align="center">
-                                            <Tooltip title="View batch details">
-                                                <IconButton size="small" component={Link} href={detailUrl(item.id)}>
-                                                    <ViewIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell>
-                                    </TableRow>
+                                    </ClickableTableRow>
                                 ))}
                                 {inventoryRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No inventory records found for the selected filters.
                                             </Typography>
@@ -262,17 +256,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(inventory?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={inventory.last_page}
-                                page={inventory.current_page}
-                                onChange={(event, page) => applyFilters({ page })}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={inventory} onPageChange={(page) => applyFilters({ page })} />
                 </MergedTablePanel>
             </Box>
         </MainLayout>

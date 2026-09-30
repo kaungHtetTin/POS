@@ -43,7 +43,8 @@ function EmbeddedPosPage({ children, header = 'POS', shell }) {
 }
 
 function PosLayoutShell({ children, header = 'POS' }) {
-    const { auth, flash, translations = {}, locale, ziggy = {} } = usePage().props;
+    const { auth, flash, settings = {}, translations = {}, locale, ziggy = {} } = usePage().props;
+    const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
     const appBase = ziggy?.base || window.laravel_base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
     const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
@@ -136,6 +137,7 @@ function PosLayoutShell({ children, header = 'POS' }) {
         { text: 'POS', href: route('pos.index'), icon: 'card', active: isActiveRoute('pos.index', route('pos.index')) },
         { text: 'Dashboard', href: route('dashboard'), icon: 'grid', active: isActiveRoute('dashboard', route('dashboard')) },
         { text: 'Sales', href: route('sales.index'), icon: 'receipt', active: isActiveRoute('sales.*', route('sales.index')) },
+        { text: 'Returns', href: route('returns.index'), icon: 'rotate', active: isActiveRoute('returns.*', route('returns.index')) },
         ...(canManageInventory ? [
             { text: 'Inventory', href: route('inventory.index'), icon: 'box', active: isActiveRoute('inventory.index', route('inventory.index')) },
             { text: 'Purchases', href: route('purchases.index'), icon: 'receipt', active: isActiveRoute('purchases.*', route('purchases.index')) },
@@ -148,19 +150,20 @@ function PosLayoutShell({ children, header = 'POS' }) {
             <AppBar
                 position="fixed"
                 sx={{
-                    color: 'text.primary',
+                    color: '#FFFFFF',
+                    bgcolor: '#0C4A3A',
                     boxShadow: 'none',
                     borderBottom: '1px solid',
-                    borderColor: 'divider',
+                    borderColor: 'rgba(255,255,255,0.14)',
                     borderRadius: 0,
                 }}
             >
-                <Toolbar sx={{ minHeight: '54px !important', gap: 1, px: { xs: 1.5, sm: 2.5 } }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'primary.main', mr: 1 }}>
-                        Pharmacy POS
+                <Toolbar sx={{ minHeight: '48px !important', gap: 1, px: { xs: 1.25, sm: 1.75 } }}>
+                    <Typography variant="subtitle1" noWrap sx={{ fontWeight: 800, color: '#FFFFFF', mr: 1, maxWidth: 190 }}>
+                        {pharmacyName}
                     </Typography>
 
-                    <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
+                    <Stack direction="row" spacing={0.5} sx={{ flex: 1, minWidth: 0, overflowX: 'auto', display: { xs: 'none', sm: 'flex' }, scrollbarWidth: 'none' }}>
                         {navItems.map((item) => (
                             <Button
                                 key={item.text}
@@ -168,11 +171,14 @@ function PosLayoutShell({ children, header = 'POS' }) {
                                 href={item.href}
                                 size="small"
                                 startIcon={<SimpleIcon name={item.icon} size={16} />}
-                                variant={item.active ? 'contained' : 'text'}
+                                variant="text"
                                 sx={{
                                     textTransform: 'none',
                                     fontWeight: item.active ? 700 : 500,
                                     borderRadius: 1,
+                                    color: item.active ? '#0C4A3A' : 'rgba(255,255,255,0.78)',
+                                    bgcolor: item.active ? '#DDF5E9' : 'transparent',
+                                    '&:hover': { bgcolor: item.active ? '#DDF5E9' : 'rgba(255,255,255,0.10)', color: item.active ? '#0C4A3A' : '#FFFFFF' },
                                     '& .MuiButton-startIcon': {
                                         mr: 0.75,
                                         color: 'inherit',
@@ -198,6 +204,12 @@ function PosLayoutShell({ children, header = 'POS' }) {
                             }}
                             sx={{
                                 width: { xs: 120, sm: 150 },
+                                display: { xs: 'none', md: 'flex' },
+                                bgcolor: 'rgba(255,255,255,0.10)',
+                                borderRadius: 1,
+                                '& .MuiInputBase-root': { color: '#FFFFFF' },
+                                '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.72)' },
+                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.22)' },
                                 '& .MuiSelect-select': {
                                     py: 0.75,
                                     overflow: 'hidden',
@@ -214,12 +226,12 @@ function PosLayoutShell({ children, header = 'POS' }) {
                         </TextField>
                     )}
 
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', display: { xs: 'none', md: 'block' } }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'rgba(255,255,255,0.70)', display: { xs: 'none', lg: 'block' } }}>
                         {header}
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ThemeControl label={__('Theme')} />
+                        <ThemeControl label={__('Theme')} inverse />
 
                         <Tooltip title={__('Language')}>
                             <IconButton
@@ -228,8 +240,10 @@ function PosLayoutShell({ children, header = 'POS' }) {
                                 size="small"
                                 sx={{
                                     border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'background.paper',
+                                    borderColor: 'rgba(255,255,255,0.22)',
+                                    bgcolor: 'rgba(255,255,255,0.10)',
+                                    color: '#FFFFFF',
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' },
                                 }}
                             >
                                 <SimpleIcon name="globe" size={17} />
@@ -327,6 +341,10 @@ function PosLayoutShell({ children, header = 'POS' }) {
                                     <Typography variant="body2">{__('Sales')}</Typography>
                                 </MenuItem>
                             )}
+                            <MenuItem component={Link} href={route('returns.index')} onClick={handleCloseUserMenu}>
+                                <ListItemIcon><SimpleIcon name="rotate" size={17} /></ListItemIcon>
+                                <Typography variant="body2">{__('Returns')}</Typography>
+                            </MenuItem>
                             <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
                                 <ListItemIcon><SimpleIcon name="user" size={17} /></ListItemIcon>
                                 <Typography variant="body2">{__('Profile')}</Typography>
@@ -351,7 +369,7 @@ function PosLayoutShell({ children, header = 'POS' }) {
                 </Toolbar>
             </AppBar>
 
-            <Toolbar sx={{ minHeight: '54px !important' }} />
+            <Toolbar sx={{ minHeight: '48px !important' }} />
 
             <Box sx={{ flex: 1 }}>
                 {children}

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { AppBarActions, AppBarBack } from '@/Components/AppBarPortal';
 import { Head, Link, useForm, usePage } from '@/spa';
 import {
     Box,
@@ -25,8 +27,8 @@ import {
     Typography,
 } from '@mui/material';
 import {
-    ArrowBack as ArrowBackIcon,
     Close as CloseIcon,
+    Edit as EditIcon,
     Payment as PaymentIcon,
     Print as PrintIcon,
     ReceiptLong as PurchaseIcon,
@@ -130,26 +132,21 @@ export default function PurchaseShow({ auth, purchase }) {
     return (
         <MainLayout auth={auth} header="Purchase Invoice">
             <Head title={`Purchase ${purchase.invoice_number}`} />
+            <AppBarBack href={route('purchases.index')} label="Back to Purchases" />
 
             <Box sx={{ flexGrow: 1 }}>
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'stretch', sm: 'center' }}
-                    spacing={1.5}
-                    sx={{ mb: 2 }}
-                    className="print:hidden"
-                >
-                    <Button
-                        component={Link}
-                        href={route('purchases.index')}
-                        variant="outlined"
-                        size="small"
-                        startIcon={<ArrowBackIcon />}
-                    >
-                        Back
-                    </Button>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <AppBarActions>
+                        <Button
+                            component={Link}
+                            href={route('purchases.index', { edit: purchase.id })}
+                            variant="outlined"
+                            size="small"
+                            startIcon={<EditIcon />}
+                            disabled={(purchase.payments || []).length > 0}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Edit Purchase
+                        </Button>
                         <Button
                             variant="contained"
                             color="success"
@@ -157,7 +154,7 @@ export default function PurchaseShow({ auth, purchase }) {
                             startIcon={<PaymentIcon />}
                             onClick={openPaymentDialog}
                             disabled={Number(purchase.due_amount || 0) <= 0}
-                            sx={{ height: 40, whiteSpace: 'nowrap' }}
+                            sx={{ whiteSpace: 'nowrap' }}
                         >
                             Record Payment
                         </Button>
@@ -166,12 +163,11 @@ export default function PurchaseShow({ auth, purchase }) {
                             size="small"
                             startIcon={<PrintIcon />}
                             onClick={() => window.print()}
-                            sx={{ height: 40, whiteSpace: 'nowrap' }}
+                            sx={{ whiteSpace: 'nowrap' }}
                         >
                             Print
                         </Button>
-                    </Stack>
-                </Stack>
+                </AppBarActions>
 
                 <Paper sx={{ p: { xs: 2, md: 3 } }}>
                     <Stack
@@ -248,31 +244,15 @@ export default function PurchaseShow({ auth, purchase }) {
                         </Paper>
                     </Box>
 
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
-                            gap: 1.5,
-                            mt: 2,
-                        }}
-                    >
-                        <Paper variant="outlined" sx={{ p: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary">Paid Qty</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>{totals.paidQuantity}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary">FOC Qty</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>{totals.focQuantity}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary">Received Qty</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>{totals.receivedQuantity}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary">Base Qty</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>{totals.baseQuantity}</Typography>
-                        </Paper>
-                    </Box>
+                    <StatCardGrid
+                        items={[
+                            { label: 'Paid Qty', value: totals.paidQuantity },
+                            { label: 'FOC Qty', value: totals.focQuantity },
+                            { label: 'Received Qty', value: totals.receivedQuantity },
+                            { label: 'Base Qty', value: totals.baseQuantity },
+                        ]}
+                        sx={{ mt: 2, mb: 0 }}
+                    />
 
                     <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2.5 }}><CsvExportButton source={purchase.items || []} filename="purchase-items.csv" /></Stack>
                     <TableContainer sx={{ mt: 1 }}>
@@ -337,6 +317,10 @@ export default function PurchaseShow({ auth, purchase }) {
                             <Stack direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
                                 <Typography variant="body2" color="text.secondary">Paid Amount</Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700 }}>{money(purchase.paid_amount)}</Typography>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
+                                <Typography variant="body2" color="text.secondary">Return Credit</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>{money(purchase.return_credit_amount)}</Typography>
                             </Stack>
                             <Divider />
                             <Stack direction="row" justifyContent="space-between" sx={{ py: 1 }}>

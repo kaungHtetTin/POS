@@ -6,27 +6,27 @@
 
 @layer base {
     :root {
-        --color-primary: #087f74;
+        --color-primary: #0E684E;
         --color-primary-soft: color-mix(in srgb, var(--color-primary) 11%, transparent);
-        --color-bg: #eef4f4;
+        --color-bg: #F6F8F7;
         --color-surface: #ffffff;
-        --color-glass: rgb(255 255 255 / 78%);
-        --color-border: rgb(15 23 42 / 10%);
-        --color-text: #172033;
-        --color-muted: #69768a;
-        --color-soft: #f2f6f6;
-        --shadow: 0 12px 30px rgb(16 71 67 / 10%);
+        --color-glass: #FFFFFF;
+        --color-border: #DDE5E1;
+        --color-text: #132238;
+        --color-muted: #687486;
+        --color-soft: #F6F8F7;
+        --shadow: none;
     }
 
     :root[data-theme="dark"] {
-        --color-bg: #0b151d;
-        --color-surface: #101d28;
-        --color-glass: rgb(16 29 40 / 78%);
-        --color-border: rgb(229 238 242 / 12%);
-        --color-text: #e7edf2;
-        --color-muted: #9aa8b8;
-        --color-soft: rgb(229 238 242 / 6%);
-        --shadow: 0 14px 34px rgb(0 0 0 / 28%);
+        --color-bg: #101915;
+        --color-surface: #17221D;
+        --color-glass: #17221D;
+        --color-border: rgb(221 229 225 / 16%);
+        --color-text: #EDF4F0;
+        --color-muted: #A9B7B0;
+        --color-soft: rgb(221 229 225 / 7%);
+        --shadow: none;
     }
 
     html,
@@ -40,14 +40,37 @@
         color: var(--color-text);
     }
 
-    input:focus, 
-    textarea:focus, 
-    select:focus {
+    /*
+     * @tailwindcss/forms targets the native input rendered inside MUI fields.
+     * MUI draws the visible border on its fieldset, so the forms-plugin focus
+     * ring would create a second blue rectangle inside the green MUI border.
+     */
+    .MuiInputBase-input,
+    .MuiInputBase-input:focus,
+    .MuiInputBase-input:focus-visible {
+        --tw-ring-color: transparent !important;
+        --tw-ring-offset-width: 0px !important;
+        --tw-ring-width: 0px !important;
+        --tw-ring-offset-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-shadow: 0 0 #0000 !important;
+        appearance: none;
+        background-color: transparent;
+        border: 0 !important;
+        border-radius: 0;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    input:not(.MuiInputBase-input):focus,
+    textarea:not(.MuiInputBase-input):focus,
+    select:not(.MuiInputBase-input):focus {
         --tw-ring-color: transparent !important;
         --tw-ring-offset-width: 0px !important;
         --tw-ring-width: 0px !important;
         outline: none !important;
-        box-shadow: none !important;
+        border-color: var(--color-primary) !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent) !important;
     }
 }
 
@@ -56,8 +79,8 @@
         background: var(--color-glass);
         border: 1px solid var(--color-border);
         box-shadow: var(--shadow);
-        backdrop-filter: blur(14px) saturate(125%);
-        -webkit-backdrop-filter: blur(14px) saturate(125%);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 
     .eyebrow {
@@ -73,11 +96,11 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        min-height: 20px;
+        min-height: 24px;
         border-radius: 99px;
         padding: 2px 8px;
-        font-size: 10px;
-        font-weight: 800;
+        font-size: 11px;
+        font-weight: 700;
         line-height: 1;
         white-space: nowrap;
     }
@@ -117,7 +140,7 @@
     .table-wrap {
         overflow-x: auto;
         border: 1px solid var(--color-border);
-        border-radius: 8px;
+        border-radius: 6px;
         background: var(--color-surface);
     }
 
@@ -130,23 +153,25 @@
     .table-wrap th,
     .table-wrap td {
         border-bottom: 1px solid var(--color-border);
-        padding: 7px 10px;
+        height: 42px;
+        padding: 6px 9px;
         color: var(--color-text);
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.35;
         text-align: left;
         vertical-align: middle;
     }
 
     .table-wrap th {
-        padding-top: 8px;
-        padding-bottom: 8px;
+        height: 34px;
+        padding-top: 6px;
+        padding-bottom: 6px;
         background: var(--color-soft);
         color: var(--color-muted);
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: 0;
+        text-transform: none;
         white-space: nowrap;
     }
 
@@ -178,7 +203,7 @@
     .table-wrap th:last-child,
     .table-wrap td:last-child,
     .MuiTableCell-root:last-child {
-        min-width: 78px;
+        min-width: 80px;
         white-space: nowrap;
     }
 
@@ -202,6 +227,11 @@
         box-shadow: none !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+    }
+
+    .MuiTableCell-root[colspan] {
+        min-height: 96px;
+        color: var(--color-muted);
     }
 }
 

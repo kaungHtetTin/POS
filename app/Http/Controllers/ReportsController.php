@@ -148,12 +148,12 @@ class ReportsController extends Controller
                 $q->where('branch_id', $branchScope['branch_id']);
             })
             ->where('status', 'Approved')
-            ->whereBetween('created_at', [$fromDate, $toDate]);
+            ->whereBetween('approved_at', [$fromDate, $toDate]);
 
         $customerReturns = (clone $returnsBase)
             ->where('type', 'Customer')
-            ->selectRaw('COALESCE(SUM(refund_amount), 0) as refund_total')
-            ->value('refund_total');
+            ->selectRaw('COALESCE(SUM(refund_amount), 0) as refund_total, COALESCE(SUM(tax_amount), 0) as tax_total')
+            ->first();
 
         $customerReturnCogs = ReturnItem::query()
             ->join('returns', 'return_items.return_id', '=', 'returns.id')
@@ -163,7 +163,7 @@ class ReportsController extends Controller
             })
             ->where('returns.type', 'Customer')
             ->where('returns.status', 'Approved')
-            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->whereBetween('returns.approved_at', [$fromDate, $toDate])
             ->selectRaw('COALESCE(SUM(return_items.cost_total), 0) as return_cogs')
             ->value('return_cogs');
 
@@ -182,7 +182,7 @@ class ReportsController extends Controller
             ->value('total');
 
         $salesNetOfTax = (float) $salesSummary->grand_total - (float) $salesSummary->tax;
-        $salesNetOfTaxAndReturns = $salesNetOfTax - (float) $customerReturns;
+        $salesNetOfTaxAndReturns = $salesNetOfTax - (float) ($customerReturns?->refund_total ?? 0) + (float) ($customerReturns?->tax_total ?? 0);
         $netCogs = (float) $cogs - (float) $customerReturnCogs;
         $grossProfit = $salesNetOfTaxAndReturns - $netCogs;
         $netProfit = $grossProfit - (float) $expensesTotal;
@@ -205,15 +205,15 @@ class ReportsController extends Controller
             };
 
             $returnsPeriodExpr = match ($trendGroupBy) {
-                'yearly' => DB::raw("DATE_FORMAT(created_at, '%Y-01-01')"),
-                'monthly' => DB::raw("DATE_FORMAT(created_at, '%Y-%m-01')"),
-                default => DB::raw("DATE(created_at)"),
+                'yearly' => DB::raw("DATE_FORMAT(approved_at, '%Y-01-01')"),
+                'monthly' => DB::raw("DATE_FORMAT(approved_at, '%Y-%m-01')"),
+                default => DB::raw("DATE(approved_at)"),
             };
 
             $returnsPeriodSelect = match ($trendGroupBy) {
-                'yearly' => "DATE_FORMAT(created_at, '%Y-01-01') as period",
-                'monthly' => "DATE_FORMAT(created_at, '%Y-%m-01') as period",
-                default => "DATE(created_at) as period",
+                'yearly' => "DATE_FORMAT(approved_at, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(approved_at, '%Y-%m-01') as period",
+                default => "DATE(approved_at) as period",
             };
 
             $expensesPeriodExpr = match ($trendGroupBy) {
@@ -250,20 +250,21 @@ class ReportsController extends Controller
                 ->where('type', 'Customer')
                 ->selectRaw($returnsPeriodSelect)
                 ->selectRaw('COALESCE(SUM(refund_amount), 0) as customer_returns')
+                ->selectRaw('COALESCE(SUM(tax_amount), 0) as return_tax')
                 ->groupBy($returnsPeriodExpr)
                 ->orderBy($returnsPeriodExpr)
                 ->get();
 
             $returnCostPeriodExpr = match ($trendGroupBy) {
-                'yearly' => DB::raw("DATE_FORMAT(returns.created_at, '%Y-01-01')"),
-                'monthly' => DB::raw("DATE_FORMAT(returns.created_at, '%Y-%m-01')"),
-                default => DB::raw('DATE(returns.created_at)'),
+                'yearly' => DB::raw("DATE_FORMAT(returns.approved_at, '%Y-01-01')"),
+                'monthly' => DB::raw("DATE_FORMAT(returns.approved_at, '%Y-%m-01')"),
+                default => DB::raw('DATE(returns.approved_at)'),
             };
 
             $returnCostPeriodSelect = match ($trendGroupBy) {
-                'yearly' => "DATE_FORMAT(returns.created_at, '%Y-01-01') as period",
-                'monthly' => "DATE_FORMAT(returns.created_at, '%Y-%m-01') as period",
-                default => 'DATE(returns.created_at) as period',
+                'yearly' => "DATE_FORMAT(returns.approved_at, '%Y-01-01') as period",
+                'monthly' => "DATE_FORMAT(returns.approved_at, '%Y-%m-01') as period",
+                default => 'DATE(returns.approved_at) as period',
             };
 
             $customerReturnCogsTrend = ReturnItem::query()
@@ -274,7 +275,7 @@ class ReportsController extends Controller
                 })
                 ->where('returns.type', 'Customer')
                 ->where('returns.status', 'Approved')
-                ->whereBetween('returns.created_at', [$fromDate, $toDate])
+                ->whereBetween('returns.approved_at', [$fromDate, $toDate])
                 ->selectRaw($returnCostPeriodSelect)
                 ->selectRaw('COALESCE(SUM(return_items.cost_total), 0) as return_cogs')
                 ->groupBy($returnCostPeriodExpr)
@@ -323,7 +324,7 @@ class ReportsController extends Controller
                 $cogsAmount = (float) ($cogsRow->cogs ?? 0) - (float) ($returnCogsRow->return_cogs ?? 0);
                 $expensesAmount = (float) ($expensesRow->expenses_total ?? 0);
 
-                $grossProfitAmount = ($netSales - $customerReturnsAmount) - $cogsAmount;
+                $grossProfitAmount = ($netSales - $customerReturnsAmount + (float) ($returnsRow->return_tax ?? 0)) - $cogsAmount;
                 $netProfitAmount = $grossProfitAmount - $expensesAmount;
 
                 return [
@@ -398,11 +399,11 @@ class ReportsController extends Controller
             ->selectRaw("
                 COALESCE(SUM(
                     CASE
-                        WHEN sales.payment_status = 'Due' THEN sales.grand_total
-                        WHEN sales.payment_status = 'Partial' THEN sales.grand_total - CASE
+                        WHEN sales.payment_status = 'Due' THEN GREATEST(sales.grand_total - COALESCE(sales.return_credit_amount, 0), 0)
+                        WHEN sales.payment_status = 'Partial' THEN GREATEST(sales.grand_total - COALESCE(sales.return_credit_amount, 0) - CASE
                             WHEN COALESCE(sales.amount_received, 0) > sales.grand_total THEN sales.grand_total
                             ELSE COALESCE(sales.amount_received, 0)
-                        END
+                        END, 0)
                         ELSE 0
                     END
                 ), 0) as receivable_total
@@ -454,7 +455,7 @@ class ReportsController extends Controller
                 'cogs' => $netCogs,
                 'gross_cogs' => (float) $cogs,
                 'customer_return_cogs' => (float) $customerReturnCogs,
-                'customer_returns' => (float) $customerReturns,
+                'customer_returns' => (float) ($customerReturns?->refund_total ?? 0),
                 'supplier_returns' => (float) $supplierReturns,
                 'expenses_total' => (float) $expensesTotal,
                 'gross_profit' => (float) $grossProfit,
@@ -520,7 +521,7 @@ class ReportsController extends Controller
             ->select('users.*')
             ->with(['roles:id,name', 'branch:id,name', 'branches:id,name'])
             ->whereHas('roles', function ($query) {
-                $query->where('name', '!=', 'Root');
+                $query->whereNotIn('name', ['Owner', 'Root']);
             })
             ->where(function ($query) use ($accessibleBranchIds, $branchScope) {
                 $targetBranchIds = $branchScope['mode'] === 'all'
@@ -648,6 +649,7 @@ class ReportsController extends Controller
         }
 
         $productId = (string) $request->get('product_id', '');
+        $search = trim((string) $request->get('search', ''));
         if ($productId !== '') {
             $productExists = Product::where('id', $productId)->exists();
             if (!$productExists) {
@@ -660,11 +662,6 @@ class ReportsController extends Controller
             ->orderBy('name')
             ->get();
 
-        $products = Product::select('id', 'name', 'generic_name', 'barcode')
-            ->where('status', 'Active')
-            ->orderBy('name')
-            ->get();
-
         $batchQuery = InventoryBatch::query()
             ->whereIn('inventory_batches.branch_id', $accessibleBranchIds)
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
@@ -673,6 +670,15 @@ class ReportsController extends Controller
             ->where('inventory_batches.quantity', '>', 0)
             ->when($productId !== '', function ($q) use ($productId) {
                 $q->where('inventory_batches.product_id', $productId);
+            })
+            ->when($search !== '', function ($q) use ($search) {
+                $q->whereHas('product', function ($productQuery) use ($search) {
+                    $productQuery->where(function ($searchQuery) use ($search) {
+                        $searchQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('generic_name', 'like', "%{$search}%")
+                            ->orWhere('barcode', 'like', "%{$search}%");
+                    });
+                });
             })
             ->when($fromDate, function ($q) use ($fromDate) {
                 $q->whereDate('inventory_batches.expiry_date', '>=', $fromDate->toDateString());
@@ -711,12 +717,12 @@ class ReportsController extends Controller
 
         return Spa::render('Reports/Expiry', [
             'branches' => $branches,
-            'products' => $products,
             'batches' => $batches,
             'summary' => $expirySummary,
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
                 'product_id' => $productId,
+                'search' => $search,
                 'from_date' => $fromDate?->toDateString() ?? '',
                 'to_date' => $toDate?->toDateString() ?? '',
             ],
@@ -957,7 +963,7 @@ class ReportsController extends Controller
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
                 $q->where('returns.branch_id', $branchScope['branch_id']);
             })
-            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->whereBetween('returns.approved_at', [$fromDate, $toDate])
             ->groupBy('return_sales.customer_id')
             ->selectRaw('return_sales.customer_id')
             ->selectRaw('COALESCE(SUM(returns.refund_amount), 0) as return_amount');
@@ -1054,7 +1060,7 @@ class ReportsController extends Controller
             ->when($branchScope['mode'] !== 'all', function ($q) use ($branchScope) {
                 $q->where('returns.branch_id', $branchScope['branch_id']);
             })
-            ->whereBetween('returns.created_at', [$fromDate, $toDate])
+            ->whereBetween('returns.approved_at', [$fromDate, $toDate])
             ->selectRaw('COALESCE(SUM(returns.refund_amount), 0) as return_total')
             ->value('return_total');
 
@@ -1208,12 +1214,12 @@ class ReportsController extends Controller
                 'suppliers.email',
                 'suppliers.payment_terms',
                 'suppliers.credit_limit',
-                'suppliers.balance',
             ])
             ->selectRaw('COUNT(purchases.id) as purchase_count')
             ->selectRaw('COALESCE(SUM(purchases.total_amount), 0) as total_amount')
             ->selectRaw('COALESCE(SUM(purchases.paid_amount), 0) as paid_amount')
             ->selectRaw('COALESCE(SUM(purchases.due_amount), 0) as due_amount')
+            ->selectRaw('COALESCE(SUM(purchases.due_amount), 0) as balance')
             ->selectRaw('COALESCE(AVG(purchases.total_amount), 0) as average_purchase')
             ->selectRaw('MAX(purchases.purchase_date) as last_purchase_date')
             ->when($search !== '', function ($q) use ($search) {
@@ -1230,7 +1236,6 @@ class ReportsController extends Controller
                 'suppliers.email',
                 'suppliers.payment_terms',
                 'suppliers.credit_limit',
-                'suppliers.balance',
             ])
             ->havingRaw('COUNT(purchases.id) > 0');
     }
@@ -1483,7 +1488,7 @@ class ReportsController extends Controller
                 'address' => $supplier->address,
                 'payment_terms' => $supplier->payment_terms,
                 'credit_limit' => (float) $supplier->credit_limit,
-                'balance' => (float) $supplier->balance,
+                'balance' => (float) ($summary->due_amount ?? 0),
             ],
             'filters' => [
                 'branch_id' => $branchScope['mode'] === 'all' ? 'all' : $branchScope['branch_id'],
@@ -1572,13 +1577,21 @@ class ReportsController extends Controller
             ->withSum(['sales as change_given_live' => function ($q) {
                 $q->where('status', '!=', 'Voided')->where('payment_method', 'Cash');
             }], 'change_due')
+            ->withSum(['returnSettlements as cash_return_received_live' => function ($q) {
+                $q->where('payment_method', 'Cash')->whereHas('returnEntry', fn ($return) => $return->where('type', 'Supplier'));
+            }], 'amount')
+            ->withSum(['returnSettlements as cash_return_paid_live' => function ($q) {
+                $q->where('payment_method', 'Cash')->whereHas('returnEntry', fn ($return) => $return->where('type', 'Customer'));
+            }], 'amount')
             ->orderByDesc('cash_sessions.opened_at')
             ->paginate(15)
             ->withQueryString()
             ->through(function ($session) {
                 $cashReceived = (float) ($session->cash_received_live ?? 0);
                 $changeGiven = (float) ($session->change_given_live ?? 0);
-                $netCash = $cashReceived - $changeGiven;
+                $returnReceived = (float) ($session->cash_return_received_live ?? 0);
+                $returnPaid = (float) ($session->cash_return_paid_live ?? 0);
+                $netCash = $cashReceived - $changeGiven + $returnReceived - $returnPaid;
                 return [
                     'id' => $session->id,
                     'branch_name' => $session->branch?->name ?? '-',
@@ -1590,6 +1603,8 @@ class ReportsController extends Controller
                     'opening_amount' => (float) $session->opening_amount,
                     'cash_received_total' => $cashReceived,
                     'change_given_total' => $changeGiven,
+                    'cash_return_received' => $returnReceived,
+                    'cash_return_paid' => $returnPaid,
                     'net_cash_sales' => $netCash,
                     'cash_sales_total' => (float) ($session->cash_sales_total ?? 0),
                     'card_sales_total' => (float) ($session->card_sales_total ?? 0),
@@ -1632,25 +1647,62 @@ class ReportsController extends Controller
 
         $summaryCashReceived = (float) ($paymentSummary?->cash_received_total ?? 0);
         $summaryChangeGiven = (float) ($paymentSummary?->change_given_total ?? 0);
-        $summaryNetCash = $summaryCashReceived - $summaryChangeGiven;
+        $returnCashSummary = \App\Models\ReturnSettlement::query()
+            ->join('returns', 'returns.id', '=', 'return_settlements.return_id')
+            ->whereIn('return_settlements.cash_session_id', (clone $baseQuery)->select('cash_sessions.id'))
+            ->where('return_settlements.payment_method', 'Cash')
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Supplier' THEN return_settlements.amount ELSE 0 END), 0) as received")
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Customer' THEN return_settlements.amount ELSE 0 END), 0) as paid")
+            ->first();
+        $summaryReturnReceived = (float) ($returnCashSummary?->received ?? 0);
+        $summaryReturnPaid = (float) ($returnCashSummary?->paid ?? 0);
+        $summaryNetCash = $summaryCashReceived - $summaryChangeGiven + $summaryReturnReceived - $summaryReturnPaid;
+
+        $cashSaleMovements = DB::table('sales')
+            ->select('cash_session_id')
+            ->selectRaw('COALESCE(SUM(amount_received - COALESCE(change_due, 0)), 0) as net_cash')
+            ->where('payment_method', 'Cash')
+            ->where('status', '!=', 'Voided')
+            ->whereNotNull('cash_session_id')
+            ->groupBy('cash_session_id');
+
+        $cashReturnMovements = DB::table('return_settlements as rs')
+            ->join('returns as r', 'r.id', '=', 'rs.return_id')
+            ->select('rs.cash_session_id')
+            ->selectRaw('COALESCE(SUM(CASE WHEN r.type = "Supplier" THEN rs.amount ELSE -rs.amount END), 0) as net_cash')
+            ->where('rs.payment_method', 'Cash')
+            ->whereNotNull('rs.cash_session_id')
+            ->groupBy('rs.cash_session_id');
 
         $byBranch = (clone $baseQuery)
             ->join('branches', 'cash_sessions.branch_id', '=', 'branches.id')
+            ->leftJoinSub(clone $cashSaleMovements, 'cash_sale_movements', function ($join) {
+                $join->on('cash_sale_movements.cash_session_id', '=', 'cash_sessions.id');
+            })
+            ->leftJoinSub(clone $cashReturnMovements, 'cash_return_movements', function ($join) {
+                $join->on('cash_return_movements.cash_session_id', '=', 'cash_sessions.id');
+            })
             ->selectRaw('branches.id as branch_id, branches.name as branch_name')
             ->selectRaw('COUNT(*) as sessions_count')
-            ->selectRaw('COALESCE(SUM(cash_sessions.net_cash_sales), 0) as net_cash_sales_total')
+            ->selectRaw('COALESCE(SUM(COALESCE(cash_sale_movements.net_cash, 0) + COALESCE(cash_return_movements.net_cash, 0)), 0) as net_cash_sales_total')
             ->selectRaw('COALESCE(SUM(cash_sessions.difference), 0) as difference_total')
             ->groupBy('branches.id', 'branches.name')
             ->orderByDesc('net_cash_sales_total')
             ->get();
 
         $byDate = (clone $baseQuery)
-            ->selectRaw('DATE(opened_at) as session_date')
+            ->leftJoinSub(clone $cashSaleMovements, 'cash_sale_movements', function ($join) {
+                $join->on('cash_sale_movements.cash_session_id', '=', 'cash_sessions.id');
+            })
+            ->leftJoinSub(clone $cashReturnMovements, 'cash_return_movements', function ($join) {
+                $join->on('cash_return_movements.cash_session_id', '=', 'cash_sessions.id');
+            })
+            ->selectRaw('DATE(cash_sessions.opened_at) as session_date')
             ->selectRaw('COUNT(*) as sessions_count')
-            ->selectRaw('COALESCE(SUM(net_cash_sales), 0) as net_cash_sales_total')
-            ->selectRaw('COALESCE(SUM(difference), 0) as difference_total')
-            ->groupBy(DB::raw('DATE(opened_at)'))
-            ->orderBy(DB::raw('DATE(opened_at)'))
+            ->selectRaw('COALESCE(SUM(COALESCE(cash_sale_movements.net_cash, 0) + COALESCE(cash_return_movements.net_cash, 0)), 0) as net_cash_sales_total')
+            ->selectRaw('COALESCE(SUM(cash_sessions.difference), 0) as difference_total')
+            ->groupBy(DB::raw('DATE(cash_sessions.opened_at)'))
+            ->orderBy(DB::raw('DATE(cash_sessions.opened_at)'))
             ->get();
 
         return Spa::render('Reports/CashSessions', [
@@ -1674,6 +1726,8 @@ class ReportsController extends Controller
                 'total_sales' => (float) ($paymentSummary?->total_sales ?? 0),
                 'cash_received_total' => $summaryCashReceived,
                 'change_given_total' => $summaryChangeGiven,
+                'cash_return_received' => $summaryReturnReceived,
+                'cash_return_paid' => $summaryReturnPaid,
                 'net_cash_sales_total' => $summaryNetCash,
                 'expected_amount_total' => (float) ($summary?->opening_amount_total ?? 0) + $summaryNetCash,
                 'counted_amount_total' => (float) ($summary?->counted_amount_total ?? 0),

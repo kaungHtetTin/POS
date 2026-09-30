@@ -27,12 +27,6 @@ class StockTransferController extends Controller
         return Spa::render('Inventory/Transfers', [
             'transfers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
-        ]);
-    }
-
-    public function create()
-    {
-        return Spa::render('Inventory/Transfers/Create', [
             'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
             'products' => Product::with('category:id,name')
                 ->with('inventories:id,product_id,branch_id,quantity')
@@ -41,6 +35,26 @@ class StockTransferController extends Controller
                 ->orderBy('name')
                 ->get(),
             'categories' => Category::select('id', 'name')->orderBy('name')->get(),
+            'open_transfer_modal' => $request->boolean('create'),
+        ]);
+    }
+
+    public function create()
+    {
+        return redirect()->route('inventory.transfers.index', ['create' => 1]);
+    }
+
+    public function show(StockTransfer $transfer)
+    {
+        $transfer->load([
+            'fromBranch:id,name',
+            'toBranch:id,name',
+            'items.product:id,name,generic_name,barcode',
+            'items.batch:id,batch_number,expiry_date',
+        ]);
+
+        return Spa::render('Inventory/Transfers/Show', [
+            'transfer' => $transfer,
         ]);
     }
 

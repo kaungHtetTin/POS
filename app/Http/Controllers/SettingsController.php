@@ -41,7 +41,7 @@ class SettingsController extends Controller
             'timezone' => Setting::get('app.timezone', 'UTC'),
             'currency_code' => Setting::get('app.currency_code', 'USD'),
             'currency_symbol' => Setting::get('app.currency_symbol', '$'),
-            'theme_primary_color' => Setting::get('app.theme_primary_color', '#00796b'),
+            'theme_primary_color' => Setting::get('app.theme_primary_color', '#0E684E'),
             'week_start' => (int) Setting::get('app.week_start', '0'), // 0 = Sunday
         ];
 

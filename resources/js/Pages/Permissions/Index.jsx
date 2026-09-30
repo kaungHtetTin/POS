@@ -1,12 +1,12 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { AppBarActions } from '@/Components/AppBarPortal';
 import { Head } from '@/spa';
 import {
     Box,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -21,36 +21,17 @@ import {
     VerifiedUser as VerifiedUserIcon
 } from '@mui/icons-material';
 
-export default function PermissionsIndex(props) {
-    const permissions = [
-        { id: 1, name: 'Process Sale', slug: 'process_sale', category: 'Sales' },
-        { id: 2, name: 'Cancel Transaction', slug: 'cancel_transaction', category: 'Sales' },
-        { id: 3, name: 'Add Products', slug: 'add_products', category: 'Products' },
-        { id: 4, name: 'Edit Products', slug: 'edit_products', category: 'Products' },
-        { id: 5, name: 'Manage Inventory', slug: 'manage_inventory', category: 'Inventory' },
-        { id: 6, name: 'Adjust Stock', slug: 'adjust_stock', category: 'Inventory' },
-        { id: 7, name: 'View Financial Reports', slug: 'view_financial_reports', category: 'Management' },
-        { id: 8, name: 'Manage Branches', slug: 'manage_branches', category: 'Management' },
-        { id: 9, name: 'Manage Users', slug: 'manage_users', category: 'Management' },
-        { id: 10, name: 'Monitor Activity', slug: 'monitor_activity', category: 'Management' },
-    ];
-
+export default function PermissionsIndex({ auth, permissions = [] }) {
     return (
         <MainLayout
-            auth={props.auth}
+            auth={auth}
             header="Permission Reference"
         >
             <Head title="Permissions" />
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            SYSTEM PERMISSIONS (READ-ONLY)
-                        </Typography>
-                        <CsvExportButton source={permissions} filename="permissions.csv" />
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
+                    <AppBarActions><CsvExportButton source={permissions} filename="permissions.csv" /></AppBarActions>
 
                     <TableContainer>
                         <Table size="small">
@@ -59,6 +40,7 @@ export default function PermissionsIndex(props) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Permission Name</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Slug</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Purpose</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -91,6 +73,9 @@ export default function PermissionsIndex(props) {
                                                 variant="outlined" 
                                                 sx={{ fontSize: '10px', height: '20px' }} 
                                             />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" color="text.secondary">{permission.description}</Typography>
                                         </TableCell>
                                     </TableRow>
                                 ))}

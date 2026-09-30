@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
 import { Head, router } from '@/spa';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { CompactDonutChart } from '@/Components/CompactReportChart';
 import {
     Box,
     Button,
     Chip,
     FormControl,
-    IconButton,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -22,12 +23,10 @@ import {
     TableHead,
     TableRow,
     TextField,
-    Tooltip,
     Typography,
 } from '@mui/material';
 import {
     FilterAlt as FilterIcon,
-    Inventory as StockIcon,
     RestartAlt as ResetIcon,
     Search as SearchIcon,
     WarningAmber as WarnIcon,
@@ -40,6 +39,11 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
     const [productStatus, setProductStatus] = useState(filters.product_status ?? 'Active');
     const [stockStatus, setStockStatus] = useState(filters.stock_status ?? 'attention');
     const itemRows = items?.data || items || [];
+    const stockChartData = [
+        { name: 'Out of stock', value: Number(summary.out || 0) },
+        { name: 'Low balance', value: Number(summary.low || 0) },
+        { name: 'In range', value: Math.max(Number(summary.total || 0) - Number(summary.out || 0) - Number(summary.low || 0), 0) },
+    ];
 
     const applyFilters = (page = undefined) => {
         router.get(
@@ -97,7 +101,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                         </Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Low balance report filters"
                         fieldKinds={['wide', 'search', 'select', 'select', 'select']}
                         onSubmit={applyFilters}
@@ -202,6 +206,10 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                         <Chip size="small" color="primary" variant="outlined" label={`Shortage: ${summary.shortage || 0}`} />
                     </Stack>
 
+                    <Box sx={{ maxWidth: 520, mb: 1.5 }}>
+                        <CompactDonutChart title="Stock Status" data={stockChartData} colors={['#ce4444', '#b77700', '#0E684E']} height={168} />
+                    </Box>
+
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -213,12 +221,15 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                                     <TableCell sx={{ fontWeight: 700 }} align="right">Minimum</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="right">Shortage</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="center">Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="right">Action</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {itemRows.map((item) => (
-                                    <TableRow key={item.id} hover>
+                                    <ClickableTableRow
+                                        key={item.id}
+                                        href={route('inventory.show', item.id)}
+                                        label={`View stock for ${item.name}`}
+                                    >
                                         <TableCell>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                                 {item.name}
@@ -237,23 +248,11 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                                             {item.shortage}
                                         </TableCell>
                                         <TableCell align="center">{statusChip(item.stock_status)}</TableCell>
-                                        <TableCell align="right">
-                                            <Tooltip title="View stock">
-                                                <IconButton
-                                                    size="small"
-                                                    color="primary"
-                                                    aria-label={`View stock for ${item.name}`}
-                                                    onClick={() => router.visit(route('inventory.show', item.id))}
-                                                >
-                                                    <StockIcon fontSize="inherit" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell>
-                                    </TableRow>
+                                    </ClickableTableRow>
                                 ))}
                                 {itemRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary">
                                                 No low-balance items found for selected filters.
                                             </Typography>
@@ -263,17 +262,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(items?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={items.last_page}
-                                page={items.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={items} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
         </MainLayout>

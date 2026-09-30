@@ -132,19 +132,24 @@ export default function Manual({ auth, appName }) {
                             </TableHead>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell><Chip label="Root / Owner" size="small" color="primary" /></TableCell>
-                                    <TableCell>Full System Admin</TableCell>
-                                    <TableCell>Unrestricted access. Only Root can manage other Root users and system-wide configurations.</TableCell>
+                                    <TableCell><Chip label="Owner" size="small" color="primary" /></TableCell>
+                                    <TableCell>Business owner</TableCell>
+                                    <TableCell>Unrestricted access, including branches, roles, permissions, and system configuration. The Owner role is protected.</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><Chip label="Manager" size="small" color="secondary" /></TableCell>
                                     <TableCell>Store Supervisor</TableCell>
-                                    <TableCell>Can manage inventory, staff (except Root), view financial reports, and approve returns.</TableCell>
+                                    <TableCell>Runs daily sales, products, inventory, purchasing, finance, staff, returns, activity monitoring, and operational settings for assigned branches.</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell><Chip label="Accountant" size="small" color="info" /></TableCell>
+                                    <TableCell>Finance staff</TableCell>
+                                    <TableCell>Records payments and expenses and reviews financial, purchasing, sales, and cash session reports for assigned branches.</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><Chip label="Cashier" size="small" variant="outlined" /></TableCell>
                                     <TableCell>Counter Staff</TableCell>
-                                    <TableCell>Focused on POS, sales, and customer management within their assigned branch.</TableCell>
+                                    <TableCell>Uses POS, maintains customers, and creates return requests within assigned branches. Completed transaction cancellation requires Manager approval.</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
@@ -165,9 +170,9 @@ export default function Manual({ auth, appName }) {
                             </TableHead>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell><Chip label="manage_inventory" size="small" color="primary" variant="outlined" /></TableCell>
-                                    <TableCell>Products/Medicines, purchases, suppliers, inventory, stock adjustments, stock transfers, categories, units, taxes, expiry report, and label printing.</TableCell>
-                                    <TableCell>Owner, manager, inventory staff, purchasing staff.</TableCell>
+                                    <TableCell><Chip label="manage_products / manage_inventory / adjust_stock" size="small" color="primary" variant="outlined" /></TableCell>
+                                    <TableCell>Separates medicine setup, stock visibility, and stock movement.</TableCell>
+                                    <TableCell>Owner and manager.</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><Chip label="process_sale" size="small" color="success" variant="outlined" /></TableCell>
@@ -181,25 +186,25 @@ export default function Manual({ auth, appName }) {
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><Chip label="view_financial_reports" size="small" color="secondary" variant="outlined" /></TableCell>
-                                    <TableCell>Sales history, reports, cash session report, expenses, and expense categories.</TableCell>
+                                    <TableCell>Read-only financial, sales, purchasing, and cash session reports.</TableCell>
                                     <TableCell>Owner, accountant, manager.</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><Chip label="manage_branches" size="small" color="info" variant="outlined" /></TableCell>
-                                    <TableCell>Branch management, system settings, invoice/label settings, localization settings, and all-branch operational access where supported.</TableCell>
-                                    <TableCell>Owner, system administrator.</TableCell>
+                                    <TableCell>Branch records and all-branch data access.</TableCell>
+                                    <TableCell>Owner.</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell><Chip label="manage_users" size="small" color="error" variant="outlined" /></TableCell>
-                                    <TableCell>Staff management, role management, permission list, and activity logs.</TableCell>
-                                    <TableCell>Owner, administrator.</TableCell>
+                                    <TableCell><Chip label="manage_staff / manage_roles_permissions" size="small" color="error" variant="outlined" /></TableCell>
+                                    <TableCell>Separates staff account maintenance from security policy administration.</TableCell>
+                                    <TableCell>Manager and Owner / Owner only.</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </TableContainer>
                     <Alert severity="info" variant="outlined" sx={{ mb: 3 }}>
                         <Typography variant="caption">
-                            <strong>Purchase/Product Access:</strong> To manage purchase products, medicines, suppliers, stock intake, and inventory movement, assign a role with <code>manage_inventory</code>.
+                            <strong>Operational access:</strong> Products, suppliers, purchases, stock visibility, and stock movement use separate permissions so custom roles can receive only the access they need.
                         </Typography>
                     </Alert>
 
@@ -226,7 +231,7 @@ export default function Manual({ auth, appName }) {
                         ))}
                     </Grid>
                     <Alert severity="info" variant="outlined">
-                        <Typography variant="caption"><strong>Auditor's Note:</strong> Activity logs are immutable and cannot be deleted or modified by any user, including Root, ensuring a transparent audit trail.</Typography>
+                        <Typography variant="caption"><strong>Auditor's Note:</strong> Activity logs are immutable and cannot be deleted or modified by any user, including Owner, ensuring a transparent audit trail.</Typography>
                     </Alert>
 
                     <Typography variant="subtitle1" gutterBottom fontWeight="bold" color="primary" sx={{ mt: 3 }}>5. Role Customization</Typography>
@@ -413,18 +418,18 @@ export default function Manual({ auth, appName }) {
                                 <TableRow>
                                     <TableCell><strong>Customer Return</strong></TableCell>
                                     <TableCell>Sale Invoice</TableCell>
-                                    <TableCell>Stock returns to batch; Refund issued to customer.</TableCell>
+                                    <TableCell>Invoice credit is applied first. Any remaining refund is tracked until paid. Only sellable items marked for restocking return to inventory.</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell><strong>Supplier Return</strong></TableCell>
                                     <TableCell>Purchase Invoice</TableCell>
-                                    <TableCell>Stock deducted from batch; Supplier balance decreased.</TableCell>
+                                    <TableCell>Stock is deducted from the original batch. Invoice credit reduces payable balance; any remaining supplier refund is tracked until received.</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </TableContainer>
                     <Alert severity="info" variant="outlined" sx={{ mt: 2 }}>
-                        <Typography variant="caption"><strong>Approval Note:</strong> Returns are created as 'Pending'. A Manager or Owner must <strong>Approve</strong> the return before stock and financial balances are actually updated.</Typography>
+                        <Typography variant="caption"><strong>Approval Note:</strong> Returns start as Pending. Approval updates eligible stock and invoice balances. Record refund payments or receipts separately when money actually changes hands.</Typography>
                     </Alert>
                 </Box>
             )
@@ -743,7 +748,7 @@ export default function Manual({ auth, appName }) {
             <Head title="SOP Manual" />
 
             <Box sx={{ maxWidth: 1200, mx: 'auto', py: 4, px: 2 }}>
-                <Paper variant="outlined" sx={{ p: 4, mb: 4, borderRadius: 1, background: 'linear-gradient(135deg, #00796b 0%, #004d40 100%)', color: 'white', border: 'none' }}>
+                <Paper variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 1, bgcolor: '#0C4A3A', color: 'white', borderColor: 'rgba(255,255,255,0.14)' }}>
                     <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, letterSpacing: -1 }}>
                         {appName} Live Manual
                     </Typography>

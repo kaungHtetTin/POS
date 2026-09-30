@@ -4,64 +4,52 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\PharmacyAccess;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class PermissionSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        $permissions = [
-            // Sales
-            ['name' => 'Process Sale', 'slug' => 'process_sale'],
-            ['name' => 'Cancel Transaction', 'slug' => 'cancel_transaction'],
-            ['name' => 'Approve Returns', 'slug' => 'approve_returns'],
-            
-            // Products
-            ['name' => 'Add Products', 'slug' => 'add_products'],
-            ['name' => 'Edit Products', 'slug' => 'edit_products'],
-            
-            // Inventory
-            ['name' => 'Manage Inventory', 'slug' => 'manage_inventory'],
-            ['name' => 'Adjust Stock', 'slug' => 'adjust_stock'],
-            
-            // Management
-            ['name' => 'View Financial Reports', 'slug' => 'view_financial_reports'],
-            ['name' => 'Manage Branches', 'slug' => 'manage_branches'],
-            ['name' => 'Manage Users', 'slug' => 'manage_users'],
-            ['name' => 'Monitor Activity', 'slug' => 'monitor_activity'],
-        ];
+        DB::transaction(function () {
+            $permissions = collect(PharmacyAccess::PERMISSIONS)->mapWithKeys(function (array $definition) {
+                $permission = Permission::updateOrCreate(
+                    ['slug' => $definition['slug']],
+                    ['name' => $definition['name']]
+                );
 
-        $createdPermissions = [];
-        foreach ($permissions as $p) {
-            $createdPermissions[$p['slug']] = Permission::firstOrCreate($p);
-        }
+                return [$definition['slug'] => $permission];
+            });
 
-        // Role Assignments
-        $manager = Role::where('name', 'Manager')->first();
-        $cashier = Role::where('name', 'Cashier')->first();
-        $root = Role::where('name', 'Root')->first();
+            $legacyMappings = [
+                'add_products' => ['manage_products'],
+                'edit_products' => ['manage_products'],
+                'manage_users' => ['manage_staff', 'manage_roles_permissions'],
+            ];
 
-        if ($root) {
-            $root->permissions()->sync(Permission::all());
-        }
+            foreach ($legacyMappings as $legacySlug => $replacementSlugs) {
+                $legacy = Permission::where('slug', $legacySlug)->first();
+                if (!$legacy) {
+                    continue;
+                }
 
-        if ($manager) {
-            $manager->permissions()->sync([
-                $createdPermissions['process_sale']->id,
-                $createdPermissions['cancel_transaction']->id,
-                $createdPermissions['approve_returns']->id,
-                $createdPermissions['add_products']->id,
-                $createdPermissions['edit_products']->id,
-                $createdPermissions['manage_inventory']->id,
-                $createdPermissions['adjust_stock']->id,
-                $createdPermissions['monitor_activity']->id,
-            ]);
-        }
+                foreach ($legacy->roles()->pluck('roles.id') as $roleId) {
+                    Role::find($roleId)?->permissions()->syncWithoutDetaching(
+                        $permissions->only($replacementSlugs)->pluck('id')
+                    );
+                }
 
-        if ($cashier) {
-            $cashier->permissions()->sync([
-                $createdPermissions['process_sale']->id,
-            ]);
-        }
+                $legacy->delete();
+            }
+
+            Role::where('name', PharmacyAccess::OWNER)->firstOrFail()
+                ->permissions()->sync($permissions->pluck('id'));
+
+            foreach (PharmacyAccess::ROLE_PERMISSIONS as $roleName => $slugs) {
+                Role::where('name', $roleName)->firstOrFail()
+                    ->permissions()->sync($permissions->only($slugs)->pluck('id'));
+            }
+        });
     }
 }

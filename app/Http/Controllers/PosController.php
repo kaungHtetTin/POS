@@ -504,6 +504,8 @@ class PosController extends Controller
                 'price_type' => $priceType,
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $lineDiscount,
+                'tax_amount' => $lineTax,
+                'payable_total' => $lineTotal,
                 'quantity' => $item['quantity'],
                 'foc_quantity' => $item['foc_quantity'],
                 'base_quantity' => $baseQuantity,
@@ -626,6 +628,9 @@ class PosController extends Controller
                         'discount_percentage' => $line['discount_percentage'],
                         'discount_amount' => $line['quantity'] > 0 ? $line['discount_amount'] * ($quantityInUnit / (float) $line['quantity']) : 0,
                         'total_price' => $totalPrice,
+                        'payable_total' => $line['quantity'] > 0 ? $line['payable_total'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'tax_amount' => $line['quantity'] > 0 ? $line['tax_amount'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'financial_snapshot' => true,
                         'created_at' => now(),
                     ]);
 
@@ -876,6 +881,15 @@ class PosController extends Controller
 
         $cashReceivedTotal = (float) ($totals?->cash_received_total ?? 0);
         $changeGivenTotal = (float) ($totals?->change_given_total ?? 0);
+        $returnCash = \App\Models\ReturnSettlement::query()
+            ->join('returns', 'returns.id', '=', 'return_settlements.return_id')
+            ->where('return_settlements.cash_session_id', $session->id)
+            ->where('return_settlements.payment_method', 'Cash')
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Supplier' THEN return_settlements.amount ELSE 0 END), 0) as received")
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Customer' THEN return_settlements.amount ELSE 0 END), 0) as paid")
+            ->first();
+        $returnReceived = (float) ($returnCash?->received ?? 0);
+        $returnPaid = (float) ($returnCash?->paid ?? 0);
         $paymentTotals = (clone $sales)
             ->selectRaw('payment_method, COALESCE(SUM(grand_total), 0) as total')
             ->groupBy('payment_method')
@@ -884,7 +898,9 @@ class PosController extends Controller
         return [
             'cash_received_total' => $cashReceivedTotal,
             'change_given_total' => $changeGivenTotal,
-            'net_cash_sales' => $cashReceivedTotal - $changeGivenTotal,
+            'cash_return_received' => $returnReceived,
+            'cash_return_paid' => $returnPaid,
+            'net_cash_sales' => $cashReceivedTotal - $changeGivenTotal + $returnReceived - $returnPaid,
             'cash_sales_total' => (float) ($paymentTotals['Cash'] ?? 0),
             'card_sales_total' => (float) ($paymentTotals['Card'] ?? 0),
             'mobile_sales_total' => (float) ($paymentTotals['Mobile'] ?? 0),
@@ -908,6 +924,8 @@ class PosController extends Controller
             'closed_at' => optional($session->closed_at)->toDateTimeString(),
             'cash_received_total' => (float) $totals['cash_received_total'],
             'change_given_total' => (float) $totals['change_given_total'],
+            'cash_return_received' => (float) $totals['cash_return_received'],
+            'cash_return_paid' => (float) $totals['cash_return_paid'],
             'net_cash_sales' => (float) $totals['net_cash_sales'],
             'cash_sales_total' => (float) $totals['cash_sales_total'],
             'card_sales_total' => (float) $totals['card_sales_total'],

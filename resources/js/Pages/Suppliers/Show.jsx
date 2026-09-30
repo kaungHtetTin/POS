@@ -1,7 +1,12 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router, useForm, usePage } from '@/spa';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { AppBarActions, AppBarBack } from '@/Components/AppBarPortal';
+import { Head, router, useForm, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -13,7 +18,6 @@ import {
     Divider,
     IconButton,
     MenuItem,
-    Pagination,
     Paper,
     Stack,
     Table,
@@ -27,7 +31,6 @@ import {
     Typography,
 } from '@mui/material';
 import {
-    ArrowBack as ArrowBackIcon,
     Close as CloseIcon,
     Payment as PaymentIcon,
     ReceiptLong as PurchaseIcon,
@@ -121,36 +124,21 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
     return (
         <MainLayout auth={auth} header="Supplier Statement">
             <Head title={`${supplier.name} Statement`} />
+            <AppBarBack href={route('suppliers.index')} label="Back to Suppliers" />
 
             <Box sx={{ flexGrow: 1 }}>
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'stretch', sm: 'center' }}
-                    spacing={1.5}
-                    sx={{ mb: 2 }}
-                >
-                    <Button
-                        component={Link}
-                        href={route('suppliers.index')}
-                        variant="outlined"
-                        size="small"
-                        startIcon={<ArrowBackIcon />}
-                        sx={{ height: 40, whiteSpace: 'nowrap' }}
-                    >
-                        Back
-                    </Button>
+                <AppBarActions>
                     <Button
                         variant="contained"
                         size="small"
                         startIcon={<PaymentIcon />}
                         onClick={() => openPaymentDialog()}
                         disabled={Number(supplier.balance || 0) <= 0}
-                        sx={{ height: 40, whiteSpace: 'nowrap' }}
+                        sx={{ whiteSpace: 'nowrap' }}
                     >
                         Record Payment
                     </Button>
-                </Stack>
+                </AppBarActions>
 
                 <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
@@ -165,26 +153,11 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                 {supplier.address || 'No address provided'}
                             </Typography>
                         </Box>
-                        <Box
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 140px)' },
-                                gap: 1,
-                            }}
-                        >
-                            <Paper variant="outlined" sx={{ p: 1.2 }}>
-                                <Typography variant="caption" color="text.secondary">Outstanding</Typography>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(supplier.balance)}</Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 1.2 }}>
-                                <Typography variant="caption" color="text.secondary">Purchases</Typography>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(totals.totalPurchases)}</Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 1.2 }}>
-                                <Typography variant="caption" color="text.secondary">Payments</Typography>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{money(totals.totalPayments)}</Typography>
-                            </Paper>
-                        </Box>
+                        <StatCardGrid items={[
+                            { label: 'Outstanding', value: money(supplier.balance), tone: 'warning' },
+                            { label: 'Purchases', value: money(totals.totalPurchases) },
+                            { label: 'Payments', value: money(totals.totalPayments), tone: 'success' },
+                        ]} sx={{ mb: 0, minWidth: { md: 560 } }} />
                     </Stack>
                 </Paper>
 
@@ -209,19 +182,14 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                     <TableCell sx={{ fontWeight: 700 }} align="right">Paid</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="right">Due</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="center">Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="right">Action</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {purchaseRows.map((purchase) => (
-                                    <TableRow key={purchase.id} hover>
+                                    <ClickableTableRow key={purchase.id} href={route('purchases.show', { purchase: purchase.id })} label={`View purchase ${purchase.invoice_number}`}>
                                         <TableCell>
-                                            <Typography
-                                                component={Link}
-                                                href={route('purchases.show', { purchase: purchase.id })}
-                                                variant="body2"
-                                                sx={{ color: 'primary.main', fontWeight: 700, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                                            >
+                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                                 {purchase.invoice_number}
                                             </Typography>
                                         </TableCell>
@@ -233,7 +201,8 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                         <TableCell align="center">
                                             <Chip size="small" label={purchase.payment_status} color={statusColor(purchase.payment_status)} variant="outlined" />
                                         </TableCell>
-                                        <TableCell align="right">
+                                        <TableActionCell>
+                                            <TableRowActions label={purchase.invoice_number}>
                                             <Tooltip title={Number(purchase.due_amount || 0) <= 0 ? 'No due amount' : 'Record payment'}>
                                                 <span>
                                                     <IconButton
@@ -247,8 +216,9 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                                                     </IconButton>
                                                 </span>
                                             </Tooltip>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
                                 {purchaseRows.length === 0 && (
                                     <TableRow>
@@ -260,17 +230,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(purchases?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={purchases.last_page}
-                                page={purchases.current_page}
-                                onChange={(event, page) => goToPage('purchases_page', page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={purchases} onPageChange={(page) => goToPage('purchases_page', page)} />
                     <Divider sx={{ my: 1.5 }} />
                     <Stack alignItems="flex-end">
                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -319,17 +279,7 @@ export default function SupplierShow({ auth, supplier, purchases, duePurchases, 
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(payments?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={payments.last_page}
-                                page={payments.current_page}
-                                onChange={(event, page) => goToPage('payments_page', page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={payments} onPageChange={(page) => goToPage('payments_page', page)} />
                 </Paper>
             </Box>
 

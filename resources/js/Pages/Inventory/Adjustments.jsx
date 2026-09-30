@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -11,11 +12,9 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    Divider,
     IconButton,
     InputAdornment,
     MenuItem,
-    Pagination,
     Paper,
     Stack,
     Table,
@@ -33,7 +32,6 @@ import {
     Close as CloseIcon,
     History as HistoryIcon,
     Search as SearchIcon,
-    SwapHoriz as AdjustmentIcon,
     Warning as WarningIcon,
 } from '@mui/icons-material';
 
@@ -98,21 +96,13 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
         <MainLayout auth={auth} header="Inventory Control">
             <Head title="Inventory Adjustments" />
 
-            <Box sx={{ p: 2 }}>
+            <Box>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AdjustmentIcon color="primary" />
-                            Stock Adjustments (Damage/Returns)
-                        </Typography>
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>New Adjustment</Button>
-                    </Stack>
-
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Inventory adjustment filters"
                         fieldKinds={['search']}
                         onSubmit={() => handleSearch()}
-                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={adjustments} dataKey="adjustments" filename="inventory-adjustments.csv" /></>}
+                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={adjustments} dataKey="adjustments" filename="inventory-adjustments.csv" /><Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>New Adjustment</Button></>}
                     >
                         <TextField
                             size="small"
@@ -169,17 +159,7 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(adjustments?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={adjustments.last_page}
-                                page={adjustments.current_page}
-                                onChange={(event, page) => handleSearch(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={adjustments} onPageChange={(page) => handleSearch(page)} />
                 </Paper>
             </Box>
 

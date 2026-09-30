@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
+use App\Models\Purchase;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use App\Support\Spa;
@@ -10,7 +12,25 @@ class SupplierController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Supplier::query()->withCount('purchases');
+        $branchIds = $this->accessibleBranchIds($request->user());
+        $query = Supplier::query()
+            ->select('id', 'name', 'phone', 'email', 'address', 'payment_terms', 'credit_limit', 'created_at', 'updated_at')
+            ->withCount(['purchases' => fn ($purchaseQuery) => $purchaseQuery->whereIn('branch_id', $branchIds)])
+            ->withSum([
+                'purchases as balance' => fn ($purchaseQuery) => $purchaseQuery->whereIn('branch_id', $branchIds),
+            ], 'due_amount');
+        $balances = Purchase::query()
+            ->whereIn('branch_id', $branchIds)
+            ->selectRaw('supplier_id, COALESCE(SUM(due_amount), 0) as balance')
+            ->groupBy('supplier_id')
+            ->pluck('balance')
+            ->map(fn ($balance) => (float) $balance);
+        $summary = [
+            'total_suppliers' => Supplier::count(),
+            'supplier_payable' => $balances->filter(fn ($balance) => $balance > 0)->sum(),
+            'supplier_credit' => abs($balances->filter(fn ($balance) => $balance < 0)->sum()),
+            'open_accounts' => $balances->filter(fn ($balance) => abs($balance) > 0.00001)->count(),
+        ];
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -23,14 +43,16 @@ class SupplierController extends Controller
         return Spa::render('Suppliers/Index', [
             'suppliers' => $query->latest()->paginate(15)->withQueryString(),
             'filters' => $request->only(['search']),
+            'summary' => $summary,
         ]);
     }
 
-    public function show(Supplier $supplier)
+    public function show(Request $request, Supplier $supplier)
     {
-        $supplier->loadCount('purchases');
+        $branchIds = $this->accessibleBranchIds($request->user());
 
         $purchases = $supplier->purchases()
+            ->whereIn('branch_id', $branchIds)
             ->with(['branch:id,name'])
             ->withCount('items')
             ->latest()
@@ -38,6 +60,7 @@ class SupplierController extends Controller
             ->withQueryString();
 
         $payments = $supplier->payments()
+            ->whereIn('branch_id', $branchIds)
             ->with(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name'])
             ->latest('payment_date')
             ->latest()
@@ -45,19 +68,26 @@ class SupplierController extends Controller
             ->withQueryString();
 
         $duePurchases = $supplier->purchases()
+            ->whereIn('branch_id', $branchIds)
             ->with(['branch:id,name'])
             ->where('due_amount', '>', 0)
             ->oldest('due_date')
             ->get();
 
         $statementSummary = [
-            'total_purchases' => (float) $supplier->purchases()->sum('total_amount'),
-            'total_due' => (float) $supplier->purchases()->sum('due_amount'),
-            'total_payments' => (float) $supplier->payments()->sum('amount'),
+            'total_purchases' => (float) $supplier->purchases()->whereIn('branch_id', $branchIds)->sum('total_amount'),
+            'total_due' => (float) $supplier->purchases()->whereIn('branch_id', $branchIds)->sum('due_amount'),
+            'total_payments' => (float) $supplier->payments()->whereIn('branch_id', $branchIds)->sum('amount'),
         ];
 
+        $supplierPayload = $supplier->only([
+            'id', 'name', 'phone', 'email', 'address', 'payment_terms', 'credit_limit',
+        ]);
+        $supplierPayload['purchases_count'] = $supplier->purchases()->whereIn('branch_id', $branchIds)->count();
+        $supplierPayload['balance'] = $statementSummary['total_due'];
+
         return Spa::render('Suppliers/Show', [
-            'supplier' => $supplier,
+            'supplier' => $supplierPayload,
             'purchases' => $purchases,
             'duePurchases' => $duePurchases,
             'payments' => $payments,
@@ -104,5 +134,22 @@ class SupplierController extends Controller
         $supplier->delete();
 
         return redirect()->back()->with('success', 'Supplier deleted successfully.');
+    }
+
+    protected function accessibleBranchIds($user)
+    {
+        if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+            return Branch::pluck('id');
+        }
+
+        $branchIds = collect([$user->branch_id, $user->active_branch_id])->filter();
+
+        try {
+            $branchIds = $branchIds->merge($user->branches()->pluck('branches.id'));
+        } catch (\Throwable $e) {
+            // Keep direct branch assignments when the optional relation is unavailable.
+        }
+
+        return $branchIds->unique()->values();
     }
 }

@@ -219,10 +219,9 @@ export default function ReportsIndex({
     }, [financial_trends?.yearly]);
 
     const balanceSheetRows = useMemo(() => ([
-        { label: 'Inventory Asset', type: 'Asset', amount: Number(balance_sheet?.inventory_asset || 0) },
-        { label: 'Customer Receivables', type: 'Asset', amount: Number(balance_sheet?.customer_receivables || 0) },
-        { label: 'Supplier Payables', type: 'Liability', amount: Number(balance_sheet?.supplier_payables || 0) },
-        { label: 'Period Net Profit', type: 'Equity', amount: Number(balance_sheet?.period_profit || 0) },
+        { label: 'Inventory at Cost', type: 'Tracked asset', amount: Number(balance_sheet?.inventory_asset || 0) },
+        { label: 'Customer Receivables', type: 'Tracked asset', amount: Number(balance_sheet?.customer_receivables || 0) },
+        { label: 'Supplier Payables', type: 'Tracked liability', amount: Number(balance_sheet?.supplier_payables || 0) },
     ]), [balance_sheet]);
 
     const formatMoney = (value) => money(value);
@@ -246,7 +245,7 @@ export default function ReportsIndex({
     const formatXAxis = (value) => formatPeriod(value, groupBy);
 
     const pieColors = ['#1976d2', '#6a1b9a', '#2e7d32', '#f57c00', '#0288d1', '#7b1fa2', '#388e3c', '#ef6c00', '#455a64', '#c2185b', '#5d4037', '#00796b'];
-    const chartHeight = 220;
+    const chartHeight = 184;
     const chartMargin = { top: 6, right: 12, bottom: 6, left: 0 };
     const axisTick = { fontSize: 11 };
     const tooltipStyles = { fontSize: 12, padding: 8 };
@@ -265,7 +264,7 @@ export default function ReportsIndex({
                         </Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Finance report filters')}
                         fieldKinds={['wide', 'select', 'date', 'date', 'select', 'amount']}
                         onSubmit={applyFilters}
@@ -347,7 +346,7 @@ export default function ReportsIndex({
 
                     </ReportFilterToolbar>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                        <CsvExportButton source={[balance_sheet]} filename="balance-sheet.csv" label="Export Balance Sheet" />
+                        <CsvExportButton source={[balance_sheet]} filename="operational-position.csv" label="Export Position" />
                         <CsvExportButton source={profit_trend || []} filename="profit-trend.csv" label="Export Profit Trend" />
                         <CsvExportButton source={expenses_by_category || []} filename="expenses-by-category.csv" label="Export Expenses" />
                         <CsvExportButton source={branch_performance || []} filename="branch-performance.csv" label="Export Branches" />
@@ -361,7 +360,7 @@ export default function ReportsIndex({
                         <Chip size="small" variant="outlined" label={`${__('Gross Total')}: ${money(summary?.grand_total)}`} color="primary" />
                         <Chip size="small" variant="outlined" label={`${__('Tax')}: ${money(summary?.tax)}`} />
                         <Chip size="small" variant="outlined" label={`${__('Discount')}: ${money(summary?.discount)}`} />
-                        <Chip size="small" variant="outlined" label={`${__('Net Sales (ex tax)')}: ${money(netSales)}`} />
+                        <Chip size="small" variant="outlined" label={`${__('Sales ex tax (before returns)')}: ${money(netSales)}`} />
                         <Chip size="small" variant="outlined" label={`${__('Customer Returns')}: ${money(summary?.customer_returns)}`} />
                         <Chip size="small" variant="outlined" label={`${__('COGS')}: ${money(summary?.cogs)}`} />
                         <Chip size="small" variant="outlined" label={`${__('Expenses')}: ${money(summary?.expenses_total)}`} />
@@ -373,15 +372,15 @@ export default function ReportsIndex({
                         <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 100%' }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 1 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                    {__('Balance Sheet Snapshot')}
+                                    {__('Operational Position Snapshot')}
                                 </Typography>
                                 <Chip size="small" variant="outlined" label={`${__('As of')} ${balance_sheet?.as_of_date || toDate}`} />
                             </Stack>
 
                             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-                                <Chip size="small" variant="outlined" label={`${__('Total Assets')}: ${money(balance_sheet?.total_assets)}`} color="primary" />
-                                <Chip size="small" variant="outlined" label={`${__('Total Liabilities')}: ${money(balance_sheet?.total_liabilities)}`} color="warning" />
-                                <Chip size="small" variant="outlined" label={`${__('Net Position')}: ${money(balance_sheet?.net_position)}`} color="success" />
+                                <Chip size="small" variant="outlined" label={`${__('Tracked Assets')}: ${money(balance_sheet?.total_assets)}`} color="primary" />
+                                <Chip size="small" variant="outlined" label={`${__('Tracked Liabilities')}: ${money(balance_sheet?.total_liabilities)}`} color="warning" />
+                                <Chip size="small" variant="outlined" label={`${__('Tracked Net Position')}: ${money(balance_sheet?.net_position)}`} color="success" />
                             </Stack>
 
                             <TableContainer>
@@ -752,10 +751,13 @@ export default function ReportsIndex({
                     <Divider sx={{ mt: 2, mb: 2 }} />
 
                     <Typography variant="caption" color="text.secondary">
-                        Net sales is calculated as (Grand Total - Tax). Net profit is (Net sales - Customer Returns - COGS - Expenses).
+                        Sales excluding tax are shown before returns. Gross profit subtracts customer returns net of returned tax and COGS net of restocked return cost. Net profit then subtracts expenses.
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                         Supplier returns are shown as refund totals and do not alter sales revenue metrics.
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        The operational position includes inventory at recorded cost, customer receivables, and supplier payables. It excludes cash, bank accounts, fixed assets, tax balances, capital, and retained earnings.
                     </Typography>
                 </Paper>
             </Box>

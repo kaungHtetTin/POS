@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
+import { AppBarActions } from '@/Components/AppBarPortal';
 import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -29,7 +30,6 @@ import {
     Delete as DeleteIcon,
     Label as LabelIcon,
     Close as CloseIcon,
-    Description as DescriptionIcon,
 } from '@mui/icons-material';
 
 export default function ExpenseCategoryIndex({ auth, categories }) {
@@ -90,24 +90,18 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            EXPENSE CATEGORIES
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
+                    <AppBarActions>
                         <CsvExportButton source={categories} filename="expense-categories.csv" />
                         <Button
                             variant="contained"
                             size="small"
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Category
                         </Button>
-                        </Stack>
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
+                        </AppBarActions>
 
                     <TableContainer>
                         <Table size="small">
@@ -118,9 +112,7 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">
                                         Expenses
                                     </TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">
-                                        Actions
-                                    </TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -148,11 +140,13 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                                                 sx={{ fontSize: '11px', height: '22px' }}
                                             />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
-                                            <IconButton size="small" color="primary" onClick={() => handleOpen(category)}>
+                                        <TableActionCell sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <TableRowActions label={category.name}>
+                                            <IconButton title="Edit category" size="small" color="primary" onClick={() => handleOpen(category)}>
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                             <IconButton
+                                                title="Delete category"
                                                 size="small"
                                                 color="error"
                                                 onClick={() => handleDelete(category)}
@@ -160,7 +154,8 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
                                 {categories.length === 0 && (
@@ -178,18 +173,30 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                 </Paper>
             </Box>
 
-            <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+            <Dialog
+                open={open}
+                onClose={handleClose}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { maxWidth: 520, borderRadius: 2 } }}
+            >
                 <form onSubmit={submit}>
-                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {editMode ? 'Edit Category' : 'Add New Category'}
-                        <IconButton size="small" onClick={handleClose}>
-                            <CloseIcon />
+                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.5, fontSize: 18, fontWeight: 800 }}>
+                        <Box>
+                            {editMode ? 'Edit Category' : 'Add New Category'}
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontWeight: 400 }}>
+                                Categories organize expenses in reports and filters.
+                            </Typography>
+                        </Box>
+                        <IconButton size="small" onClick={handleClose} aria-label="Close category form">
+                            <CloseIcon fontSize="small" />
                         </IconButton>
                     </DialogTitle>
-                    <DialogContent dividers>
-                        <Stack spacing={2.5} sx={{ mt: 1 }}>
+                    <DialogContent dividers sx={{ px: 2, py: 1.75 }}>
+                        <Stack spacing={1.5}>
                             <TextField
                                 label="Category Name"
+                                placeholder="For example: Utilities"
                                 fullWidth
                                 size="small"
                                 value={data.name}
@@ -197,25 +204,25 @@ export default function ExpenseCategoryIndex({ auth, categories }) {
                                 error={!!errors.name}
                                 helperText={errors.name}
                                 required
+                                autoFocus
                             />
                             <TextField
                                 label="Description"
+                                placeholder="Optional note about expenses in this category"
                                 fullWidth
                                 size="small"
                                 multiline
-                                rows={3}
+                                minRows={2}
+                                maxRows={5}
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
                                 error={!!errors.description}
                                 helperText={errors.description}
-                                InputProps={{
-                                    startAdornment: <DescriptionIcon sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} />,
-                                }}
                             />
                         </Stack>
                     </DialogContent>
-                    <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={handleClose} size="small">
+                    <DialogActions sx={{ px: 2, py: 1.25, gap: 0.75 }}>
+                        <Button onClick={handleClose} size="small" color="inherit">
                             Cancel
                         </Button>
                         <Button type="submit" variant="contained" size="small" disabled={processing}>

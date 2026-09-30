@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, useForm, router, usePage } from '@/spa';
+import { Head, useForm, router, usePage } from '@/spa';
 import {
     Box,
     Chip,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -24,7 +26,6 @@ import {
     DialogActions,
     TextField,
     InputAdornment,
-    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -35,7 +36,6 @@ import {
     Phone as PhoneIcon,
     Email as EmailIcon,
     Search as SearchIcon,
-    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function CustomerIndex({ auth, customers, filters }) {
@@ -136,18 +136,10 @@ export default function CustomerIndex({ auth, customers, filters }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            {__('CUSTOMER DIRECTORY')}
-                        </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>
-                            {__('Add Customer')}
-                        </Button>
-                    </Stack>
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Customer filters')}
                         fieldKinds={['search']}
-                        actions={<CsvExportButton source={customers} dataKey="customers" filename="customers.csv" />}
+                        actions={<><CsvExportButton source={customers} dataKey="customers" filename="customers.csv" /><Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>{__('Add Customer')}</Button></>}
                     >
                         <TextField
                             size="small"
@@ -157,8 +149,6 @@ export default function CustomerIndex({ auth, customers, filters }) {
                             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
                         />
                     </ReportFilterToolbar>
-                    <Divider sx={{ mb: 2 }} />
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -167,12 +157,12 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Contact')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Current balance')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Status')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Actions')}</TableCell>
+                                    <TableActionHead>{__('Actions')}</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {customerRows.map((customer) => (
-                                    <TableRow key={customer.id} hover>
+                                    <ClickableTableRow key={customer.id} href={route('customers.show', customer.id)} label={`View ${customer.name}`}>
                                         <TableCell sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <PersonIcon fontSize="small" color="primary" />
@@ -202,23 +192,10 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                                 label={__(customer.has_overdue ? 'Overdue' : Number(customer.current_balance || 0) > 0 ? 'Credit' : 'Paid')}
                                                 color={customer.has_overdue ? 'error' : Number(customer.current_balance || 0) > 0 ? 'info' : 'success'} />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
-                                            <Stack
-                                                direction="row"
-                                                spacing={0}
-                                                justifyContent="flex-end"
-                                                sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}
-                                            >
+                                        <TableActionCell sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <TableRowActions label={customer.name}>
                                                 <IconButton
-                                                component={Link}
-                                                href={route('customers.show', customer.id)}
-                                                size="small"
-                                                color="primary"
-                                                aria-label={`View ${customer.name}`}
-                                            >
-                                                <ViewIcon fontSize="inherit" />
-                                            </IconButton>
-                                                <IconButton
+                                                title={__('Edit customer')}
                                                 size="small"
                                                 color="primary"
                                                 onClick={() => handleOpen(customer)}
@@ -226,6 +203,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                                 <IconButton
+                                                title={__('Delete customer')}
                                                 size="small"
                                                 color="error"
                                                 onClick={() => handleDelete(customer)}
@@ -233,9 +211,9 @@ export default function CustomerIndex({ auth, customers, filters }) {
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                                 </IconButton>
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
                                 {customerRows.length === 0 && (
                                     <TableRow>
@@ -249,17 +227,7 @@ export default function CustomerIndex({ auth, customers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(customers?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={customers.last_page}
-                                page={customers.current_page}
-                                onChange={(event, page) => handlePageChange(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={customers} onPageChange={(page) => handlePageChange(page)} />
                 </Paper>
             </Box>
 

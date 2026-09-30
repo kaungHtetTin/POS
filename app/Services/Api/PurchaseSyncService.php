@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseSyncService
@@ -27,6 +28,12 @@ class PurchaseSyncService
 
         $existing = Purchase::where('client_reference', $clientReference)->first();
         if ($existing) {
+            if (!$this->userCanAccessBranch($user, $existing->branch_id)) {
+                throw ValidationException::withMessages([
+                    'client_reference' => 'This synchronized purchase is not available in your branch scope.',
+                ]);
+            }
+
             return [
                 'client_reference' => $clientReference,
                 'created' => false,
@@ -92,7 +99,8 @@ class PurchaseSyncService
                 $lineTotal = $paidQuantity * (float) $item['unit_price'];
 
                 return array_merge($item, [
-                    'batch_number' => trim((string) ($item['batch_number'] ?? '')) ?: 'BATCH-' . now()->format('YmdHis'),
+                    'batch_number' => trim((string) ($item['batch_number'] ?? ''))
+                        ?: 'BATCH-' . now()->format('YmdHis') . '-' . strtoupper(substr((string) Str::uuid(), 0, 8)),
                     'foc_quantity' => $focQuantity,
                     'base_quantity' => $baseQuantity,
                     'foc_base_quantity' => $focQuantity * $conversionFactor,
@@ -160,23 +168,41 @@ class PurchaseSyncService
                     'created_at' => now(),
                 ]);
 
-                InventoryBatch::create([
-                    'branch_id' => $validated['branch_id'],
-                    'product_id' => $item['product_id'],
-                    'batch_number' => $item['batch_number'],
-                    'expiry_date' => $item['expiry_date'],
-                    'quantity' => $item['base_quantity'],
-                    'purchase_price' => $item['base_unit_price'],
-                    'selling_price' => $item['base_selling_price'],
-                    'is_synced' => true,
-                ]);
+                $batch = InventoryBatch::where('branch_id', $validated['branch_id'])
+                    ->where('product_id', $item['product_id'])
+                    ->where('batch_number', $item['batch_number'])
+                    ->whereDate('expiry_date', $item['expiry_date'])
+                    ->lockForUpdate()
+                    ->first();
 
-                $inventory = Inventory::firstOrNew([
+                if ($batch) {
+                    $existingQuantity = (int) $batch->quantity;
+                    $incomingQuantity = (int) $item['base_quantity'];
+                    $newQuantity = $existingQuantity + $incomingQuantity;
+                    $batch->update([
+                        'quantity' => $newQuantity,
+                        'purchase_price' => (($existingQuantity * (float) $batch->purchase_price) + ($incomingQuantity * (float) $item['base_unit_price'])) / $newQuantity,
+                        'selling_price' => (($existingQuantity * (float) $batch->selling_price) + ($incomingQuantity * (float) $item['base_selling_price'])) / $newQuantity,
+                        'is_synced' => true,
+                    ]);
+                } else {
+                    InventoryBatch::create([
+                        'branch_id' => $validated['branch_id'],
+                        'product_id' => $item['product_id'],
+                        'batch_number' => $item['batch_number'],
+                        'expiry_date' => $item['expiry_date'],
+                        'quantity' => $item['base_quantity'],
+                        'purchase_price' => $item['base_unit_price'],
+                        'selling_price' => $item['base_selling_price'],
+                        'is_synced' => true,
+                    ]);
+                }
+
+                $inventory = Inventory::firstOrCreate([
                     'branch_id' => $validated['branch_id'],
                     'product_id' => $item['product_id'],
-                ]);
-                $inventory->quantity = ($inventory->quantity ?? 0) + $item['base_quantity'];
-                $inventory->save();
+                ], ['quantity' => 0]);
+                $inventory->increment('quantity', $item['base_quantity']);
 
                 $pricing->purchasePrices($item, $user->id);
             }
@@ -214,8 +240,7 @@ class PurchaseSyncService
         return $user->canAccessBranch($branchId)
             || $user->hasRole('Root')
             || $user->hasRole('Owner')
-            || $user->hasPermission('manage_branches')
-            || $user->hasPermission('manage_inventory');
+            || $user->hasPermission('manage_branches');
     }
 
     private function loadPurchase(Purchase $purchase): Purchase

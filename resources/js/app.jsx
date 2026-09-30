@@ -10,7 +10,6 @@ import { ColorModeContext } from './contexts/ColorModeContext';
 import PersistentShellContext from './contexts/PersistentShellContext';
 import PageContainer from './Components/PageContainer';
 import MainLayout from './Layouts/MainLayout';
-import PosLayout from './Layouts/PosLayout';
 import { SpaProvider, router } from './spa';
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
@@ -98,26 +97,26 @@ function PageContentSkeleton() {
         >
             <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
             <Stack spacing={1.25}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                    <Skeleton variant="rounded" width="min(32%, 260px)" height={28} />
-                    <Skeleton variant="rounded" width={112} height={32} />
+                <Stack spacing={0.75}>
+                    <Skeleton variant="rounded" width={180} height={28} />
+                    <Skeleton variant="rounded" width="min(55%, 340px)" height={14} />
                 </Stack>
                 <Box
                     sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, minmax(0, 1fr))' },
                         gap: 1,
                     }}
                 >
-                    {[0, 1, 2].map((item) => (
-                        <Skeleton key={item} variant="rounded" height={68} />
+                    {[0, 1, 2, 3].map((item) => (
+                        <Skeleton key={item} variant="rounded" height={62} />
                     ))}
                 </Box>
                 <Paper variant="outlined" sx={{ p: 1.25 }}>
-                    <Stack spacing={1}>
-                        <Skeleton variant="rounded" width="42%" height={30} />
+                    <Stack spacing={0.125}>
+                        <Skeleton variant="rounded" width="42%" height={38} />
                         {[0, 1, 2, 3, 4].map((item) => (
-                            <Skeleton key={item} variant="rounded" height={38} />
+                            <Skeleton key={item} variant="rounded" height={42} />
                         ))}
                     </Stack>
                 </Paper>
@@ -146,7 +145,7 @@ function ContentTransition({ loading, error, children }) {
 }
 
 function Application() {
-    const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#087f74';
+    const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#0E684E';
     const [mode, setMode] = useState(() => {
         const stored = window.localStorage.getItem('app.theme');
         return stored === 'dark' || stored === 'light' ? stored : 'light';
@@ -156,7 +155,9 @@ function Application() {
         return /^#[0-9A-Fa-f]{6}$/.test(stored || '') ? stored.toUpperCase() : defaultPrimaryColor;
     });
     const [shellHeader, setShellHeader] = useState('');
-    const shellContext = useMemo(() => ({ setHeader: setShellHeader }), []);
+    const [appBarTarget, setAppBarTarget] = useState(null);
+    const [appBarBackTarget, setAppBarBackTarget] = useState(null);
+    const shellContext = useMemo(() => ({ setHeader: setShellHeader, appBarTarget, appBarBackTarget }), [appBarTarget, appBarBackTarget]);
 
     const colorMode = useMemo(() => ({
         mode,
@@ -205,14 +206,12 @@ function Application() {
                         const isAuthenticated = Boolean(page.props?.auth?.user);
                         if (!isAuthenticated) return content;
 
-                        const ShellLayout = page.component === 'POS/Index' ? PosLayout : MainLayout;
-
                         return (
-                            <ShellLayout header={shellHeader}>
+                            <MainLayout header={shellHeader} setAppBarTarget={setAppBarTarget} setAppBarBackTarget={setAppBarBackTarget}>
                                 <PersistentShellContext.Provider value={shellContext}>
                                     {content}
                                 </PersistentShellContext.Provider>
-                            </ShellLayout>
+                            </MainLayout>
                         );
                     }}
                 </SpaProvider>

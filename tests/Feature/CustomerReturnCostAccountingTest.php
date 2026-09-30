@@ -83,6 +83,7 @@ class CustomerReturnCostAccountingTest extends TestCase
                 'reference_item_id' => $saleItem->id,
                 'quantity' => 1,
                 'refund_price' => 999,
+                'restock' => true,
             ]],
         ]);
         $response->assertRedirect();

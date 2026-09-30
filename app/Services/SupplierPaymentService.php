@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Branch;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
@@ -23,7 +24,22 @@ class SupplierPaymentService
                 ]);
             }
 
+            $accessibleBranchIds = $this->accessibleBranchIds($user);
+
+            if ($accessibleBranchIds->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'No accessible branch is available for this payment.',
+                ]);
+            }
+
+            if (!empty($data['branch_id']) && !$accessibleBranchIds->contains($data['branch_id'])) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'You do not have access to the selected branch.',
+                ]);
+            }
+
             $purchasesQuery = Purchase::where('supplier_id', $supplier->id)
+                ->whereIn('branch_id', $accessibleBranchIds)
                 ->where('due_amount', '>', 0)
                 ->lockForUpdate();
 
@@ -80,7 +96,7 @@ class SupplierPaymentService
                 $payments->push(SupplierPayment::create([
                     'supplier_id' => $supplier->id,
                     'purchase_id' => $purchase->id,
-                    'branch_id' => $data['branch_id'] ?? $purchase->branch_id ?? $user->currentBranchId(),
+                    'branch_id' => $purchase->branch_id,
                     'user_id' => $user->id,
                     'payment_date' => $data['payment_date'],
                     'amount' => $appliedAmount,
@@ -114,5 +130,22 @@ class SupplierPaymentService
         }
 
         return 'Due';
+    }
+
+    protected function accessibleBranchIds(User $user)
+    {
+        if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+            return Branch::pluck('id');
+        }
+
+        $branchIds = collect([$user->branch_id, $user->active_branch_id])->filter();
+
+        try {
+            $branchIds = $branchIds->merge($user->branches()->pluck('branches.id'));
+        } catch (\Throwable $e) {
+            // Keep direct branch assignments when the optional relation is unavailable.
+        }
+
+        return $branchIds->unique()->values();
     }
 }

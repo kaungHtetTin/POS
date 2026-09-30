@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -32,7 +34,6 @@ import {
     Checkbox,
     InputAdornment,
     ListItemText,
-    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -154,17 +155,11 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            {__('SYSTEM STAFF DIRECTORY')}
-                        </Typography>
-                        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>{__('Add New Staff')}</Button>
-                    </Stack>
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Staff filters')}
                         fieldKinds={['search']}
                         onSubmit={() => applySearch()}
-                        actions={<><Button variant="outlined" size="small" type="submit">{__('Search')}</Button><CsvExportButton source={staff} dataKey="staff" filename="staff.csv" /></>}
+                        actions={<><Button variant="outlined" size="small" type="submit">{__('Search')}</Button><CsvExportButton source={staff} dataKey="staff" filename="staff.csv" /><Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>{__('Add Staff')}</Button></>}
                     >
                         <TextField
                             size="small"
@@ -174,8 +169,6 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
                         />
                     </ReportFilterToolbar>
-                    <Divider sx={{ mb: 2 }} />
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -184,7 +177,7 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Role')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Branch')}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{__('Contact')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">{__('Actions')}</TableCell>
+                                    <TableActionHead>{__('Actions')}</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -233,8 +226,10 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                                         <TableCell>
                                             <Typography variant="body2">{member.phone || __('N/A')}</Typography>
                                         </TableCell>
-                                        <TableCell align="right">
+                                        <TableActionCell>
+                                            <TableRowActions label={member.name}>
                                             <IconButton 
+                                                title={__('Edit staff')}
                                                 size="small" 
                                                 color="primary" 
                                                 onClick={() => handleOpen(member)}
@@ -242,6 +237,7 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                             <IconButton 
+                                                title={__('Delete staff')}
                                                 size="small" 
                                                 color="error" 
                                                 onClick={() => handleDelete(member)}
@@ -249,23 +245,14 @@ export default function StaffIndex({ auth, staff, roles, branches, filters = {} 
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(staff?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={staff.last_page}
-                                page={staff.current_page}
-                                onChange={(event, page) => applySearch(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={staff} onPageChange={(page) => applySearch(page)} />
                 </Paper>
             </Box>
 

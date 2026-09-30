@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import MergedTablePanel from '@/Components/MergedTablePanel';
+import DataTableFooter from '@/Components/DataTableFooter';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
 import { compressImage } from '@/Utils/compressImage';
 import { Head, useForm, router, usePage } from '@/spa';
 import {
@@ -50,9 +53,13 @@ import {
     AddCircleOutline as AddUnitIcon,
     CheckCircle as BaseUnitIcon,
     Print as PrintIcon,
+    UploadFile as UploadFileIcon,
+    Inventory2Outlined as StockIcon,
+    WarningAmberOutlined as LowStockIcon,
+    HighlightOffOutlined as OutOfStockIcon,
 } from '@mui/icons-material';
 
-export default function ProductIndex({ auth, products, categories, taxes, units, filters, default_tax_id: defaultTaxId }) {
+export default function ProductIndex({ auth, products, categories, taxes, units, filters, summary = {}, default_tax_id: defaultTaxId }) {
     const { ziggy = {} } = usePage().props;
     const appBase = ziggy?.base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -154,6 +161,18 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         setSelectedCategory('');
         setSelectedStatus('');
         router.get(route('products.index'));
+    };
+
+    const handlePageChange = (page) => {
+        router.get(route('products.index'), {
+            search: search.trim() || undefined,
+            category: selectedCategory || undefined,
+            status: selectedStatus || undefined,
+            page,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const togglePrintSelection = (productId) => {
@@ -287,6 +306,12 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
             <Head title="Medicines" />
 
             <Box sx={{ flexGrow: 1 }}>
+                <StatCardGrid items={[
+                    { label: 'Total Medicines', value: Number(summary.total_products || 0).toLocaleString(), icon: <ProductIcon /> },
+                    { label: 'Total Stock Units', value: Number(summary.total_stock_units || 0).toLocaleString(), icon: <StockIcon />, tone: 'success' },
+                    { label: 'Low Stock', value: Number(summary.low_stock || 0).toLocaleString(), icon: <LowStockIcon />, tone: 'warning' },
+                    { label: 'Out of Stock', value: Number(summary.out_of_stock || 0).toLocaleString(), icon: <OutOfStockIcon />, tone: 'danger' },
+                ]} />
                 <MergedTablePanel
                     eyebrow="Medicine Inventory"
                     title="Medicines"
@@ -315,31 +340,18 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             )}
                         </Stack>
                     }
-                    actions={
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            <Button variant="outlined" size="small" onClick={() => router.visit(route('products.import.create'))} sx={{ height: 40, whiteSpace: 'nowrap' }}>
-                                Import CSV
-                            </Button>
-                            <Button
-                                variant="contained"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit(route('products.create'))}
-                                sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                            >
-                                Add New Medicine
-                            </Button>
-                        </Stack>
-                    }
                     filters={
-                        <ReportFilterToolbar
+                        <ReportFilterToolbar appBar
                             ariaLabel="Medicine filters"
                             fieldKinds={['search', 'select', 'select']}
                             sx={{ mb: 0 }}
                             actions={(
                                 <>
                                     <Button variant="outlined" size="small" onClick={handleClearFilters} color="inherit" startIcon={<ClearIcon />}>Clear</Button>
+                                    <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={() => router.visit(route('products.import.create'))}>Import CSV</Button>
                                     <CsvExportButton source={products} dataKey="products" filename="medicines.csv" />
+                                    <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={handleOpenPrintDialog} disabled={selectedForPrint.length === 0}>Print Barcode List</Button>
+                                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => router.visit(route('products.create'))}>Add Medicine</Button>
                                 </>
                             )}
                         >
@@ -406,7 +418,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                     <TableCell sx={{ fontWeight: 'bold' }}>Tax</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Discount</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -486,16 +498,16 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                                 sx={{ fontSize: '10px', height: '20px' }}
                                             />
                                         </TableCell>
-                                        <TableCell align="right">
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
-                                                <IconButton size="small" color="primary" onClick={() => router.visit(route('products.edit', product.id))}>
+                                        <TableActionCell>
+                                            <TableRowActions label={product.name}>
+                                                <IconButton title="Edit medicine" size="small" color="primary" onClick={() => router.visit(route('products.edit', product.id))}>
                                                     <EditIcon fontSize="inherit" />
                                                 </IconButton>
-                                                <IconButton size="small" color="error" onClick={() => handleDelete(product)}>
+                                                <IconButton title="Delete medicine" size="small" color="error" onClick={() => handleDelete(product)}>
                                                     <DeleteIcon fontSize="inherit" />
                                                 </IconButton>
-                                            </Stack>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
                                 {products.data.length === 0 && (
@@ -510,6 +522,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    <DataTableFooter paginator={products} onPageChange={handlePageChange} />
                 </MergedTablePanel>
             </Box>
 
@@ -826,7 +839,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         <TableCell sx={{ fontWeight: 'bold', width: '22%' }}>Conversion Factor</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Retail Price</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '18%' }}>Wholesale Price</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '20%' }} align="right">Actions</TableCell>
+                                        <TableActionHead>Actions</TableActionHead>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -899,8 +912,8 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                                     }}
                                                 />
                                             </TableCell>
-                                            <TableCell sx={{ py: 1.5 }} align="right">
-                                                <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                                            <TableActionCell sx={{ py: 1.5 }}>
+                                                <TableRowActions label={unit.unit_id ? `unit ${unit.unit_id}` : `unit row ${index + 1}`}>
                                                     <Tooltip title={unit.is_base_unit ? "Current Base Unit" : "Set as Base Unit"}>
                                                         <IconButton
                                                             size="small"
@@ -921,8 +934,8 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                                             <DeleteIcon fontSize="inherit" />
                                                         </IconButton>
                                                     )}
-                                                </Stack>
-                                            </TableCell>
+                                                </TableRowActions>
+                                            </TableActionCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -966,7 +979,7 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold', width: 100 }} align="center">Quantity</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', width: 50 }} align="right"></TableCell>
+                                <TableActionHead>Actions</TableActionHead>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -985,11 +998,13 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                             inputProps={{ min: 1, style: { textAlign: 'center' } }}
                                         />
                                     </TableCell>
-                                    <TableCell align="right">
-                                        <IconButton size="small" color="error" onClick={() => removePrintItem(item.id)}>
+                                    <TableActionCell>
+                                        <TableRowActions label={item.name}>
+                                        <IconButton title="Remove label" size="small" color="error" onClick={() => removePrintItem(item.id)}>
                                             <DeleteIcon fontSize="inherit" />
                                         </IconButton>
-                                    </TableCell>
+                                        </TableRowActions>
+                                    </TableActionCell>
                                 </TableRow>
                             ))}
                         </TableBody>

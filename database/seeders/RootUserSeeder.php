@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Branch;
+use App\Support\PharmacyAccess;
 use Illuminate\Support\Facades\Hash;
 
 class RootUserSeeder extends Seeder
@@ -20,14 +21,13 @@ class RootUserSeeder extends Seeder
         // Get Main Branch
         $branch = Branch::where('name', 'Main Branch')->first();
 
-        // Create Root Role
-        $rootRole = Role::firstOrCreate(['name' => 'Root']);
+        $ownerRole = Role::firstOrCreate(['name' => PharmacyAccess::OWNER]);
 
-        // Create Admin/Root User
+        // Create the initial Owner user.
         $user = User::firstOrCreate(
             ['email' => 'admin@store.com'],
             [
-                'name' => 'Root Admin',
+                'name' => 'Owner Admin',
                 'password' => Hash::make('password'),
                 'status' => 'Active',
                 'branch_id' => $branch?->id,
@@ -43,10 +43,12 @@ class RootUserSeeder extends Seeder
             ]);
         }
 
-        // Assign Role
-        if (!$user->roles()->where('name', 'Root')->exists()) {
-            $user->roles()->attach($rootRole->id);
+        if ($user->name === 'Root Admin') {
+            $user->update(['name' => 'Owner Admin']);
         }
+
+        // Keep the initial administrator on the immutable Owner role.
+        $user->roles()->sync([$ownerRole->id]);
 
         // Ensure user can access the branch (pivot table if needed)
         if ($branch && !$user->branches()->where('branches.id', $branch->id)->exists()) {

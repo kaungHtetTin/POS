@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\CustomerPayment;
 use App\Models\Purchase;
 use App\Models\Sale;
 use Carbon\Carbon;
@@ -76,7 +77,7 @@ class FinanceController extends Controller
             ->get();
 
         $baseQuery = Purchase::query()
-            ->with(['supplier:id,name,phone,email,balance', 'branch:id,name'])
+            ->with(['supplier:id,name,phone,email', 'branch:id,name'])
             ->withCount('payments')
             ->whereIn('branch_id', $accessibleBranchIds)
             ->where('due_amount', '>', 0);
@@ -156,7 +157,6 @@ class FinanceController extends Controller
                         'name' => $purchase->supplier->name,
                         'phone' => $purchase->supplier->phone,
                         'email' => $purchase->supplier->email,
-                        'balance' => (float) $purchase->supplier->balance,
                     ] : null,
                     'branch' => $purchase->branch ? [
                         'id' => $purchase->branch->id,
@@ -180,7 +180,7 @@ class FinanceController extends Controller
         $user = $request->user();
         $accessibleBranchIds = $this->accessibleBranchIds($user);
         $branchScope = $this->resolveBranchScope($request, $user, $accessibleBranchIds);
-        $receivableExpression = 'GREATEST(sales.grand_total - LEAST(COALESCE(sales.amount_received, 0), sales.grand_total), 0)';
+        $receivableExpression = 'GREATEST(sales.grand_total - COALESCE(sales.amount_received, 0) - COALESCE(sales.return_credit_amount, 0), 0)';
 
         $filters = [
             'branch_id' => (string) $request->get('branch_id', ''),
@@ -219,9 +219,9 @@ class FinanceController extends Controller
         } elseif (in_array($filters['payment_status'], ['Credit', 'Partial', 'Due'], true)) {
             $baseQuery->where(fn ($q) => $q->whereNull('sales.due_date')->orWhereDate('sales.due_date', '>=', today()));
             if ($filters['payment_status'] === 'Partial') {
-                $baseQuery->where('sales.amount_received', '>', 0);
+                $baseQuery->whereRaw('COALESCE(sales.amount_received, 0) + COALESCE(sales.return_credit_amount, 0) > 0');
             } else {
-                $baseQuery->whereRaw('COALESCE(sales.amount_received, 0) <= 0');
+                $baseQuery->whereRaw('COALESCE(sales.amount_received, 0) + COALESCE(sales.return_credit_amount, 0) <= 0');
             }
         }
 
@@ -334,7 +334,7 @@ class FinanceController extends Controller
             abort(403);
         }
 
-        DB::transaction(function () use ($sale, $validated) {
+        DB::transaction(function () use ($sale, $validated, $user) {
             $lockedSale = Sale::query()->lockForUpdate()->findOrFail($sale->id);
 
             if ($lockedSale->status === 'Voided') {
@@ -351,7 +351,8 @@ class FinanceController extends Controller
 
             $grandTotal = (float) $lockedSale->grand_total;
             $currentReceived = min(max((float) $lockedSale->amount_received, 0), $grandTotal);
-            $receivableAmount = max($grandTotal - $currentReceived, 0);
+            $creditApplied = max((float) $lockedSale->return_credit_amount, 0);
+            $receivableAmount = max($grandTotal - $currentReceived - $creditApplied, 0);
             $receiveAmount = (float) $validated['amount'];
 
             if ($receivableAmount <= 0) {
@@ -366,16 +367,25 @@ class FinanceController extends Controller
                 ]);
             }
 
-            $newReceived = min($grandTotal, $currentReceived + $receiveAmount);
+            $newReceived = min($grandTotal - $creditApplied, $currentReceived + $receiveAmount);
 
             $lockedSale->forceFill([
                 'amount_received' => $newReceived,
                 'change_due' => 0,
-                'payment_method' => $validated['payment_method'],
-                'payment_status' => $newReceived >= $grandTotal ? 'Paid' : 'Partial',
+                'payment_status' => $newReceived + $creditApplied >= $grandTotal ? 'Paid' : 'Partial',
                 'is_synced' => false,
                 'synced_at' => null,
             ])->save();
+
+            CustomerPayment::create([
+                'sale_id' => $lockedSale->id,
+                'customer_id' => $lockedSale->customer_id,
+                'branch_id' => $lockedSale->branch_id,
+                'user_id' => $user->id,
+                'payment_date' => today()->toDateString(),
+                'amount' => $receiveAmount,
+                'payment_method' => $validated['payment_method'],
+            ]);
         });
 
         return redirect()->back()->with('success', 'Customer payment received successfully.');

@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { CompactBarChart, CompactLineChart } from '@/Components/CompactReportChart';
 import { Head, router } from '@/spa';
 import {
     Box,
@@ -10,7 +12,6 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -73,7 +74,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                         </Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Cash session report filters"
                         fieldKinds={['wide', 'date', 'date', 'select']}
                         onSubmit={applyFilters}
@@ -141,7 +142,9 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                         <Chip size="small" color="primary" label={`All Sales: ${money(summary.total_sales)}`} />
                         <Chip size="small" variant="outlined" label={`Cash Received: ${money(summary.cash_received_total)}`} />
                         <Chip size="small" variant="outlined" label={`Change Given: ${money(summary.change_given_total)}`} />
-                        <Chip size="small" variant="outlined" label={`Net Cash Sales: ${money(summary.net_cash_sales_total)}`} color="primary" />
+                        <Chip size="small" variant="outlined" label={`Supplier refunds received: ${money(summary.cash_return_received)}`} />
+                        <Chip size="small" variant="outlined" label={`Customer refunds paid: ${money(summary.cash_return_paid)}`} />
+                        <Chip size="small" variant="outlined" label={`Net Cash Movement: ${money(summary.net_cash_sales_total)}`} color="primary" />
                         <Chip size="small" variant="outlined" label={`Expected Total: ${money(summary.expected_amount_total)}`} />
                         <Chip size="small" variant="outlined" label={`Counted Total: ${money(summary.counted_amount_total)}`} />
                         <Chip
@@ -151,6 +154,14 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                             sx={{ color: diffColor(summary.difference_total), borderColor: diffColor(summary.difference_total) }}
                         />
                     </Stack>
+
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' }, gap: 1.25, mb: 1.5 }}>
+                        <CompactLineChart title="Daily Cash Movement" data={dateTrend} xKey="session_date" series={[
+                            { key: 'net_cash_sales_total', label: 'Net Cash', color: '#0E684E' },
+                            { key: 'difference_total', label: 'Difference', color: '#b77700' },
+                        ]} valueFormatter={(value) => money(value)} />
+                        <CompactBarChart title="Cash by Branch" data={branchTrend} xKey="branch_name" series={[{ key: 'net_cash_sales_total', label: 'Net Cash', color: '#0E684E' }]} valueFormatter={(value) => money(value)} />
+                    </Box>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
                         <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 calc(50% - 6px)' }}>
@@ -297,17 +308,7 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        {Number(sessions?.last_page || 1) > 1 && (
-                            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                                <Pagination
-                                    size="small"
-                                    count={sessions.last_page}
-                                    page={sessions.current_page}
-                                    onChange={(event, page) => applyFilters(page)}
-                                    color="primary"
-                                />
-                            </Stack>
-                        )}
+                        <DataTableFooter paginator={sessions} onPageChange={(page) => applyFilters(page)} />
                     </Paper>
                 </Paper>
             </Box>

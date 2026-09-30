@@ -17,6 +17,7 @@ class ReturnItem extends Model
     protected $fillable = [
         'return_id',
         'source_sale_item_id',
+        'source_purchase_item_id',
         'product_id',
         'batch_id',
         'unit_id',
@@ -25,6 +26,11 @@ class ReturnItem extends Model
         'base_unit_cost',
         'cost_total',
         'refund_price',
+        'refund_amount',
+        'tax_amount',
+        'restock',
+        'paid_quantity',
+        'foc_quantity',
         'created_at',
     ];
 
@@ -34,6 +40,11 @@ class ReturnItem extends Model
         'base_unit_cost' => 'decimal:6',
         'cost_total' => 'decimal:2',
         'refund_price' => 'decimal:2',
+        'refund_amount' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
+        'restock' => 'boolean',
+        'paid_quantity' => 'decimal:2',
+        'foc_quantity' => 'decimal:2',
     ];
 
     public function returnEntry()

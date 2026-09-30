@@ -1,11 +1,9 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link } from '@/spa';
-import { Box, Typography, Button, Paper, useTheme } from '@mui/material';
-import { 
-    GppBad as GppBadIcon, 
-    Home as HomeIcon 
-} from '@mui/icons-material';
+import { AppBarBack } from '@/Components/AppBarPortal';
+import { Head } from '@/spa';
+import { Box, Typography, Paper, useTheme } from '@mui/material';
+import { GppBad as GppBadIcon } from '@mui/icons-material';
 
 export default function Error({ status, message, auth }) {
     const theme = useTheme();
@@ -27,6 +25,7 @@ export default function Error({ status, message, auth }) {
     return (
         <MainLayout auth={auth} header={title}>
             <Head title={title} />
+            <AppBarBack href={route('dashboard')} label="Back to Dashboard" />
             
             <Box
                 sx={{
@@ -34,7 +33,7 @@ export default function Error({ status, message, auth }) {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minHeight: '60vh',
+                    minHeight: '40vh',
                     textAlign: 'center',
                     px: 3
                 }}
@@ -42,21 +41,21 @@ export default function Error({ status, message, auth }) {
                 <Paper
                     variant="outlined"
                     sx={{
-                        p: 6,
+                        p: 3,
                         maxWidth: 500,
                         borderRadius: 2,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: 3,
+                        gap: 1.5,
                         borderColor: 'divider',
                         boxShadow: 'none'
                     }}
                 >
                     <Box
                         sx={{
-                            width: 80,
-                            height: 80,
+                            width: 52,
+                            height: 52,
                             borderRadius: '50%',
                             bgcolor: theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)',
                             display: 'flex',
@@ -66,27 +65,17 @@ export default function Error({ status, message, auth }) {
                             mb: 1
                         }}
                     >
-                        <GppBadIcon sx={{ fontSize: 48 }} />
+                        <GppBadIcon sx={{ fontSize: 28 }} />
                     </Box>
 
                     <Box>
-                        <Typography variant="h4" fontWeight={800} gutterBottom>
+                        <Typography variant="h5" fontWeight={800} gutterBottom>
                             {title}
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
                             {description}
                         </Typography>
                     </Box>
-
-                    <Button
-                        component={Link}
-                        href={route('dashboard')}
-                        variant="contained"
-                        startIcon={<HomeIcon />}
-                        sx={{ px: 4, py: 1.2, borderRadius: 1, fontWeight: 700 }}
-                    >
-                        Back to Dashboard
-                    </Button>
                 </Paper>
             </Box>
         </MainLayout>

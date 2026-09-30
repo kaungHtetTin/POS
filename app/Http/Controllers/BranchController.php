@@ -27,9 +27,9 @@ class BranchController extends Controller
 
         $branch = Branch::create($validated);
 
-        // Automatically assign new branch to all Root users
+        // Owners always retain access to every branch.
         $rootUsers = User::whereHas('roles', function($q) {
-            $q->where('name', 'Root');
+            $q->whereIn('name', ['Owner', 'Root']);
         })->get();
 
         foreach ($rootUsers as $user) {

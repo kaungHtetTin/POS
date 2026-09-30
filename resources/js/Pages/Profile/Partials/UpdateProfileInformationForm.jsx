@@ -97,7 +97,7 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
                                     bottom: 0,
                                     right: 0,
                                     bgcolor: 'background.paper',
-                                    boxShadow: 1,
+                                    boxShadow: 'none',
                                     '&:hover': { bgcolor: 'background.default' },
                                     width: 32,
                                     height: 32,

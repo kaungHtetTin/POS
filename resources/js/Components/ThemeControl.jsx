@@ -12,10 +12,10 @@ import {
 import { ColorModeContext } from '@/contexts/ColorModeContext';
 import SimpleIcon from '@/Components/SimpleIcon';
 
-const brandPresets = ['#087f74', '#1565c0', '#7c3aed', '#c2410c', '#b42318', '#2f6f4e'];
+const brandPresets = ['#0E684E', '#1565c0', '#7c3aed', '#c2410c', '#b42318', '#2f6f4e'];
 
-export default function ThemeControl({ label = 'Theme' }) {
-    const { mode = 'light', primaryColor = '#087f74', setMode, setPrimaryColor } = useContext(ColorModeContext);
+export default function ThemeControl({ label = 'Theme', inverse = false }) {
+    const { mode = 'light', primaryColor = '#0E684E', setMode, setPrimaryColor } = useContext(ColorModeContext);
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
 
@@ -41,8 +41,10 @@ export default function ThemeControl({ label = 'Theme' }) {
                     aria-label={label}
                     sx={{
                         border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
+                        borderColor: inverse ? 'rgba(255,255,255,0.22)' : 'divider',
+                        bgcolor: inverse ? 'rgba(255,255,255,0.10)' : 'background.paper',
+                        color: inverse ? '#FFFFFF' : 'text.secondary',
+                        '&:hover': inverse ? { bgcolor: 'rgba(255,255,255,0.18)', color: '#FFFFFF' } : undefined,
                     }}
                 >
                     <SimpleIcon name="palette" size={17} />

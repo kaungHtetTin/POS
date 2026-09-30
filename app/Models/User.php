@@ -122,6 +122,10 @@ class User extends Authenticatable
      */
     public function hasPermission($permissionSlug)
     {
+        if ($this->hasRole('Owner') || $this->hasRole('Root')) {
+            return true;
+        }
+
         return $this->roles()->whereHas('permissions', function ($query) use ($permissionSlug) {
             $query->where('slug', $permissionSlug);
         })->exists();

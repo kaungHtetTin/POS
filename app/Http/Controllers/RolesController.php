@@ -6,15 +6,18 @@ use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Http\Request;
 use App\Support\Spa;
+use App\Support\PharmacyAccess;
 use Illuminate\Support\Facades\DB;
 
 class RolesController extends Controller
 {
+    private const PROTECTED_ROLES = ['Owner', 'Root'];
+
     public function index()
     {
         return Spa::render('Roles/Index', [
             'roles' => Role::with('permissions')->withCount('users')->get(),
-            'permissions' => Permission::all()
+            'permissions' => Permission::whereIn('slug', PharmacyAccess::permissionSlugs())->orderBy('name')->get()
         ]);
     }
 
@@ -40,8 +43,8 @@ class RolesController extends Controller
 
     public function update(Request $request, Role $role)
     {
-        if ($role->name === 'Root') {
-            abort(403, 'The Root role cannot be modified.');
+        if (in_array($role->name, self::PROTECTED_ROLES, true)) {
+            abort(403, 'The Owner role cannot be modified.');
         }
 
         $validated = $request->validate([
@@ -64,8 +67,8 @@ class RolesController extends Controller
 
     public function destroy(Role $role)
     {
-        if ($role->name === 'Root' || $role->users()->exists()) {
-            abort(403, 'Role cannot be deleted if it is Root or has assigned users.');
+        if (in_array($role->name, self::PROTECTED_ROLES, true) || $role->users()->exists()) {
+            abort(403, 'System roles and roles with assigned users cannot be deleted.');
         }
 
         $role->delete();

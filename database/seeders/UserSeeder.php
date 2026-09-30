@@ -36,6 +36,12 @@ class UserSeeder extends Seeder
                 'role' => 'Manager',
             ],
             [
+                'name' => 'Accountant User',
+                'email' => 'accountant@store.com',
+                'password' => Hash::make('password'),
+                'role' => 'Accountant',
+            ],
+            [
                 'name' => 'Cashier User',
                 'email' => 'cashier@store.com',
                 'password' => Hash::make('password'),

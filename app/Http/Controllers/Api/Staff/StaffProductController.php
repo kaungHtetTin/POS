@@ -20,7 +20,7 @@ class StaffProductController extends Controller
 {
     public function index(Request $request)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -64,7 +64,7 @@ class StaffProductController extends Controller
 
     public function lookupData(Request $request)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -81,7 +81,7 @@ class StaffProductController extends Controller
 
     public function store(Request $request)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -121,7 +121,7 @@ class StaffProductController extends Controller
 
     public function show(Request $request, Product $product)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -132,7 +132,7 @@ class StaffProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -179,7 +179,7 @@ class StaffProductController extends Controller
 
     public function destroy(Request $request, Product $product)
     {
-        if (!$this->canManageInventory($request)) {
+        if (!$this->canManageProducts($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -519,5 +519,10 @@ class StaffProductController extends Controller
     private function canManageInventory(Request $request): bool
     {
         return $request->user()->hasPermission('manage_inventory');
+    }
+
+    private function canManageProducts(Request $request): bool
+    {
+        return $request->user()->hasPermission('manage_products');
     }
 }

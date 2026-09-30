@@ -19,10 +19,20 @@ class ReturnEntry extends Model
         'reason',
         'refund_amount',
         'status',
+        'credit_applied',
+        'settlement_due',
+        'settlement_paid',
+        'tax_amount',
+        'approved_at',
     ];
 
     protected $casts = [
         'refund_amount' => 'decimal:2',
+        'credit_applied' => 'decimal:2',
+        'settlement_due' => 'decimal:2',
+        'settlement_paid' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
+        'approved_at' => 'datetime',
     ];
 
     public function branch()
@@ -34,5 +44,9 @@ class ReturnEntry extends Model
     {
         return $this->hasMany(ReturnItem::class, 'return_id');
     }
-}
 
+    public function settlements()
+    {
+        return $this->hasMany(ReturnSettlement::class, 'return_id');
+    }
+}

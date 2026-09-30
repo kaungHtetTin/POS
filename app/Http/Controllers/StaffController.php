@@ -14,6 +14,8 @@ use Illuminate\Validation\Rules;
 
 class StaffController extends Controller
 {
+    private const PROTECTED_ROLES = ['Owner', 'Root'];
+
     protected function resolveStaff(string $staff): User
     {
         return User::query()->findOrFail($staff);
@@ -22,6 +24,13 @@ class StaffController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->get('search', ''));
+        $branchIds = $this->accessibleBranchIds($request->user());
+        $roles = Role::with('permissions')
+            ->whereNotIn('name', self::PROTECTED_ROLES)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Role $role) => $this->canAssignRole($request->user(), $role))
+            ->values();
 
         return Spa::render('Staff/Index', [
             'staff' => User::with([
@@ -41,8 +50,9 @@ class StaffController extends Controller
                 $q->where('status', '!=', 'Voided');
             }], 'grand_total')
             ->whereHas('roles', function($q) {
-                $q->where('name', '!=', 'Root');
+                $q->whereNotIn('name', self::PROTECTED_ROLES);
             })
+            ->whereIn('branch_id', $branchIds)
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
@@ -53,8 +63,8 @@ class StaffController extends Controller
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString(),
-            'roles' => Role::where('name', '!=', 'Root')->get(),
-            'branches' => Branch::select('id', 'name')->orderBy('name')->get(),
+            'roles' => $roles,
+            'branches' => Branch::select('id', 'name')->whereIn('id', $branchIds)->orderBy('name')->get(),
             'filters' => [
                 'search' => $search,
             ],
@@ -74,6 +84,9 @@ class StaffController extends Controller
             'role_id' => 'required|exists:roles,id',
             'image' => 'nullable|image|max:250',
         ]);
+
+        $this->ensureAssignableRole($request->user(), $request->role_id);
+        $this->ensureAssignableBranches($request->user(), $request->branch_id, $request->branch_ids ?? []);
 
         DB::transaction(function () use ($request) {
             $imagePath = null;
@@ -109,8 +122,9 @@ class StaffController extends Controller
     {
         $staff = $this->resolveStaff($staff);
 
-        // Prevent modifying Root users
-        if ($staff->hasRole('Root')) {
+        $this->ensureCanManageStaff($request->user(), $staff);
+
+        if ($this->hasProtectedRole($staff)) {
             abort(403);
         }
 
@@ -125,6 +139,9 @@ class StaffController extends Controller
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'image' => 'nullable|image|max:250',
         ]);
+
+        $this->ensureAssignableRole($request->user(), $request->role_id);
+        $this->ensureAssignableBranches($request->user(), $request->branch_id, $request->branch_ids ?? []);
 
         DB::transaction(function () use ($request, $staff) {
             $data = [
@@ -167,7 +184,9 @@ class StaffController extends Controller
     {
         $staff = $this->resolveStaff($staff);
 
-        if ($staff->hasRole('Root') || $staff->id === auth()->id()) {
+        $this->ensureCanManageStaff(auth()->user(), $staff);
+
+        if ($this->hasProtectedRole($staff) || $staff->id === auth()->id()) {
             abort(403);
         }
 
@@ -179,5 +198,69 @@ class StaffController extends Controller
         $staff->delete();
 
         return redirect()->back();
+    }
+
+    private function hasProtectedRole(User $user): bool
+    {
+        return $user->roles()->whereIn('name', self::PROTECTED_ROLES)->exists();
+    }
+
+    private function ensureAssignableRole(User $actor, string $roleId): void
+    {
+        $role = Role::with('permissions')->findOrFail($roleId);
+
+        abort_unless(
+            $this->canAssignRole($actor, $role),
+            403,
+            'You cannot assign a role with permissions outside your own access.'
+        );
+    }
+
+    private function canAssignRole(User $actor, Role $role): bool
+    {
+        if (in_array($role->name, self::PROTECTED_ROLES, true)) {
+            return false;
+        }
+
+        if ($actor->hasRole('Owner') || $actor->hasRole('Root')) {
+            return true;
+        }
+
+        return $role->permissions->every(fn ($permission) => $actor->hasPermission($permission->slug));
+    }
+
+    private function accessibleBranchIds(User $user)
+    {
+        if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+            return Branch::pluck('id');
+        }
+
+        return collect([$user->branch_id, $user->active_branch_id])
+            ->merge($user->branches()->pluck('branches.id'))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    private function ensureAssignableBranches(User $actor, string $primaryBranchId, array $additionalBranchIds): void
+    {
+        $allowed = $this->accessibleBranchIds($actor);
+        $requested = collect($additionalBranchIds)->push($primaryBranchId)->filter()->unique();
+
+        abort_if($requested->diff($allowed)->isNotEmpty(), 403, 'You cannot assign staff to a branch outside your access.');
+    }
+
+    private function ensureCanManageStaff(User $actor, User $staff): void
+    {
+        $staffBranchIds = collect([$staff->branch_id])
+            ->merge($staff->branches()->pluck('branches.id'))
+            ->filter()
+            ->unique();
+
+        abort_if(
+            $staffBranchIds->diff($this->accessibleBranchIds($actor))->isNotEmpty(),
+            403,
+            'You cannot manage staff assigned outside your branches.'
+        );
     }
 }

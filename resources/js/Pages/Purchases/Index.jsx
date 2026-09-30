@@ -1,13 +1,18 @@
 import { automaticPrice, purchaseBuyingCost } from '@/Utils/automaticPricing';
-import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router, useForm } from '@/spa';
+import { Head, router, useForm } from '@/spa';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
@@ -17,7 +22,6 @@ import {
     IconButton,
     InputAdornment,
     MenuItem,
-    Pagination,
     Paper,
     Stack,
     Table,
@@ -31,15 +35,24 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
+    Check as CheckIcon,
     Close as CloseIcon,
     Delete as DeleteIcon,
     Edit as EditIcon,
-    Inventory as InventoryIcon,
+    CheckCircle as CheckCircleIcon,
+    NavigateBefore as NavigateBeforeIcon,
+    NavigateNext as NavigateNextIcon,
     Payment as PaymentIcon,
     ReceiptLong as PurchaseIcon,
     Search as SearchIcon,
-    Visibility as VisibilityIcon,
 } from '@mui/icons-material';
+
+const purchaseSteps = [
+    { label: 'Basic Information', shortLabel: 'Basic' },
+    { label: 'Select Products', shortLabel: 'Products' },
+    { label: 'Quantities & Prices', shortLabel: 'Quantities' },
+    { label: 'Review & Confirm', shortLabel: 'Review' },
+];
 
 const emptyItem = {
     product_id: '',
@@ -52,6 +65,23 @@ const emptyItem = {
     selling_price: 0,
     wholesale_price: 0,
 };
+
+const compactCellFieldSx = {
+    minWidth: 0,
+    '& .MuiInputBase-root': { minHeight: 30, fontSize: '0.78rem' },
+    '& .MuiInputBase-input': { width: '100%', minWidth: 0, px: 0.5, py: 0.5 },
+    '& .MuiSelect-select': { px: 0.75, py: '4px !important' },
+    '& input[type="number"]': { MozAppearance: 'textfield' },
+    '& input[type="number"]::-webkit-outer-spin-button, & input[type="number"]::-webkit-inner-spin-button': {
+        WebkitAppearance: 'none',
+        margin: 0,
+    },
+};
+
+const validationCellSx = (invalid) => invalid ? {
+    boxShadow: (theme) => `inset 0 0 0 1px ${theme.palette.error.main}`,
+    bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(211, 47, 47, 0.035)' : 'rgba(239, 83, 80, 0.08)',
+} : undefined;
 
 const dateInputValue = (date) => {
     const year = date.getFullYear();
@@ -75,8 +105,13 @@ const addDaysToInputDate = (dateString, days) => {
     return dateInputValue(date);
 };
 
-export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters, pricing_rules = [] }) {
-    const [open, setOpen] = useState(false);
+export default function PurchaseIndex({ auth, purchases, suppliers, products, branches, filters, pricing_rules = [], open_purchase_modal = false, edit_purchase = null }) {
+    const [open, setOpen] = useState(Boolean(open_purchase_modal));
+    const initialEditHandled = useRef(false);
+    const [activeStep, setActiveStep] = useState(0);
+    const [stepErrors, setStepErrors] = useState([]);
+    const [productQuery, setProductQuery] = useState('');
+    const [categoryId, setCategoryId] = useState('all');
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentPurchase, setPaymentPurchase] = useState(null);
     const [editingPurchase, setEditingPurchase] = useState(null);
@@ -84,7 +119,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
     const purchaseRows = purchases?.data || purchases || [];
     const defaultPurchaseDate = todayInputValue();
 
-    const { data, setData, post, patch, delete: destroy, processing, errors, reset } = useForm({
+    const { data, setData, post, patch, delete: destroy, processing, errors, reset, clearErrors } = useForm({
         supplier_id: '',
         branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
         invoice_number: '',
@@ -92,7 +127,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         due_date: addDaysToInputDate(defaultPurchaseDate, 7),
         payment_status: 'Due',
         paid_amount: 0,
-        items: [{ ...emptyItem }],
+        items: [],
     });
 
     const {
@@ -171,12 +206,63 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         return product?.product_units || [];
     };
 
+    const categories = useMemo(() => {
+        const unique = new Map();
+        products.forEach((product) => {
+            if (product.category?.id) unique.set(product.category.id, product.category);
+        });
+        return Array.from(unique.values()).sort((left, right) => left.name.localeCompare(right.name));
+    }, [products]);
+
+    const selectedProductIds = useMemo(
+        () => new Set(data.items.map((item) => String(item.product_id))),
+        [data.items]
+    );
+
+    const filteredProducts = useMemo(() => {
+        const query = productQuery.trim().toLowerCase();
+        return products.filter((product) => {
+            const matchesCategory = categoryId === 'all' || String(product.category_id) === String(categoryId);
+            const searchable = [product.name, product.generic_name, product.barcode, product.category?.name]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return matchesCategory && (!query || searchable.includes(query));
+        });
+    }, [products, productQuery, categoryId]);
+
+    const allFilteredProductsSelected = filteredProducts.length > 0
+        && filteredProducts.every((product) => selectedProductIds.has(String(product.id)));
+    const someFilteredProductsSelected = filteredProducts.some((product) => selectedProductIds.has(String(product.id)));
+
+    const getBaseUnit = (product) => {
+        const units = product?.product_units || [];
+        return units.find((unit) => unit.is_base_unit) || units[0];
+    };
+
+    const getProductStock = (product) => (product?.inventories || [])
+        .filter((inventory) => String(inventory.branch_id) === String(data.branch_id))
+        .reduce((sum, inventory) => sum + Number(inventory.quantity || 0), 0);
+
+    const quantitySummary = useMemo(() => data.items.reduce((summary, item) => {
+        const selectedUnit = getUnitsForProduct(item.product_id).find((unit) => unit.unit_id === item.unit_id);
+        const factor = Number(selectedUnit?.conversion_factor || 1);
+        summary.paid += Number(item.quantity || 0) * factor;
+        summary.foc += Number(item.foc_quantity || 0) * factor;
+        return summary;
+    }, { paid: 0, foc: 0 }), [data.items, products]);
+
     const ensureOptionValue = (value, options) => {
         const normalized = value ?? '';
         return options.some((option) => option === normalized) ? normalized : '';
     };
 
     const handleOpen = (purchase = null) => {
+        clearErrors();
+        setStepErrors([]);
+        setActiveStep(0);
+        setProductQuery('');
+        setCategoryId('all');
         if (purchase) {
             setEditingPurchase(purchase);
             const supplierId = ensureOptionValue(
@@ -237,22 +323,43 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
             const purchaseDate = todayInputValue();
             setData({
                 supplier_id: '',
-                branch_id: auth.user?.branch_id || branches[0]?.id || '',
+                branch_id: auth.user?.current_branch_id || auth.user?.branch_id || branches[0]?.id || '',
                 invoice_number: '',
                 purchase_date: purchaseDate,
                 due_date: addDaysToInputDate(purchaseDate, 7),
                 payment_status: 'Due',
                 paid_amount: 0,
-                items: [{ ...emptyItem }],
+                items: [],
             });
         }
         setOpen(true);
     };
 
+    useEffect(() => {
+        if (edit_purchase && !initialEditHandled.current) {
+            initialEditHandled.current = true;
+            handleOpen(edit_purchase);
+        }
+    }, [edit_purchase]);
+
     const handleClose = () => {
         setOpen(false);
         setEditingPurchase(null);
+        setActiveStep(0);
+        setStepErrors([]);
+        setProductQuery('');
+        setCategoryId('all');
+        clearErrors();
         reset();
+
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('create') || url.searchParams.has('edit')) {
+                url.searchParams.delete('create');
+                url.searchParams.delete('edit');
+                window.history.replaceState(window.history.state, '', url.toString());
+            }
+        }
     };
 
     const handlePaymentOpen = (purchase) => {
@@ -297,15 +404,47 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         router.get(route('purchases.index'), { search: search || undefined, page }, { preserveState: true, replace: true });
     };
 
-    const addItem = () => {
-        setData('items', [...data.items, { ...emptyItem }]);
+    const purchaseItemForProduct = (product) => {
+        const units = getUnitsForProduct(product.id);
+        const preferredUnit = units.find((unit) => unit.is_base_unit) || units[0];
+
+        return {
+            ...emptyItem,
+            product_id: product.id,
+            unit_id: preferredUnit?.unit_id || '',
+            selling_price: Number(preferredUnit?.selling_price || 0),
+            wholesale_price: Number(preferredUnit?.wholesale_price || preferredUnit?.selling_price || 0),
+        };
+    };
+
+    const addProduct = (product) => {
+        if (!product?.id || selectedProductIds.has(String(product.id))) return;
+        setData('items', [
+            ...data.items,
+            purchaseItemForProduct(product),
+        ]);
+        setStepErrors([]);
     };
 
     const removeItem = (index) => {
-        if (data.items.length === 1) {
-            return;
-        }
         setData('items', data.items.filter((_, itemIndex) => itemIndex !== index));
+    };
+
+    const removeProduct = (productId) => {
+        setData('items', data.items.filter((item) => String(item.product_id) !== String(productId)));
+    };
+
+    const toggleFilteredProducts = (checked) => {
+        const filteredIds = new Set(filteredProducts.map((product) => String(product.id)));
+        if (checked) {
+            const additions = filteredProducts
+                .filter((product) => !selectedProductIds.has(String(product.id)))
+                .map(purchaseItemForProduct);
+            setData('items', [...data.items, ...additions]);
+        } else {
+            setData('items', data.items.filter((item) => !filteredIds.has(String(item.product_id))));
+        }
+        setStepErrors([]);
     };
 
     const automaticFor = (item, field) => getUnitsForProduct(item.product_id).find((unit) => unit.unit_id === item.unit_id)?.[field + '_mode'] === 'automatic';
@@ -368,8 +507,84 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
         setData('items', updatedItems);
     };
 
+    const getStepErrors = (step) => {
+        const messages = [];
+
+        if (step === 0) {
+            if (!data.supplier_id) messages.push('Supplier is required.');
+            if (!data.branch_id) messages.push('Branch is required.');
+            if (!data.invoice_number.trim()) messages.push('Invoice number is required.');
+            if (!data.purchase_date) messages.push('Purchase date is required.');
+            if (!data.due_date) messages.push('Payment due date is required.');
+            if (data.purchase_date && data.due_date && data.due_date < data.purchase_date) {
+                messages.push('Payment due date cannot be before the purchase date.');
+            }
+        }
+
+        if (step === 1 && data.items.length === 0) {
+            messages.push('Select at least one product.');
+        }
+
+        if (step === 2) {
+            if (data.items.length === 0) messages.push('Select at least one product.');
+            data.items.forEach((item, index) => {
+                const label = getProductById(item.product_id)?.name || `Item ${index + 1}`;
+                if (!item.unit_id) messages.push(`${label}: unit is required.`);
+                if (!item.expiry_date) messages.push(`${label}: expiry date is required.`);
+                if (Number(item.quantity || 0) < 1) messages.push(`${label}: quantity must be at least 1.`);
+                if (Number(item.foc_quantity || 0) < 0) messages.push(`${label}: FOC quantity cannot be negative.`);
+                if (Number(item.unit_price || 0) <= 0) messages.push(`${label}: unit cost is required.`);
+                if (Number(item.selling_price || 0) <= 0) messages.push(`${label}: selling price is required.`);
+                if (Number(item.wholesale_price || 0) <= 0) messages.push(`${label}: wholesale price is required.`);
+            });
+        }
+
+        if (step === 3) {
+            messages.push(...getStepErrors(0), ...getStepErrors(1), ...getStepErrors(2));
+            if (data.payment_status === 'Partial' && Number(data.paid_amount || 0) > totalAmount) {
+                messages.push('Paid amount cannot exceed the purchase total.');
+            }
+        }
+
+        return [...new Set(messages)];
+    };
+
+    const goNext = () => {
+        clearErrors();
+        const messages = getStepErrors(activeStep);
+        if (messages.length) {
+            setStepErrors(messages);
+            return;
+        }
+        setStepErrors([]);
+        setActiveStep((step) => Math.min(step + 1, purchaseSteps.length - 1));
+    };
+
+    const goBack = () => {
+        clearErrors();
+        setStepErrors([]);
+        setActiveStep((step) => Math.max(step - 1, 0));
+    };
+
     const submit = (event) => {
-        event.preventDefault();
+        event?.preventDefault();
+        const messages = getStepErrors(3);
+        if (messages.length) {
+            setStepErrors(messages);
+            return;
+        }
+        setStepErrors([]);
+        const handleSubmissionError = (formErrors) => {
+            const errorKeys = Object.keys(formErrors || {});
+            if (errorKeys.some((key) => key === 'items' || key.startsWith('items.'))) {
+                setActiveStep(2);
+                setStepErrors(['validation']);
+                return;
+            }
+            if (errorKeys.some((key) => ['supplier_id', 'branch_id', 'invoice_number', 'purchase_date', 'due_date', 'payment_status', 'paid_amount'].includes(key))) {
+                setActiveStep(0);
+            }
+        };
         if (editingPurchase) {
             const purchaseId = editingPurchase?.id || editingPurchase?.purchase_id || '';
             if (!purchaseId) {
@@ -379,11 +594,13 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
             patch(route('purchases.update', { purchase: purchaseId }), {
                 preserveScroll: true,
                 onSuccess: () => handleClose(),
+                onError: handleSubmissionError,
             });
         } else {
             post(route('purchases.store'), {
                 preserveScroll: true,
                 onSuccess: () => handleClose(),
+                onError: handleSubmissionError,
             });
         }
     };
@@ -394,18 +611,11 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1.5} justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            PURCHASE ORDERS & STOCK RECEIPTS
-                        </Typography>
-                        <Button component={Link} href={route('purchases.create')} variant="contained" size="small" startIcon={<AddIcon />}>Create Purchase</Button>
-                    </Stack>
-
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Purchase list filters"
                         fieldKinds={['search']}
                         onSubmit={() => handleSearch()}
-                        actions={<><Button variant="outlined" size="small" type="submit">Search</Button><CsvExportButton source={purchases} dataKey="purchases" filename="purchases.csv" /></>}
+                        actions={<><Button variant="outlined" size="small" type="submit">Search</Button><CsvExportButton source={purchases} dataKey="purchases" filename="purchases.csv" /><Button type="button" onClick={() => handleOpen()} variant="contained" size="small" startIcon={<AddIcon />}>Create Purchase</Button></>}
                     >
                         <TextField
                             size="small"
@@ -415,8 +625,6 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
                         />
                     </ReportFilterToolbar>
-
-                    <Divider sx={{ mb: 2 }} />
 
                     <TableContainer>
                         <Table size="small">
@@ -431,26 +639,16 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Paid</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Due</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {purchaseRows.map((purchase) => (
-                                    <TableRow key={purchase.id} hover>
+                                    <ClickableTableRow key={purchase.id} href={route('purchases.show', { purchase: purchase.id })} label={`View purchase ${purchase.invoice_number}`}>
                                         <TableCell>
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <PurchaseIcon fontSize="small" color="primary" />
-                                                <Typography
-                                                    component={Link}
-                                                    href={route('purchases.show', { purchase: purchase.id })}
-                                                    variant="body2"
-                                                    sx={{
-                                                        fontWeight: 500,
-                                                        color: 'primary.main',
-                                                        textDecoration: 'none',
-                                                        '&:hover': { textDecoration: 'underline' },
-                                                    }}
-                                                >
+                                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                                     {purchase.invoice_number}
                                                 </Typography>
                                             </Stack>
@@ -473,22 +671,8 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 variant="outlined"
                                             />
                                         </TableCell>
-                                        <TableCell align="center">
-                                            <Stack
-                                                direction="row"
-                                                spacing={0}
-                                                justifyContent="center"
-                                                sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}
-                                            >
-                                                <IconButton
-                                                    component={Link}
-                                                    href={route('purchases.show', { purchase: purchase.id })}
-                                                    size="small"
-                                                    color="info"
-                                                    title="View Invoice"
-                                                >
-                                                    <VisibilityIcon fontSize="inherit" />
-                                                </IconButton>
+                                        <TableActionCell>
+                                            <TableRowActions label={purchase.invoice_number}>
                                                 <IconButton
                                                     size="small"
                                                     color="success"
@@ -516,9 +700,9 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                                                 >
                                                     <DeleteIcon fontSize="inherit" />
                                                 </IconButton>
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
                                 {purchaseRows.length === 0 && (
                                     <TableRow>
@@ -532,360 +716,617 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(purchases?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={purchases.last_page}
-                                page={purchases.current_page}
-                                onChange={(event, page) => handleSearch(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={purchases} onPageChange={(page) => handleSearch(page)} />
                 </Paper>
             </Box>
 
-            <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
-                <form onSubmit={submit}>
-                    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {editingPurchase ? 'Edit Purchase Order' : 'Create Purchase Order & Receive Stock'}
-                        <IconButton size="small" onClick={handleClose}>
-                            <CloseIcon />
-                        </IconButton>
-                    </DialogTitle>
-                    <DialogContent dividers>
-                        <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <Dialog
+                open={open}
+                onClose={processing ? undefined : handleClose}
+                maxWidth="xl"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        width: 'min(1440px, calc(100vw - 32px))',
+                        height: 'min(900px, calc(100vh - 32px))',
+                        maxHeight: 'calc(100vh - 32px)',
+                        m: 2,
+                        overflow: 'hidden',
+                    },
+                }}
+            >
+                <DialogTitle sx={{ width: '100%', boxSizing: 'border-box', px: { xs: 1.5, md: 2 }, py: 0.75, borderBottom: 1, borderColor: 'divider' }}>
+                    <Stack direction="row" alignItems="center" sx={{ width: '100%', minHeight: 42 }}>
+                        <Box sx={{ minWidth: { xs: 120, md: 210 }, flexShrink: 0 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
+                                {editingPurchase ? 'Edit Purchase' : 'New Purchase'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: { xs: 'none', lg: 'block' } }}>
+                                Receive inventory and supplier payment details
+                            </Typography>
+                        </Box>
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            sx={{
+                                flex: '0 1 760px',
+                                minWidth: 0,
+                                maxWidth: 760,
+                                ml: 'auto',
+                                gap: 1,
+                            }}
+                        >
+                            <Box
+                                role="tablist"
+                                aria-label="Purchase form steps"
+                                sx={{
+                                    flex: 1,
+                                    minWidth: 120,
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    px: 0.5,
+                                }}
+                            >
+                            {purchaseSteps.map((step, index) => {
+                                const completed = index < activeStep;
+                                const active = index === activeStep;
 
-                            {editingPurchase && (
-                                <Alert severity="warning" sx={{ mb: 1 }}>
-                                    Warning: Editing this purchase will temporarily reverse previous stock increases and supplier balance changes before applying new values.
-                                </Alert>
-                            )}
-
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    select
-                                    label="Supplier"
-                                    fullWidth
-                                    size="small"
-                                    value={data.supplier_id}
-                                    onChange={(event) => setData('supplier_id', event.target.value)}
-                                    error={!!errors.supplier_id}
-                                    helperText={errors.supplier_id}
-                                    required
-                                >
-                                    {suppliers.map((supplier) => (
-                                        <MenuItem key={supplier.id} value={supplier.id}>
-                                            {supplier.name}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-
-                                <TextField
-                                    select
-                                    label="Branch"
-                                    fullWidth
-                                    size="small"
-                                    value={data.branch_id}
-                                    onChange={(event) => setData('branch_id', event.target.value)}
-                                    error={!!errors.branch_id}
-                                    helperText={errors.branch_id}
-                                    required
-                                >
-                                    {branches.map((branch) => (
-                                        <MenuItem key={branch.id} value={branch.id}>
-                                            {branch.name}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-                            </Stack>
-
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    label="Invoice Number"
-                                    fullWidth
-                                    size="small"
-                                    value={data.invoice_number}
-                                    onChange={(event) => setData('invoice_number', event.target.value)}
-                                    error={!!errors.invoice_number}
-                                    helperText={errors.invoice_number}
-                                    required
-                                />
-                                <TextField
-                                    label="Purchase Date"
-                                    type="date"
-                                    fullWidth
-                                    size="small"
-                                    value={data.purchase_date}
-                                    onChange={(event) => {
-                                        const purchaseDate = event.target.value;
-                                        setData({
-                                            ...data,
-                                            purchase_date: purchaseDate,
-                                            due_date: addDaysToInputDate(purchaseDate, 7),
-                                        });
-                                    }}
-                                    error={!!errors.purchase_date}
-                                    helperText={errors.purchase_date}
-                                    InputLabelProps={{ shrink: true }}
-                                    required
-                                />
-                                <TextField
-                                    label="Payment Due Date"
-                                    type="date"
-                                    fullWidth
-                                    size="small"
-                                    value={data.due_date}
-                                    onChange={(event) => setData('due_date', event.target.value)}
-                                    error={!!errors.due_date}
-                                    helperText={errors.due_date || 'Defaults to 7 days after purchase date'}
-                                    InputLabelProps={{ shrink: true }}
-                                    required
-                                />
-                            </Stack>
-
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    select
-                                    label="Payment Status"
-                                    fullWidth
-                                    size="small"
-                                    value={data.payment_status}
-                                    onChange={(event) => setData('payment_status', event.target.value)}
-                                    error={!!errors.payment_status}
-                                    helperText={errors.payment_status}
-                                >
-                                    <MenuItem value="Paid">Paid</MenuItem>
-                                    <MenuItem value="Partial">Partial</MenuItem>
-                                    <MenuItem value="Due">Due</MenuItem>
-                                </TextField>
-                                <TextField
-                                    label="Paid Amount"
-                                    type="number"
-                                    fullWidth
-                                    size="small"
-                                    value={data.payment_status === 'Paid' ? totalAmount : data.payment_status === 'Due' ? 0 : data.paid_amount}
-                                    onChange={(event) => setData('paid_amount', event.target.value)}
-                                    disabled={data.payment_status !== 'Partial'}
-                                    error={!!errors.paid_amount}
-                                    helperText={errors.paid_amount}
-                                    inputProps={{ min: 0, step: '0.01' }}
-                                />
-                            </Stack>
-
-                            {selectedSupplier && (
-                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                    <Alert severity="info" sx={{ flex: 1 }}>
-                                        Current Balance: ${Number(selectedSupplier.balance || 0).toFixed(2)}
-                                    </Alert>
-                                    <Alert severity="info" sx={{ flex: 1 }}>
-                                        Projected Balance: ${Number(projectedBalance || 0).toFixed(2)}
-                                    </Alert>
-                                </Stack>
-                            )}
-
-                            <Divider />
-
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    Purchase Items
-                                </Typography>
-                                <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={addItem}>
-                                    Add Item
-                                </Button>
-                            </Stack>
-
-                            <Stack spacing={1.5}>
-                                {data.items.map((item, index) => {
-                                    const unitsForProduct = getUnitsForProduct(item.product_id);
-                                    const selectedUnit = unitsForProduct.find((unit) => unit.unit_id === item.unit_id);
-                                    const conversionFactor = Number(selectedUnit?.conversion_factor || 1);
-                                    const paidQuantity = Number(item.quantity || 0);
-                                    const focQuantity = Number(item.foc_quantity || 0);
-                                    const receivedQuantity = paidQuantity + focQuantity;
-                                    const baseQuantity = receivedQuantity * conversionFactor;
-                                    const lineTotal = (Number(item.quantity || 0) * Number(item.unit_price || 0)).toFixed(2);
-
-                                    return (
-                                        <Paper key={index} variant="outlined" sx={{ p: 1.5 }}>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                                                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                                                    Item #{index + 1}
-                                                </Typography>
-                                                <IconButton color="error" size="small" onClick={() => removeItem(index)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Stack>
-
+                                return (
+                                    <Box
+                                        key={step.label}
+                                        component="button"
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={active}
+                                        aria-current={active ? 'step' : undefined}
+                                        title={step.label}
+                                        onClick={() => {
+                                            if (index <= activeStep) {
+                                                setStepErrors([]);
+                                                clearErrors();
+                                                setActiveStep(index);
+                                            }
+                                        }}
+                                        disabled={index > activeStep || processing}
+                                        sx={{
+                                            position: 'relative',
+                                            flex: 1,
+                                            minWidth: 0,
+                                            p: 0,
+                                            m: 0,
+                                            border: 0,
+                                            color: 'inherit',
+                                            bgcolor: 'transparent',
+                                            font: 'inherit',
+                                            cursor: index <= activeStep && !processing ? 'pointer' : 'default',
+                                            opacity: 1,
+                                            '&:focus-visible': {
+                                                outline: '2px solid',
+                                                outlineColor: 'primary.main',
+                                                outlineOffset: 2,
+                                                borderRadius: 1,
+                                            },
+                                        }}
+                                    >
+                                        {index < purchaseSteps.length - 1 && (
+                                            <Box
+                                                aria-hidden="true"
+                                                sx={{
+                                                    position: 'absolute',
+                                                    zIndex: 0,
+                                                    top: 13,
+                                                    left: '50%',
+                                                    width: '100%',
+                                                    height: 2,
+                                                    bgcolor: completed ? 'success.light' : 'divider',
+                                                }}
+                                            />
+                                        )}
+                                        <Stack alignItems="center" spacing={0.25} sx={{ position: 'relative', zIndex: 1 }}>
                                             <Box
                                                 sx={{
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: '50%',
                                                     display: 'grid',
-                                                    gridTemplateColumns: { xs: '1fr', md: '2fr 1fr 0.7fr 0.7fr 0.9fr 0.9fr 0.9fr' },
-                                                    gap: 1.2,
-                                                    mb: 1.2,
+                                                    placeItems: 'center',
+                                                    border: '2px solid',
+                                                    borderColor: completed || active ? 'success.light' : 'divider',
+                                                    bgcolor: completed ? 'success.light' : active ? 'background.paper' : 'background.paper',
+                                                    color: completed ? 'common.white' : active ? 'success.dark' : 'text.secondary',
+                                                    boxShadow: active ? (theme) => `0 0 0 5px ${theme.palette.success.main}18` : 'none',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 800,
                                                 }}
                                             >
-                                                <TextField
-                                                    select
-                                                    size="small"
-                                                    label="Product"
-                                                    value={item.product_id}
-                                                    onChange={(event) => updateItem(index, 'product_id', event.target.value)}
-                                                    required
-                                                    sx={{ minWidth: 220 }}
-                                                >
-                                                    {products.map((product) => (
-                                                        <MenuItem key={product.id} value={product.id}>
-                                                            {product.name}
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
-                                                <TextField
-                                                    select
-                                                    size="small"
-                                                    label="Unit"
-                                                    value={item.unit_id}
-                                                    onChange={(event) => updateItem(index, 'unit_id', event.target.value)}
-                                                    required
-                                                    disabled={!item.product_id}
-                                                    sx={{ minWidth: 120 }}
-                                                >
-                                                    {unitsForProduct.map((productUnit) => (
-                                                        <MenuItem key={productUnit.id} value={productUnit.unit_id}>
-                                                            {productUnit.unit?.short_name || productUnit.unit?.name}
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
-                                                <TextField
-                                                    size="small"
-                                                    label="Qty"
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(event) => updateItem(index, 'quantity', event.target.value)}
-                                                    inputProps={{ min: 1 }}
-                                                    required
-                                                />
-                                                <TextField
-                                                    size="small"
-                                                    label="FOC Qty"
-                                                    type="number"
-                                                    value={item.foc_quantity}
-                                                    onChange={(event) => updateItem(index, 'foc_quantity', event.target.value)}
-                                                    inputProps={{ min: 0 }}
-                                                />
-                                                <TextField
-                                                    size="small"
-                                                    label="Unit Cost"
-                                                    type="number"
-                                                    value={item.unit_price}
-                                                    onChange={(event) => updateItem(index, 'unit_price', event.target.value)}
-                                                    inputProps={{ min: 0.01, step: '0.01' }}
-                                                    required
-                                                />
-                                                <TextField
-                                                    size="small"
-                                                    label="Selling Price"
-                                                    type="number"
-                                                    value={item.selling_price}
-                                                    disabled={automaticFor(item, 'selling_price')}
-                                                    helperText={automaticFor(item, 'selling_price') ? 'Automatic; latest purchase cost used on save' : ''}
-                                                    onChange={(event) => updateItem(index, 'selling_price', event.target.value)}
-                                                    inputProps={{ min: 0.01, step: '0.01' }}
-                                                    required
-                                                />
-                                                <TextField
-                                                    size="small"
-                                                    label="Wholesale Price"
-                                                    type="number"
-                                                    value={item.wholesale_price}
-                                                    disabled={automaticFor(item, 'wholesale_price')}
-                                                    helperText={automaticFor(item, 'wholesale_price') ? 'Automatic; latest purchase cost used on save' : ''}
-                                                    onChange={(event) => updateItem(index, 'wholesale_price', event.target.value)}
-                                                    inputProps={{ min: 0.01, step: '0.01' }}
-                                                    required
-                                                />
+                                                {completed ? <CheckIcon sx={{ fontSize: 18 }} /> : index + 1}
                                             </Box>
-
-                                            <Box
+                                            <Typography
+                                                component="span"
                                                 sx={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: { xs: '1fr', md: '1.5fr 1fr auto' },
-                                                    gap: 1.2,
-                                                    alignItems: 'start',
+                                                    display: { xs: 'none', md: 'block' },
+                                                    position: 'relative',
+                                                    pb: active ? 0.5 : 0,
+                                                    color: completed || active ? 'success.dark' : 'text.secondary',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 800,
+                                                    lineHeight: 1,
+                                                    whiteSpace: 'nowrap',
+                                                    '&::after': active ? {
+                                                        content: '""',
+                                                        position: 'absolute',
+                                                        left: '50%',
+                                                        bottom: 0,
+                                                        width: 28,
+                                                        height: 3,
+                                                        borderRadius: 2,
+                                                        bgcolor: 'success.dark',
+                                                        transform: 'translateX(-50%)',
+                                                    } : undefined,
                                                 }}
                                             >
-                                                <TextField
-                                                    size="small"
-                                                    label="Batch Number"
-                                                    value={item.batch_number}
-                                                    onChange={(event) => updateItem(index, 'batch_number', event.target.value)}
-                                                    placeholder="Optional (auto-generate if empty)"
-                                                    sx={{ minWidth: 180 }}
-                                                />
-                                                <TextField
-                                                    size="small"
-                                                    label="Expiry Date"
-                                                    type="date"
-                                                    value={item.expiry_date}
-                                                    onChange={(event) => updateItem(index, 'expiry_date', event.target.value)}
-                                                    InputLabelProps={{ shrink: true }}
-                                                    required
-                                                    sx={{ minWidth: 150 }}
-                                                />
-                                                <Paper
-                                                    variant="outlined"
-                                                    sx={{
-                                                        p: 1,
-                                                        minWidth: { md: 170 },
-                                                        bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255,255,255,0.03)',
-                                                    }}
-                                                >
-                                                    <Typography variant="caption" color="text.secondary">Line Total</Typography>
-                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>${lineTotal}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        Received: {receivedQuantity} | Base Qty: {baseQuantity}
-                                                    </Typography>
-                                                </Paper>
-                                            </Box>
-
-                                            {errors[`items.${index}.product_id`] && (
-                                                <Typography variant="caption" color="error">{errors[`items.${index}.product_id`]}</Typography>
-                                            )}
-                                            {errors[`items.${index}.unit_id`] && (
-                                                <Typography variant="caption" color="error">{errors[`items.${index}.unit_id`]}</Typography>
-                                            )}
-                                            {errors[`items.${index}.foc_quantity`] && (
-                                                <Typography variant="caption" color="error">{errors[`items.${index}.foc_quantity`]}</Typography>
-                                            )}
-                                            {errors[`items.${index}.wholesale_price`] && (
-                                                <Typography variant="caption" color="error">{errors[`items.${index}.wholesale_price`]}</Typography>
-                                            )}
-                                        </Paper>
-                                    );
-                                })}
-                            </Stack>
-
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <InventoryIcon fontSize="small" color="primary" />
-                                        <Typography variant="body2">Total Amount: ${totalAmount.toFixed(2)}</Typography>
-                                    </Stack>
-                                </Paper>
-                                <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                                    <Typography variant="body2">Due Amount: ${dueAmount.toFixed(2)}</Typography>
-                                </Paper>
-                            </Stack>
+                                                {step.shortLabel}
+                                            </Typography>
+                                        </Stack>
+                                    </Box>
+                                );
+                            })}
+                            </Box>
+                            <IconButton size="small" onClick={handleClose} disabled={processing} aria-label="Cancel purchase" sx={{ flexShrink: 0 }}>
+                                <CloseIcon fontSize="small" />
+                            </IconButton>
                         </Stack>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={handleClose} size="small">Cancel</Button>
-                        <Button type="submit" variant="contained" size="small" disabled={processing}>
-                            {editingPurchase ? 'Update Purchase' : 'Save Purchase & Receive Stock'}
-                        </Button>
-                    </DialogActions>
-                </form>
+                    </Stack>
+                </DialogTitle>
+
+                <DialogContent
+                    sx={{
+                        p: activeStep <= 2 ? { xs: 1.25, md: 1.5 } : { xs: 2, md: 2.5 },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0,
+                        overflow: activeStep <= 2 ? 'hidden' : 'auto',
+                        bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'background.default',
+                    }}
+                >
+                    <Stack spacing={activeStep <= 2 ? 1.25 : 2} sx={{ flex: activeStep <= 2 ? 1 : 'initial', minHeight: 0 }}>
+                        {editingPurchase && activeStep === 0 && (
+                            <Alert severity="warning">
+                                Updating this purchase recalculates its stock movement and supplier balance.
+                            </Alert>
+                        )}
+
+                        {stepErrors.length > 0 && activeStep !== 2 && (
+                            <Alert severity="error">
+                                <Stack spacing={0.25}>
+                                    {stepErrors.map((message) => (
+                                        <Typography key={message} variant="body2">{message}</Typography>
+                                    ))}
+                                </Stack>
+                            </Alert>
+                        )}
+
+                        {activeStep === 0 && (
+                            <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>Purchase information</Typography>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 1.5, alignItems: 'start' }}>
+                                    <Autocomplete
+                                        options={suppliers}
+                                        value={selectedSupplier || null}
+                                        onChange={(_, supplier) => {
+                                            setData('supplier_id', supplier?.id || '');
+                                            setStepErrors([]);
+                                        }}
+                                        getOptionLabel={(supplier) => supplier?.name || ''}
+                                        isOptionEqualToValue={(option, value) => option.id === value.id}
+                                        renderInput={(params) => (
+                                            <TextField {...params} label="Supplier" size="small" required error={!!errors.supplier_id} helperText={errors.supplier_id || 'Search supplier name'} />
+                                        )}
+                                    />
+                                    <TextField
+                                        select
+                                        label="Branch"
+                                        size="small"
+                                        value={data.branch_id}
+                                        onChange={(event) => setData('branch_id', event.target.value)}
+                                        error={!!errors.branch_id}
+                                        helperText={errors.branch_id}
+                                        required
+                                    >
+                                        {branches.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}
+                                    </TextField>
+                                    <TextField
+                                        label="Invoice Number"
+                                        size="small"
+                                        value={data.invoice_number}
+                                        onChange={(event) => setData('invoice_number', event.target.value)}
+                                        error={!!errors.invoice_number}
+                                        helperText={errors.invoice_number}
+                                        required
+                                    />
+                                    <TextField
+                                        label="Purchase Date"
+                                        type="date"
+                                        size="small"
+                                        value={data.purchase_date}
+                                        onChange={(event) => {
+                                            const purchaseDate = event.target.value;
+                                            setData({ ...data, purchase_date: purchaseDate, due_date: addDaysToInputDate(purchaseDate, 7) });
+                                        }}
+                                        error={!!errors.purchase_date}
+                                        helperText={errors.purchase_date}
+                                        InputLabelProps={{ shrink: true }}
+                                        required
+                                    />
+                                    <TextField
+                                        label="Payment Due Date"
+                                        type="date"
+                                        size="small"
+                                        value={data.due_date}
+                                        onChange={(event) => setData('due_date', event.target.value)}
+                                        error={!!errors.due_date}
+                                        helperText={errors.due_date || 'Defaults to 7 days after purchase'}
+                                        InputLabelProps={{ shrink: true }}
+                                        required
+                                    />
+                                    <TextField
+                                        select
+                                        label="Payment Status"
+                                        size="small"
+                                        value={data.payment_status}
+                                        onChange={(event) => setData('payment_status', event.target.value)}
+                                        error={!!errors.payment_status}
+                                        helperText={errors.payment_status}
+                                    >
+                                        <MenuItem value="Paid">Paid</MenuItem>
+                                        <MenuItem value="Partial">Partial</MenuItem>
+                                        <MenuItem value="Due">Due</MenuItem>
+                                    </TextField>
+                                    <TextField
+                                        label="Paid Amount"
+                                        type="number"
+                                        size="small"
+                                        value={data.payment_status === 'Paid' ? totalAmount : data.payment_status === 'Due' ? 0 : data.paid_amount}
+                                        onChange={(event) => setData('paid_amount', event.target.value)}
+                                        disabled={data.payment_status !== 'Partial'}
+                                        error={!!errors.paid_amount}
+                                        helperText={errors.paid_amount}
+                                        inputProps={{ min: 0, step: '0.01' }}
+                                    />
+                                    {selectedSupplier && (
+                                        <Paper
+                                            variant="outlined"
+                                            sx={{
+                                                px: 1.5,
+                                                py: 0.75,
+                                                display: 'grid',
+                                                gridTemplateColumns: '1fr 1fr',
+                                                gap: 1.5,
+                                                gridColumn: { sm: 'span 2', md: 'span 1' },
+                                                bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(8, 145, 111, 0.04)' : 'rgba(52, 211, 153, 0.08)',
+                                            }}
+                                        >
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" noWrap>Current balance</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>${Number(selectedSupplier.balance || 0).toFixed(2)}</Typography>
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" noWrap>Projected</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800 }}>${Number(projectedBalance || 0).toFixed(2)}</Typography>
+                                            </Box>
+                                        </Paper>
+                                    )}
+                                </Box>
+                            </Paper>
+                        )}
+
+                        {activeStep === 1 && (
+                            <Paper variant="outlined" sx={{ p: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(360px, 1fr) 320px' }, gap: 1, alignItems: 'center', mb: 1 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Search name, SKU, barcode, or category"
+                                        value={productQuery}
+                                        onChange={(event) => setProductQuery(event.target.value)}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+                                    />
+                                    <TextField select size="small" value={categoryId} onChange={(event) => setCategoryId(event.target.value)} inputProps={{ 'aria-label': 'Product category' }}>
+                                        <MenuItem value="all">All categories</MenuItem>
+                                        {categories.map((category) => <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>)}
+                                    </TextField>
+                                </Box>
+                                <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell padding="checkbox" sx={{ width: 52 }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={allFilteredProductsSelected}
+                                                        indeterminate={!allFilteredProductsSelected && someFilteredProductsSelected}
+                                                        disabled={filteredProducts.length === 0}
+                                                        onChange={(event) => toggleFilteredProducts(event.target.checked)}
+                                                        inputProps={{ 'aria-label': 'Select all matching products' }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>Stock</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>Cost</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>Buying Units</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {filteredProducts.map((product) => {
+                                                const selected = selectedProductIds.has(String(product.id));
+                                                const units = getUnitsForProduct(product.id);
+                                                const baseUnit = getBaseUnit(product);
+                                                const baseUnitName = baseUnit?.unit?.short_name || baseUnit?.unit?.name || 'base unit';
+                                                const stock = getProductStock(product);
+                                                return (
+                                                    <TableRow
+                                                        key={product.id}
+                                                        hover
+                                                        selected={selected}
+                                                        onClick={() => selected ? removeProduct(product.id) : addProduct(product)}
+                                                        sx={{
+                                                            cursor: 'pointer',
+                                                            '&.Mui-selected, &.Mui-selected:hover': {
+                                                                bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(8, 145, 111, 0.08)' : 'rgba(52, 211, 153, 0.12)',
+                                                            },
+                                                        }}
+                                                    >
+                                                        <TableCell padding="checkbox">
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={selected}
+                                                                onClick={(event) => event.stopPropagation()}
+                                                                onChange={() => selected ? removeProduct(product.id) : addProduct(product)}
+                                                                inputProps={{ 'aria-label': `Select ${product.name}` }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{product.name}</Typography>
+                                                        </TableCell>
+                                                        <TableCell>{product.category?.name || 'Uncategorized'}</TableCell>
+                                                        <TableCell>{Number(stock).toLocaleString()} {baseUnitName}</TableCell>
+                                                        <TableCell>
+                                                            <Typography component="span" variant="body2" sx={{ fontWeight: 800 }}>
+                                                                ${Number(product.pricing_buying_cost || 0).toFixed(2)}
+                                                            </Typography>
+                                                            <Typography component="span" variant="body2" color="text.secondary"> / {baseUnitName}</Typography>
+                                                        </TableCell>
+                                                        <TableCell>{units.map((unit) => unit.unit?.short_name || unit.unit?.name).filter(Boolean).join(' · ') || '-'}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                            {filteredProducts.length === 0 && (
+                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5 }}><Typography color="text.secondary">No products match this search.</Typography></TableCell></TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Paper>
+                        )}
+
+                        {activeStep === 2 && (
+                            <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                                <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                                    <Table
+                                        stickyHeader
+                                        size="small"
+                                        sx={{
+                                            minWidth: 1040,
+                                            tableLayout: 'fixed',
+                                            '& .MuiTableCell-root': {
+                                                px: 0.75,
+                                                py: 0.5,
+                                                borderRight: 1,
+                                                borderColor: 'divider',
+                                                overflow: 'hidden',
+                                                overflowWrap: 'anywhere',
+                                            },
+                                            '& .MuiTableCell-head': {
+                                                py: 1,
+                                                fontSize: '0.72rem',
+                                                fontWeight: 800,
+                                                lineHeight: 1.1,
+                                                whiteSpace: 'normal',
+                                            },
+                                        }}
+                                    >
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ width: 150 }}>Product</TableCell>
+                                                <TableCell sx={{ width: 100 }}>Buying Unit</TableCell>
+                                                <TableCell sx={{ width: 62 }}>Paid Qty</TableCell>
+                                                <TableCell sx={{ width: 62 }}>FOC Qty</TableCell>
+                                                <TableCell sx={{ width: 74 }}>Unit Cost</TableCell>
+                                                <TableCell sx={{ width: 72 }}>Retail</TableCell>
+                                                <TableCell sx={{ width: 82 }}>Wholesale</TableCell>
+                                                <TableCell sx={{ width: 100 }}>Batch</TableCell>
+                                                <TableCell sx={{ width: 112 }}>Expiry</TableCell>
+                                                <TableCell sx={{ width: 88 }}>Effective Cost</TableCell>
+                                                <TableCell sx={{ width: 90 }}>Line Total</TableCell>
+                                                <TableCell sx={{ width: 44 }} aria-label="Actions" />
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {data.items.map((item, index) => {
+                                                const product = getProductById(item.product_id);
+                                                const units = getUnitsForProduct(item.product_id);
+                                                const selectedUnit = units.find((unit) => unit.unit_id === item.unit_id);
+                                                const factor = Number(selectedUnit?.conversion_factor || 1);
+                                                const paidQuantity = Number(item.quantity || 0);
+                                                const focQuantity = Number(item.foc_quantity || 0);
+                                                const receivedBaseQuantity = (paidQuantity + focQuantity) * factor;
+                                                const lineTotal = paidQuantity * Number(item.unit_price || 0);
+                                                const effectiveCost = receivedBaseQuantity > 0 ? lineTotal / receivedBaseQuantity : 0;
+                                                const baseUnit = getBaseUnit(product);
+                                                const baseUnitName = baseUnit?.unit?.short_name || baseUnit?.unit?.name || 'base';
+                                                const fieldProps = { variant: 'standard', fullWidth: true, InputProps: { disableUnderline: true }, sx: compactCellFieldSx };
+                                                const showClientErrors = stepErrors.length > 0;
+                                                const fieldInvalid = {
+                                                    unit_id: (showClientErrors && !item.unit_id) || Boolean(errors[`items.${index}.unit_id`]),
+                                                    quantity: (showClientErrors && Number(item.quantity || 0) < 1) || Boolean(errors[`items.${index}.quantity`]),
+                                                    foc_quantity: (showClientErrors && Number(item.foc_quantity || 0) < 0) || Boolean(errors[`items.${index}.foc_quantity`]),
+                                                    unit_price: (showClientErrors && Number(item.unit_price || 0) <= 0) || Boolean(errors[`items.${index}.unit_price`]),
+                                                    selling_price: (showClientErrors && Number(item.selling_price || 0) <= 0) || Boolean(errors[`items.${index}.selling_price`]),
+                                                    wholesale_price: (showClientErrors && Number(item.wholesale_price || 0) <= 0) || Boolean(errors[`items.${index}.wholesale_price`]),
+                                                    expiry_date: (showClientErrors && !item.expiry_date) || Boolean(errors[`items.${index}.expiry_date`]),
+                                                };
+
+                                                return (
+                                                    <TableRow key={item.product_id} hover>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{product?.name || `Item ${index + 1}`}</Typography>
+                                                            <Typography variant="caption" color="text.secondary" noWrap>
+                                                                {Number(getProductStock(product)).toLocaleString()} {baseUnitName}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.unit_id)}>
+                                                            <TextField {...fieldProps} select value={item.unit_id} onChange={(event) => updateItem(index, 'unit_id', event.target.value)} inputProps={{ 'aria-label': `${product?.name || 'Product'} buying unit` }}>
+                                                                {units.map((unit) => (
+                                                                    <MenuItem key={unit.id} value={unit.unit_id}>
+                                                                        {unit.unit?.short_name || unit.unit?.name}{Number(unit.conversion_factor || 1) > 1 ? ` (×${unit.conversion_factor})` : ''}
+                                                                    </MenuItem>
+                                                                ))}
+                                                            </TextField>
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.quantity)}>
+                                                            <TextField {...fieldProps} type="number" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} inputProps={{ min: 1, 'aria-label': `${product?.name || 'Product'} paid quantity` }} />
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.foc_quantity)}>
+                                                            <TextField {...fieldProps} type="number" value={item.foc_quantity} onChange={(event) => updateItem(index, 'foc_quantity', event.target.value)} inputProps={{ min: 0, 'aria-label': `${product?.name || 'Product'} FOC quantity` }} />
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.unit_price)}>
+                                                            <TextField {...fieldProps} type="number" value={item.unit_price} onChange={(event) => updateItem(index, 'unit_price', event.target.value)} inputProps={{ min: 0.01, step: '0.01', 'aria-label': `${product?.name || 'Product'} unit cost` }} />
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.selling_price)}>
+                                                            <TextField {...fieldProps} type="number" value={item.selling_price} onChange={(event) => updateItem(index, 'selling_price', event.target.value)} disabled={automaticFor(item, 'selling_price')} inputProps={{ min: 0.01, step: '0.01', 'aria-label': `${product?.name || 'Product'} retail price` }} />
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.wholesale_price)}>
+                                                            <TextField {...fieldProps} type="number" value={item.wholesale_price} onChange={(event) => updateItem(index, 'wholesale_price', event.target.value)} disabled={automaticFor(item, 'wholesale_price')} inputProps={{ min: 0.01, step: '0.01', 'aria-label': `${product?.name || 'Product'} wholesale price` }} />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <TextField {...fieldProps} value={item.batch_number} placeholder="Auto" onChange={(event) => updateItem(index, 'batch_number', event.target.value)} inputProps={{ 'aria-label': `${product?.name || 'Product'} batch number` }} />
+                                                        </TableCell>
+                                                        <TableCell sx={validationCellSx(fieldInvalid.expiry_date)}>
+                                                            <TextField {...fieldProps} type="date" value={item.expiry_date} onChange={(event) => updateItem(index, 'expiry_date', event.target.value)} inputProps={{ 'aria-label': `${product?.name || 'Product'} expiry date` }} />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2">{effectiveCost.toFixed(2)} / {baseUnitName}</Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2" sx={{ fontWeight: 800 }}>${lineTotal.toFixed(2)}</Typography>
+                                                        </TableCell>
+                                                        <TableCell align="center" sx={{ borderRight: '0 !important' }}>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => removeItem(index)}
+                                                                aria-label={`Remove ${product?.name || 'item'}`}
+                                                                sx={{ border: 1, borderColor: 'error.light', borderRadius: 1 }}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                                <Stack
+                                    direction="row"
+                                    justifyContent="flex-end"
+                                    alignItems="center"
+                                    divider={<Divider orientation="vertical" flexItem />}
+                                    sx={{ minHeight: 52, px: 1.5, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}
+                                >
+                                    <Typography variant="body2" sx={{ px: 2 }} color="text.secondary">Paid <Box component="strong" sx={{ ml: 0.75, color: 'text.primary' }}>{quantitySummary.paid}</Box></Typography>
+                                    <Typography variant="body2" sx={{ px: 2 }} color="text.secondary">FOC <Box component="strong" sx={{ ml: 0.75, color: 'text.primary' }}>{quantitySummary.foc}</Box></Typography>
+                                    <Typography variant="body2" sx={{ px: 2 }} color="text.secondary">Received <Box component="strong" sx={{ ml: 0.75, color: 'text.primary' }}>{quantitySummary.paid + quantitySummary.foc}</Box></Typography>
+                                    <Paper elevation={0} sx={{ px: 2, py: 1, ml: 1.5, bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(8, 145, 111, 0.1)' : 'rgba(52, 211, 153, 0.14)' }}>
+                                        <Typography variant="body2" color="text.secondary">Total <Box component="strong" sx={{ ml: 1, color: 'success.dark', fontSize: '1rem' }}>${totalAmount.toFixed(2)}</Box></Typography>
+                                    </Paper>
+                                </Stack>
+                            </Paper>
+                        )}
+
+                        {activeStep === 3 && (
+                            <Stack spacing={2}>
+                                {Object.keys(errors).length > 0 && (
+                                    <Alert severity="error">{Object.values(errors).flat().join(' ')}</Alert>
+                                )}
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 1.25 }}>
+                                    {[
+                                        ['Supplier', selectedSupplier?.name || '-'],
+                                        ['Invoice', data.invoice_number || '-'],
+                                        ['Products', data.items.length],
+                                        ['Purchase Total', `$${totalAmount.toFixed(2)}`],
+                                        ['Amount Due', `$${dueAmount.toFixed(2)}`],
+                                    ].map(([label, value]) => (
+                                        <Paper key={label} variant="outlined" sx={{ p: 1.5 }}>
+                                            <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{value}</Typography>
+                                        </Paper>
+                                    ))}
+                                </Box>
+                                <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                                    <TableContainer>
+                                        <Table size="small">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }}>Batch / Expiry</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }}>Unit</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }} align="right">Paid</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }} align="right">FOC</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }} align="right">Unit Cost</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700 }} align="right">Line Total</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {data.items.map((item) => {
+                                                    const product = getProductById(item.product_id);
+                                                    const unit = getUnitsForProduct(item.product_id).find((candidate) => candidate.unit_id === item.unit_id);
+                                                    return (
+                                                        <TableRow key={item.product_id}>
+                                                            <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>{product?.name || '-'}</Typography></TableCell>
+                                                            <TableCell><Typography variant="body2">{item.batch_number || 'Auto generated'}</Typography><Typography variant="caption" color="text.secondary">{formatPurchaseDate(item.expiry_date)}</Typography></TableCell>
+                                                            <TableCell>{unit?.unit?.short_name || unit?.unit?.name || '-'}</TableCell>
+                                                            <TableCell align="right">{item.quantity}</TableCell>
+                                                            <TableCell align="right">{item.foc_quantity || 0}</TableCell>
+                                                            <TableCell align="right">${Number(item.unit_price || 0).toFixed(2)}</TableCell>
+                                                            <TableCell align="right" sx={{ fontWeight: 800 }}>${(Number(item.quantity || 0) * Number(item.unit_price || 0)).toFixed(2)}</TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Paper>
+                            </Stack>
+                        )}
+                    </Stack>
+                </DialogContent>
+
+                <DialogActions sx={{ px: { xs: 2, md: 2.5 }, py: 1.5, borderTop: 1, borderColor: 'divider', justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">Step {activeStep + 1} of {purchaseSteps.length}</Typography>
+                    <Stack direction="row" spacing={1}>
+                        {activeStep > 0 && (
+                            <Button type="button" variant="outlined" startIcon={<NavigateBeforeIcon />} onClick={goBack} disabled={processing}>Previous</Button>
+                        )}
+                        {activeStep < purchaseSteps.length - 1 ? (
+                            <Button type="button" variant="contained" endIcon={<NavigateNextIcon />} onClick={goNext} disabled={processing}>Continue</Button>
+                        ) : (
+                            <Button type="button" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={submit} disabled={processing}>
+                                {editingPurchase ? 'Update Purchase' : 'Confirm & Receive Stock'}
+                            </Button>
+                        )}
+                    </Stack>
+                </DialogActions>
             </Dialog>
 
             <Dialog open={paymentOpen} onClose={handlePaymentClose} maxWidth="sm" fullWidth>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import DataTableFooter from '@/Components/DataTableFooter';
 import { Head, router } from '@/spa';
 import {
     Box,
@@ -21,7 +22,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FilterAlt as FilterIcon, History as HistoryIcon } from '@mui/icons-material';
+import { FilterAlt as FilterIcon } from '@mui/icons-material';
 
 export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs }) {
     const [fromDate, setFromDate] = useState(filters?.from_date || '');
@@ -66,17 +67,7 @@ export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <HistoryIcon fontSize="small" color="primary" />
-                            USER ACTIVITY LOGS
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Total: {logs?.total || 0}
-                        </Typography>
-                    </Stack>
-
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Activity log filters"
                         fieldKinds={['date', 'date', 'wide', 'select', 'search']}
                         onSubmit={applyFilters}
@@ -190,29 +181,10 @@ export default function ActivityLogsIndex({ auth, users = [], filters = {}, logs
                         </Table>
                     </TableContainer>
 
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">
-                            Page {logs?.current_page || 1} / {logs?.last_page || 1}
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                disabled={!logs?.prev_page_url}
-                                onClick={() => goToPage(logs?.prev_page_url)}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                disabled={!logs?.next_page_url}
-                                onClick={() => goToPage(logs?.next_page_url)}
-                            >
-                                Next
-                            </Button>
-                        </Stack>
-                    </Stack>
+                    <DataTableFooter
+                        paginator={logs}
+                        onPageChange={(page) => goToPage(page < Number(logs?.current_page || 1) ? logs?.prev_page_url : logs?.next_page_url)}
+                    />
                 </Paper>
             </Box>
         </MainLayout>

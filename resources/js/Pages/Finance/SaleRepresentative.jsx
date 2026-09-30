@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { CompactBarChart } from '@/Components/CompactReportChart';
 import { Head, router, usePage } from '@/spa';
 import {
     Avatar,
@@ -12,7 +15,6 @@ import {
     InputAdornment,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -32,16 +34,6 @@ import {
     RestartAlt as ResetIcon,
     Search as SearchIcon,
 } from '@mui/icons-material';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Legend,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 
 export default function SaleRepresentative({
     auth,
@@ -122,40 +114,12 @@ export default function SaleRepresentative({
         }));
     }, [sales_power_chart]);
 
-    const representativeNameTick = useMemo(() => {
-        return (value) => {
-            const text = String(value ?? '');
-            if (text.length <= 14) return text;
-            return `${text.slice(0, 13)}...`;
-        };
-    }, []);
-
-    const representativeYAxisWidth = useMemo(() => {
-        const maxLen = salesPowerChartData.reduce((max, row) => Math.max(max, String(row.name ?? '').length), 0);
-        if (maxLen <= 10) return 72;
-        if (maxLen <= 14) return 84;
-        return 96;
-    }, [salesPowerChartData]);
-
-    const axisTick = { fontSize: 11 };
-    const tooltipStyles = { fontSize: 12, padding: 8 };
-    const legendStyles = { fontSize: 11, lineHeight: '12px' };
-    const chartHeight = Math.max(220, Math.min(360, salesPowerChartData.length * 26 + 72));
-
     return (
         <MainLayout auth={auth} header={__('Sale Representative')}>
             <Head title={__('Sale Representative')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                    <Box>
-                        <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            {__('Finance')}
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                            {__('Sale Representative')}
-                        </Typography>
-                    </Box>
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
                     <Chip
                         icon={<ReportIcon />}
                         label={`${__('Sale Power')} ${money(summary.sale_power)}`}
@@ -171,7 +135,7 @@ export default function SaleRepresentative({
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('SALE REPRESENTATIVE FILTERS')}</Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Sale representative filters')}
                         fieldKinds={['wide', 'select', 'date', 'date', 'search']}
                         onSubmit={() => applyFilters()}
@@ -244,63 +208,14 @@ export default function SaleRepresentative({
                         />
                     </ReportFilterToolbar>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(5, 1fr)' }, gap: 1.2 }}>
-                        {summaryCards.map(([label, value]) => (
-                            <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
-                            </Paper>
-                        ))}
-                    </Box>
+                    <StatCardGrid items={summaryCards.map(([label, value]) => ({ label: __(label), value }))} sx={{ mb: 0 }} />
                 </Paper>
 
-                <Paper sx={{ p: 2, mb: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                        <ReportIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('STAFF SALES POWER')}</Typography>
-                    </Stack>
-
-                    {salesPowerChartData.length > 0 ? (
-                        <Box sx={{ height: chartHeight }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={salesPowerChartData}
-                                    layout="vertical"
-                                    margin={{ top: 6, right: 16, bottom: 6, left: 0 }}
-                                    barSize={12}
-                                >
-                                    <CartesianGrid strokeDasharray="2 2" />
-                                    <XAxis type="number" tickFormatter={formatMoney} tick={axisTick} />
-                                    <YAxis
-                                        type="category"
-                                        dataKey="name"
-                                        width={representativeYAxisWidth}
-                                        tick={axisTick}
-                                        tickFormatter={representativeNameTick}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <Tooltip formatter={(value) => formatMoney(value)} contentStyle={tooltipStyles} />
-                                    <Legend iconSize={8} wrapperStyle={legendStyles} />
-                                    <Bar dataKey="sale_power" name={__('Sale Power')} fill="#2e7d32" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    ) : (
-                        <Box sx={{ py: 5, textAlign: 'center' }}>
-                            <Typography variant="body2" color="text.secondary">
-                                {__('No staff sales data for selected filters.')}
-                            </Typography>
-                        </Box>
-                    )}
-                </Paper>
+                <Box sx={{ mb: 1.5 }}>
+                    <CompactBarChart title={__('Staff Sales Power')} data={salesPowerChartData} xKey="name" series={[{ key: 'sale_power', label: __('Sale Power'), color: '#0E684E' }]} valueFormatter={formatMoney} />
+                </Box>
 
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                        <ReportIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('SALE REPRESENTATIVE LIST')}</Typography>
-                    </Stack>
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -378,17 +293,7 @@ export default function SaleRepresentative({
                         </Table>
                     </TableContainer>
 
-                    {Number(representatives.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={representatives.last_page}
-                                page={representatives.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={representatives} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
         </MainLayout>

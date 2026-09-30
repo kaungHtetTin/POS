@@ -33,6 +33,9 @@ class SaleItem extends Model
         'discount_percentage',
         'discount_amount',
         'total_price',
+        'payable_total',
+        'tax_amount',
+        'financial_snapshot',
         'created_at',
     ];
 
@@ -49,6 +52,9 @@ class SaleItem extends Model
         'discount_percentage' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'total_price' => 'decimal:2',
+        'payable_total' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
+        'financial_snapshot' => 'boolean',
     ];
 
     public function sale()

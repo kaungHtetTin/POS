@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
 import { Head, Link, useForm, router } from '@/spa';
 import {
     Box,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -24,7 +27,6 @@ import {
     DialogActions,
     TextField,
     InputAdornment,
-    Pagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -37,10 +39,12 @@ import {
     Email as EmailIcon,
     AccountBalanceWallet as BalanceIcon,
     Search as SearchIcon,
-    Visibility as VisibilityIcon,
+    GroupsOutlined as SupplierCountIcon,
+    CreditScoreOutlined as CreditIcon,
+    AccountBalanceOutlined as AccountIcon,
 } from '@mui/icons-material';
 
-export default function SupplierIndex({ auth, suppliers, filters }) {
+export default function SupplierIndex({ auth, suppliers, filters, summary = {} }) {
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState(null);
@@ -139,19 +143,16 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            SUPPLIER DIRECTORY
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                            <Button component={Link} href={route('suppliers.import')} variant="outlined" size="small" startIcon={<UploadFileIcon />}>Import CSV</Button>
-                            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>Add Supplier</Button>
-                        </Stack>
-                    </Stack>
-                    <ReportFilterToolbar
+                    <StatCardGrid items={[
+                        { label: 'Total Suppliers', value: Number(summary.total_suppliers || 0).toLocaleString(), icon: <SupplierCountIcon /> },
+                        { label: 'Supplier Payable', value: `$${Number(summary.supplier_payable || 0).toFixed(2)}`, icon: <BalanceIcon />, tone: 'warning' },
+                        { label: 'Supplier Credit', value: `$${Number(summary.supplier_credit || 0).toFixed(2)}`, icon: <CreditIcon />, tone: 'success' },
+                        { label: 'Open Accounts', value: Number(summary.open_accounts || 0).toLocaleString(), icon: <AccountIcon />, tone: 'info' },
+                    ]} />
+                    <ReportFilterToolbar appBar
                         ariaLabel="Supplier filters"
                         fieldKinds={['search']}
-                        actions={<CsvExportButton source={suppliers} dataKey="suppliers" filename="suppliers.csv" />}
+                        actions={<><CsvExportButton source={suppliers} dataKey="suppliers" filename="suppliers.csv" /><Button component={Link} href={route('suppliers.import')} variant="outlined" size="small" startIcon={<UploadFileIcon />}>Import CSV</Button><Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>Add Supplier</Button></>}
                     >
                         <TextField
                             size="small"
@@ -161,8 +162,6 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
                         />
                     </ReportFilterToolbar>
-                    <Divider sx={{ mb: 2 }} />
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -171,27 +170,17 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Contact & Terms</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Outstanding Balance</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Purchases</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {supplierRows.map((supplier) => (
-                                    <TableRow key={supplier.id} hover>
+                                    <ClickableTableRow key={supplier.id} href={route('suppliers.show', { supplier: supplier.id })} label={`View ${supplier.name}`}>
                                         <TableCell sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Stack direction="row" spacing={1} alignItems="center">
                                                 <SupplierIcon fontSize="small" color="primary" />
                                                 <Stack spacing={0.2}>
-                                                    <Typography
-                                                        component={Link}
-                                                        href={route('suppliers.show', { supplier: supplier.id })}
-                                                        variant="body2"
-                                                        sx={{
-                                                            color: 'primary.main',
-                                                            fontWeight: 700,
-                                                            textDecoration: 'none',
-                                                            '&:hover': { textDecoration: 'underline' },
-                                                        }}
-                                                    >
+                                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                                         {supplier.name}
                                                     </Typography>
                                                     <Typography variant="caption" color="text.secondary">{supplier.address || 'No address provided'}</Typography>
@@ -232,22 +221,10 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                                 sx={{ fontSize: '11px', height: '22px' }}
                                             />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
-                                            <Stack
-                                                direction="row"
-                                                spacing={0}
-                                                justifyContent="flex-end"
-                                                sx={{ gap: 1.25, '& > *': { m: '0 !important' } }}
-                                            >
+                                        <TableActionCell sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <TableRowActions label={supplier.name}>
                                                 <IconButton
-                                                component={Link}
-                                                href={route('suppliers.show', { supplier: supplier.id })}
-                                                size="small"
-                                                color="info"
-                                            >
-                                                <VisibilityIcon fontSize="inherit" />
-                                            </IconButton>
-                                                <IconButton
+                                                title="Edit supplier"
                                                 size="small"
                                                 color="primary"
                                                 onClick={() => handleOpen(supplier)}
@@ -255,6 +232,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                                 <IconButton
+                                                title="Delete supplier"
                                                 size="small"
                                                 color="error"
                                                 onClick={() => handleDelete(supplier)}
@@ -262,9 +240,9 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                                 </IconButton>
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
                                 {supplierRows.length === 0 && (
                                     <TableRow>
@@ -278,17 +256,7 @@ export default function SupplierIndex({ auth, suppliers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(suppliers?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={suppliers.last_page}
-                                page={suppliers.current_page}
-                                onChange={(event, page) => handlePageChange(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={suppliers} onPageChange={(page) => handlePageChange(page)} />
                 </Paper>
             </Box>
 

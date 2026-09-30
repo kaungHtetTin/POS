@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\CashSession;
 use Illuminate\Http\Request;
 
 class ActiveBranchController extends Controller
@@ -15,6 +16,17 @@ class ActiveBranchController extends Controller
 
         $branchId = $validated['branch_id'];
         $user = $request->user();
+
+        $hasOpenSession = CashSession::where('user_id', $user->id)
+            ->where('status', 'open')
+            ->whereNull('closed_at')
+            ->exists();
+
+        if ($hasOpenSession) {
+            return redirect()->back()->withErrors([
+                'branch_id' => 'Close your active cash session before switching branches.',
+            ]);
+        }
 
         $canAccessAllBranches = $user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches');
 
@@ -29,4 +41,3 @@ class ActiveBranchController extends Controller
         return redirect()->back();
     }
 }
-

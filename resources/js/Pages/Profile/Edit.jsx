@@ -1,4 +1,5 @@
 import MainLayout from '@/Layouts/MainLayout';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
@@ -12,9 +13,10 @@ export default function Edit({ auth, mustVerifyEmail, status }) {
             header="Profile Settings"
         >
             <Head title="Profile" />
+            <AppBarBack href={route('dashboard')} label="Back to Dashboard" />
 
             <Box sx={{ flexGrow: 1 }}>
-                <Grid container spacing={2}>
+                <Grid container spacing={1.5}>
                     <Grid item xs={12} md={7}>
                         <Paper sx={{ p: 2 }}>
                             <UpdateProfileInformationForm
@@ -25,7 +27,7 @@ export default function Edit({ auth, mustVerifyEmail, status }) {
                     </Grid>
 
                     <Grid item xs={12} md={5}>
-                        <Stack spacing={2}>
+                        <Stack spacing={1.5}>
                             <Paper sx={{ p: 2 }}>
                                 <UpdatePasswordForm />
                             </Paper>

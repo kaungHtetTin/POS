@@ -3,16 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
-use App\Models\Inventory;
-use App\Models\InventoryBatch;
 use App\Models\Purchase;
-use App\Models\PurchaseItem;
 use App\Models\ReturnEntry;
 use App\Models\ReturnItem;
 use App\Models\Sale;
-use App\Models\SaleItem;
+use App\Services\ReturnPricing;
+use App\Services\ReturnService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Support\Spa;
 
 class ReturnsController extends Controller
@@ -47,6 +44,7 @@ class ReturnsController extends Controller
         $query = ReturnEntry::query()
             ->with([
                 'branch:id,name',
+                'settlements',
                 'items' => function ($q) {
                     $q->with(['product:id,name', 'unit:id,name,short_name']);
                 },
@@ -89,10 +87,18 @@ class ReturnsController extends Controller
             ->orderBy('name')
             ->get();
 
+        $settlementSummary = ReturnEntry::whereIn('branch_id', $accessibleBranchIds)
+            ->when($request->filled('branch_id'), fn ($query) => $query->where('branch_id', $request->branch_id))
+            ->where('status', 'Approved')
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'Customer' THEN settlement_due - settlement_paid ELSE 0 END), 0) as customer_refunds_due")
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'Supplier' THEN settlement_due - settlement_paid ELSE 0 END), 0) as supplier_refunds_due")
+            ->first();
+
         return Spa::render('Returns/Index', [
             'returns' => $returns,
             'branches' => $branches,
             'filters' => $request->only(['type', 'status', 'branch_id']),
+            'settlementSummary' => $settlementSummary,
         ]);
     }
 
@@ -111,6 +117,7 @@ class ReturnsController extends Controller
             ->where('status', '!=', 'Voided')
             ->with([
                 'branch:id,name',
+                'customer:id,name',
                 'items' => function ($q) {
                     $q->with(['product:id,name', 'unit:id,name,short_name', 'batch:id,batch_number,expiry_date']);
                 },
@@ -128,6 +135,9 @@ class ReturnsController extends Controller
             ->groupBy('source_sale_item_id')
             ->pluck('returned_base_quantity', 'source_sale_item_id');
 
+        $sale->load('items');
+        $lineAmounts = app(ReturnPricing::class)->saleLineAmounts($sale);
+
         return response()->json([
             'id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
@@ -135,7 +145,12 @@ class ReturnsController extends Controller
             'branch_name' => $sale->branch?->name,
             'sale_date' => $sale->sale_date?->format('Y-m-d H:i:s'),
             'grand_total' => (float) $sale->grand_total,
-            'items' => $sale->items->map(function ($item) use ($returnedBaseQuantities) {
+            'party_name' => $sale->customer?->name ?? 'Walk-in customer',
+            'amount_received' => (float) $sale->amount_received,
+            'payment_method' => $sale->payment_method,
+            'customer_id' => $sale->customer_id,
+            'return_credit_amount' => (float) $sale->return_credit_amount,
+            'items' => $sale->items->map(function ($item) use ($returnedBaseQuantities, $lineAmounts) {
                 $conversionFactor = (int) round(((int) $item->base_quantity) / ((float) $item->quantity ?: 1));
                 $returnableBaseQuantity = max(
                     (int) $item->base_quantity - (int) ($returnedBaseQuantities[$item->id] ?? 0),
@@ -154,7 +169,9 @@ class ReturnsController extends Controller
                     'quantity' => $conversionFactor > 0 ? $returnableBaseQuantity / $conversionFactor : 0,
                     'base_quantity' => (int) $item->base_quantity,
                     'returnable_base_quantity' => $returnableBaseQuantity,
-                    'unit_price' => (float) $item->unit_price,
+                    'previously_returned_quantity' => $conversionFactor > 0 ? (int) ($returnedBaseQuantities[$item->id] ?? 0) / $conversionFactor : 0,
+                    'original_quantity' => (float) $item->quantity,
+                    'unit_price' => (float) $item->quantity > 0 ? round(($lineAmounts[$item->id] ?? 0) / 100 / (float) $item->quantity, 2) : 0,
                 ];
             })->values(),
         ]);
@@ -174,6 +191,7 @@ class ReturnsController extends Controller
             ->whereIn('branch_id', $accessibleBranchIds)
             ->with([
                 'branch:id,name',
+                'supplier:id,name',
                 'items' => function ($q) {
                     $q->with(['product:id,name', 'unit:id,name,short_name']);
                 },
@@ -184,6 +202,11 @@ class ReturnsController extends Controller
             return response()->json(null, 404);
         }
 
+        $previous = ReturnItem::query()
+            ->whereIn('source_purchase_item_id', $purchase->items->pluck('id'))
+            ->whereHas('returnEntry', fn ($query) => $query->where('status', '!=', 'Rejected'))
+            ->get()->groupBy('source_purchase_item_id');
+
         return response()->json([
             'id' => $purchase->id,
             'invoice_number' => $purchase->invoice_number,
@@ -191,7 +214,14 @@ class ReturnsController extends Controller
             'branch_name' => $purchase->branch?->name,
             'purchase_date' => $purchase->purchase_date,
             'total_amount' => (float) $purchase->total_amount,
-            'items' => $purchase->items->map(function ($item) {
+            'party_name' => $purchase->supplier?->name,
+            'paid_amount' => (float) $purchase->paid_amount,
+            'due_amount' => (float) $purchase->due_amount,
+            'return_credit_amount' => (float) $purchase->return_credit_amount,
+            'items' => $purchase->items->map(function ($item) use ($previous) {
+                $returned = $previous->get($item->id, collect());
+                $remainingPaid = max((float) $item->quantity - (float) $returned->sum('paid_quantity'), 0);
+                $remainingFoc = max((float) ($item->foc_quantity ?? 0) - (float) $returned->sum('foc_quantity'), 0);
                 return [
                     'id' => $item->id,
                     'product_id' => $item->product_id,
@@ -203,6 +233,9 @@ class ReturnsController extends Controller
                     'quantity' => (int) $item->quantity,
                     'foc_quantity' => (int) ($item->foc_quantity ?? 0),
                     'received_quantity' => (int) $item->quantity + (int) ($item->foc_quantity ?? 0),
+                    'remaining_paid_quantity' => $remainingPaid,
+                    'remaining_foc_quantity' => $remainingFoc,
+                    'previously_returned_quantity' => (float) $returned->sum('quantity'),
                     'base_quantity' => (int) $item->base_quantity,
                     'foc_base_quantity' => (int) ($item->foc_base_quantity ?? 0),
                     'unit_price' => (float) $item->unit_price,
@@ -211,7 +244,7 @@ class ReturnsController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ReturnService $service)
     {
         $validated = $request->validate([
             'type' => 'required|in:Customer,Supplier',
@@ -219,258 +252,50 @@ class ReturnsController extends Controller
             'reason' => 'required|string|max:2000',
             'items' => 'required|array|min:1',
             'items.*.reference_item_id' => 'required|uuid',
-            'items.*.quantity' => 'required|numeric|min:0.01|max:999999.99',
-            'items.*.refund_price' => 'required|numeric|min:0|max:999999999999.99',
+            'items.*.quantity' => 'required|numeric|min:0|max:999999.99',
+            'items.*.foc_quantity' => 'nullable|numeric|min:0|max:999999.99',
+            'items.*.restock' => 'nullable|boolean',
+            'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
+            'payment_reference' => 'nullable|string|max:255',
         ]);
 
-        $user = $request->user();
-        $accessibleBranchIds = $this->accessibleBranchIds($user);
+        $service->complete($validated, $this->accessibleBranchIds($request->user()), $request->user());
 
-        if ($validated['type'] === 'Customer') {
-            $sale = Sale::where('id', $validated['reference_id'])
-                ->whereIn('branch_id', $accessibleBranchIds)
-                ->where('status', '!=', 'Voided')
-                ->firstOrFail();
-
-            $referenceItems = SaleItem::where('sale_id', $sale->id)->get()->keyBy('id');
-
-            $previouslyReturned = ReturnItem::query()
-                ->whereIn('source_sale_item_id', $referenceItems->keys())
-                ->whereHas('returnEntry', fn ($query) => $query->where('status', '!=', 'Rejected'))
-                ->selectRaw('source_sale_item_id, COALESCE(SUM(base_quantity), 0) as returned_base_quantity')
-                ->groupBy('source_sale_item_id')
-                ->pluck('returned_base_quantity', 'source_sale_item_id');
-
-            $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems, $previouslyReturned) {
-                $ref = $referenceItems->get($item['reference_item_id']);
-                if (!$ref) {
-                    abort(422);
-                }
-
-                $conversionFactor = (int) round(((int) $ref->base_quantity) / ((float) $ref->quantity ?: 1));
-                if ($conversionFactor < 1) {
-                    abort(422);
-                }
-
-                $rawBaseQuantity = (float) $item['quantity'] * $conversionFactor;
-                $baseQuantity = (int) round($rawBaseQuantity);
-                if (abs($rawBaseQuantity - $baseQuantity) > 0.0001) {
-                    abort(422);
-                }
-
-                $returnableBaseQuantity = (int) $ref->base_quantity
-                    - (int) ($previouslyReturned[$ref->id] ?? 0);
-
-                if ($baseQuantity > $returnableBaseQuantity) {
-                    abort(422, 'Return quantity exceeds the quantity remaining on the original sale item.');
-                }
-
-                $baseUnitCost = (float) $ref->base_unit_cost;
-
-                return [
-                    'source_sale_item_id' => $ref->id,
-                    'product_id' => $ref->product_id,
-                    'batch_id' => $ref->batch_id,
-                    'unit_id' => $ref->unit_id,
-                    'quantity' => (float) $item['quantity'],
-                    'base_quantity' => $baseQuantity,
-                    'refund_price' => (float) $ref->unit_price,
-                    'base_unit_cost' => $baseUnitCost,
-                    'cost_total' => round($baseQuantity * $baseUnitCost, 2),
-                ];
-            });
-
-            $refundAmount = (float) $preparedItems->sum(function ($i) {
-                return (float) $i['quantity'] * (float) $i['refund_price'];
-            });
-
-            DB::transaction(function () use ($sale, $validated, $preparedItems, $refundAmount) {
-                $return = ReturnEntry::create([
-                    'type' => 'Customer',
-                    'reference_id' => $sale->id,
-                    'branch_id' => $sale->branch_id,
-                    'reason' => $validated['reason'],
-                    'refund_amount' => $refundAmount,
-                    'status' => 'Pending',
-                ]);
-
-                foreach ($preparedItems as $item) {
-                    ReturnItem::create([
-                        'return_id' => $return->id,
-                        'source_sale_item_id' => $item['source_sale_item_id'],
-                        'product_id' => $item['product_id'],
-                        'batch_id' => $item['batch_id'],
-                        'unit_id' => $item['unit_id'],
-                        'quantity' => $item['quantity'],
-                        'base_quantity' => $item['base_quantity'],
-                        'base_unit_cost' => $item['base_unit_cost'],
-                        'cost_total' => $item['cost_total'],
-                        'refund_price' => $item['refund_price'],
-                        'created_at' => now(),
-                    ]);
-                }
-            });
-
-            return redirect()->back()->with('success', 'Return created.');
-        }
-
-        $purchase = Purchase::where('id', $validated['reference_id'])
-            ->whereIn('branch_id', $accessibleBranchIds)
-            ->firstOrFail();
-
-        $referenceItems = PurchaseItem::where('purchase_id', $purchase->id)->get()->keyBy('id');
-        $productUnitRows = DB::table('product_units')
-            ->select('product_id', 'unit_id', 'conversion_factor')
-            ->whereIn('product_id', $referenceItems->pluck('product_id')->unique()->values())
-            ->whereIn('unit_id', $referenceItems->pluck('unit_id')->unique()->values())
-            ->get();
-
-        $preparedItems = collect($validated['items'])->map(function ($item) use ($referenceItems, $productUnitRows, $purchase) {
-            $ref = $referenceItems->get($item['reference_item_id']);
-            if (!$ref) {
-                abort(422);
-            }
-
-            $productUnit = $productUnitRows->first(function ($row) use ($ref) {
-                return $row->product_id === $ref->product_id && $row->unit_id === $ref->unit_id;
-            });
-
-            $conversionFactor = $productUnit
-                ? (int) $productUnit->conversion_factor
-                : (int) round(((int) $ref->base_quantity) / ((int) $ref->quantity ?: 1));
-
-            if ($conversionFactor < 1) {
-                abort(422);
-            }
-
-            $rawBaseQuantity = (float) $item['quantity'] * $conversionFactor;
-            $baseQuantity = (int) round($rawBaseQuantity);
-            if (abs($rawBaseQuantity - $baseQuantity) > 0.0001) {
-                abort(422);
-            }
-
-            $batch = InventoryBatch::where('branch_id', $purchase->branch_id)
-                ->where('product_id', $ref->product_id)
-                ->where('batch_number', $ref->batch_number)
-                ->whereDate('expiry_date', $ref->expiry_date)
-                ->first();
-
-            if (!$batch) {
-                abort(422);
-            }
-
-            return [
-                'product_id' => $ref->product_id,
-                'batch_id' => $batch->id,
-                'unit_id' => $ref->unit_id,
-                'quantity' => (float) $item['quantity'],
-                'base_quantity' => $baseQuantity,
-                'refund_price' => (float) $item['refund_price'],
-                'base_unit_cost' => (float) $batch->purchase_price,
-                'cost_total' => round($baseQuantity * (float) $batch->purchase_price, 2),
-            ];
-        });
-
-        $refundAmount = (float) $preparedItems->sum(function ($i) {
-            return (float) $i['quantity'] * (float) $i['refund_price'];
-        });
-
-        DB::transaction(function () use ($purchase, $validated, $preparedItems, $refundAmount) {
-            $return = ReturnEntry::create([
-                'type' => 'Supplier',
-                'reference_id' => $purchase->id,
-                'branch_id' => $purchase->branch_id,
-                'reason' => $validated['reason'],
-                'refund_amount' => $refundAmount,
-                'status' => 'Pending',
-            ]);
-
-            foreach ($preparedItems as $item) {
-                ReturnItem::create([
-                    'return_id' => $return->id,
-                    'product_id' => $item['product_id'],
-                    'batch_id' => $item['batch_id'],
-                    'unit_id' => $item['unit_id'],
-                    'quantity' => $item['quantity'],
-                    'base_quantity' => $item['base_quantity'],
-                    'base_unit_cost' => $item['base_unit_cost'],
-                    'cost_total' => $item['cost_total'],
-                    'refund_price' => $item['refund_price'],
-                    'created_at' => now(),
-                ]);
-            }
-        });
-
-        return redirect()->back()->with('success', 'Return created.');
+        return redirect()->back()->with('success', 'Return approved and refund completed.');
     }
 
-    public function updateStatus(Request $request, ReturnEntry $return)
+    public function updateStatus(Request $request, ReturnEntry $return, ReturnService $service)
     {
         $validated = $request->validate([
-            'status' => 'required|in:Pending,Approved,Rejected',
+            'status' => 'required|in:Approved,Rejected',
         ]);
 
-        $user = $request->user();
-        $accessibleBranchIds = $this->accessibleBranchIds($user);
-
-        if (!$this->canAccessAllBranches($user) && !in_array($return->branch_id, $accessibleBranchIds->toArray(), true)) {
+        if (!$this->accessibleBranchIds($request->user())->contains($return->branch_id)) {
             abort(403);
         }
 
-        if ($return->status === $validated['status']) {
-            return redirect()->back();
-        }
-
-        if ($return->status !== 'Pending') {
-            abort(422);
-        }
-
-        DB::transaction(function () use ($return, $validated) {
-            if ($validated['status'] === 'Approved') {
-                $items = $return->items()->get();
-
-                foreach ($items as $item) {
-                    $baseQty = (int) ($item->base_quantity ?? 0);
-                    if ($baseQty <= 0) {
-                        continue;
-                    }
-
-                    $batch = $item->batch_id ? InventoryBatch::lockForUpdate()->find($item->batch_id) : null;
-
-                    $inventory = Inventory::lockForUpdate()->firstOrCreate(
-                        ['branch_id' => $return->branch_id, 'product_id' => $item->product_id],
-                        ['quantity' => 0]
-                    );
-
-                    if ($return->type === 'Customer') {
-                        if ($batch) {
-                            $existingQuantity = (int) $batch->quantity;
-                            $newQuantity = $existingQuantity + $baseQty;
-                            $returnCost = (float) $item->base_unit_cost;
-                            $restoredAverageCost = $newQuantity > 0
-                                ? (($existingQuantity * (float) $batch->purchase_price) + ($baseQty * $returnCost)) / $newQuantity
-                                : $returnCost;
-
-                            $batch->update([
-                                'quantity' => $newQuantity,
-                                'purchase_price' => $restoredAverageCost,
-                            ]);
-                        }
-                        $inventory->update(['quantity' => (int) $inventory->quantity + $baseQty]);
-                    } else {
-                        if ($batch) {
-                            $newQty = (int) $batch->quantity - $baseQty;
-                            $batch->update(['quantity' => max($newQty, 0)]);
-                        }
-                        $newInv = (int) $inventory->quantity - $baseQty;
-                        $inventory->update(['quantity' => max($newInv, 0)]);
-                    }
-                }
-            }
-
-            $return->update(['status' => $validated['status']]);
-        });
+        $service->decide($return, $validated['status']);
 
         return redirect()->back()->with('success', 'Return status updated.');
+    }
+
+    public function settle(Request $request, ReturnEntry $return, ReturnService $service)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01|max:999999999999.99',
+            'payment_method' => 'required|in:Cash,Card,Mobile,Wallet',
+            'reference_number' => 'required_unless:payment_method,Cash|nullable|string|max:255',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        if (!$this->accessibleBranchIds($request->user())->contains($return->branch_id)) {
+            abort(403);
+        }
+
+        $service->settle($return, $request->user(), $validated);
+
+        return redirect()->back()->with('success', $return->type === 'Customer'
+            ? 'Customer refund recorded.'
+            : 'Supplier refund received.');
     }
 }

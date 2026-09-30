@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router, useForm, usePage } from '@/spa';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { CompactBarChart } from '@/Components/CompactReportChart';
+import { Head, router, useForm, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -16,7 +21,6 @@ import {
     InputAdornment,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -37,7 +41,6 @@ import {
     Payment as PaymentIcon,
     RestartAlt as ResetIcon,
     Search as SearchIcon,
-    Visibility as ViewIcon,
 } from '@mui/icons-material';
 
 export default function AmountReceivable({
@@ -169,15 +172,7 @@ export default function AmountReceivable({
             <Head title={__('Amount Receivable')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                    <Box>
-                        <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            {__('Finance')}
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                            {__('Amount Receivable')}
-                        </Typography>
-                    </Box>
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
                     <Chip icon={<BalanceIcon />} label={`${__('Receivable')} ${money(summary.receivable_amount)}`} color="warning" variant="outlined" sx={{ height: 36, alignSelf: { xs: 'flex-start', md: 'center' } }} />
                 </Stack>
 
@@ -187,7 +182,7 @@ export default function AmountReceivable({
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('CUSTOMER RECEIVABLE FILTERS')}</Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Customer receivable filters')}
                         fieldKinds={['wide', 'select', 'select', 'date', 'date', 'amount', 'amount', 'select', 'search']}
                         onSubmit={() => applyFilters()}
@@ -290,22 +285,23 @@ export default function AmountReceivable({
                         />
                     </ReportFilterToolbar>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(6, 1fr)' }, gap: 1.2 }}>
-                        {summaryCards.map(([label, value]) => (
-                            <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
-                            </Paper>
-                        ))}
-                    </Box>
+                    <StatCardGrid items={summaryCards.map(([label, value]) => ({ label: __(label), value }))} sx={{ mb: 0 }} />
                 </Paper>
 
-                <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                        <BalanceIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('AMOUNT RECEIVABLE LIST')}</Typography>
-                    </Stack>
+                <Box sx={{ mb: 1.5 }}>
+                    <CompactBarChart title={__('Receivable Overview')} data={[{
+                        name: __('Current period'),
+                        total: Number(summary.grand_total || 0),
+                        collected: Number(summary.received_amount || 0),
+                        receivable: Number(summary.receivable_amount || 0),
+                    }]} xKey="name" layout="horizontal" series={[
+                        { key: 'total', label: __('Original Sales'), color: '#2874bc' },
+                        { key: 'collected', label: __('Collected'), color: '#0E684E' },
+                        { key: 'receivable', label: __('Receivable'), color: '#b77700' },
+                    ]} valueFormatter={(value) => `$${money(value)}`} height={168} />
+                </Box>
 
+                <Paper sx={{ p: 2 }}>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -319,12 +315,16 @@ export default function AmountReceivable({
                                     <TableCell sx={{ fontWeight: 700 }} align="right">{__('Collected')}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="right">{__('Need To Collect')}</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }} align="center">{__('Status')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="center">{__('Actions')}</TableCell>
+                                    <TableActionHead>{__('Actions')}</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {rows.map((sale) => (
-                                    <TableRow key={sale.id} hover>
+                                    <ClickableTableRow
+                                        key={sale.id}
+                                        href={sale.customer?.id ? route('customers.show', { customer: sale.customer.id }) : undefined}
+                                        label={sale.customer?.id ? `View customer ${sale.customer.name}` : undefined}
+                                    >
                                         <TableCell>{formatDate(sale.sale_date)}</TableCell>
                                         <TableCell>{formatDate(sale.due_date, true)}</TableCell>
                                         <TableCell>
@@ -333,9 +333,7 @@ export default function AmountReceivable({
                                         </TableCell>
                                         <TableCell>
                                             {sale.customer?.id ? (
-                                                <Link href={route('customers.show', { customer: sale.customer.id })}>
-                                                    <Typography variant="body2">{sale.customer.name}</Typography>
-                                                </Link>
+                                                <Typography variant="body2">{sale.customer.name}</Typography>
                                             ) : (
                                                 <Typography variant="body2">-</Typography>
                                             )}
@@ -357,8 +355,8 @@ export default function AmountReceivable({
                                                 variant="outlined"
                                             />
                                         </TableCell>
-                                        <TableCell align="center">
-                                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                                        <TableActionCell>
+                                            <TableRowActions label={sale.invoice_number}>
                                                 <Tooltip title={__('Receive payment')}>
                                                     <span>
                                                         <IconButton
@@ -371,21 +369,9 @@ export default function AmountReceivable({
                                                         </IconButton>
                                                     </span>
                                                 </Tooltip>
-                                                {sale.customer?.id && (
-                                                    <Tooltip title={__('View customer')}>
-                                                        <IconButton
-                                                            component={Link}
-                                                            href={route('customers.show', { customer: sale.customer.id })}
-                                                            size="small"
-                                                            color="primary"
-                                                        >
-                                                            <ViewIcon fontSize="inherit" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableRowActions>
+                                        </TableActionCell>
+                                    </ClickableTableRow>
                                 ))}
                                 {rows.length === 0 && (
                                     <TableRow>
@@ -398,17 +384,7 @@ export default function AmountReceivable({
                         </Table>
                     </TableContainer>
 
-                    {Number(sales.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={sales.last_page}
-                                page={sales.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={sales} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
 

@@ -74,7 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     | Base URL: /api/cashier
     */
-    Route::prefix('cashier')->group(function () {
+    Route::prefix('cashier')->middleware('permission:process_sale')->group(function () {
         // Products
         Route::get('/products', [CashierPosController::class, 'searchProducts']);
 
@@ -113,24 +113,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('staff')->group(function () {
         Route::get('/suppliers', [StaffPurchaseController::class, 'suppliers']);
         Route::get('/suppliers/{supplier}/statement', [StaffPurchaseController::class, 'supplierStatement']);
-        Route::get('/supplier-payments', [StaffPurchaseController::class, 'supplierPayments']);
-        Route::post('/supplier-payments', [StaffPurchaseController::class, 'storeSupplierPayment']);
-        Route::get('/branches', [StaffPurchaseController::class, 'branches']);
+        Route::get('/supplier-payments', [StaffPurchaseController::class, 'supplierPayments'])->middleware('permission:manage_payments');
+        Route::post('/supplier-payments', [StaffPurchaseController::class, 'storeSupplierPayment'])->middleware('permission:manage_payments');
+        Route::get('/branches', [StaffPurchaseController::class, 'branches'])->middleware('permission:manage_purchases');
 
-        Route::get('/products/lookups', [StaffProductController::class, 'lookupData']);
-        Route::get('/products', [StaffProductController::class, 'index']);
-        Route::post('/products', [StaffProductController::class, 'store']);
-        Route::get('/products/{product}', [StaffProductController::class, 'show']);
-        Route::put('/products/{product}', [StaffProductController::class, 'update']);
-        Route::patch('/products/{product}', [StaffProductController::class, 'update']);
-        Route::delete('/products/{product}', [StaffProductController::class, 'destroy']);
+        Route::get('/products/lookups', [StaffProductController::class, 'lookupData'])->middleware('permission:manage_products');
+        Route::get('/products', [StaffProductController::class, 'index'])->middleware('permission:manage_products');
+        Route::post('/products', [StaffProductController::class, 'store'])->middleware('permission:manage_products');
+        Route::get('/products/{product}', [StaffProductController::class, 'show'])->middleware('permission:manage_products');
+        Route::put('/products/{product}', [StaffProductController::class, 'update'])->middleware('permission:manage_products');
+        Route::patch('/products/{product}', [StaffProductController::class, 'update'])->middleware('permission:manage_products');
+        Route::delete('/products/{product}', [StaffProductController::class, 'destroy'])->middleware('permission:manage_products');
 
-        Route::get('/inventory/stock', [StaffProductController::class, 'stock']);
-        Route::get('/inventory/products/{product}/batches', [StaffProductController::class, 'inventoryBatches']);
+        Route::get('/inventory/stock', [StaffProductController::class, 'stock'])->middleware('permission:manage_inventory');
+        Route::get('/inventory/products/{product}/batches', [StaffProductController::class, 'inventoryBatches'])->middleware('permission:manage_inventory');
 
-        Route::get('/purchases', [StaffPurchaseController::class, 'index']);
-        Route::post('/purchases', [StaffPurchaseController::class, 'store']);
-        Route::get('/purchases/{purchase}', [StaffPurchaseController::class, 'show']);
+        Route::get('/purchases', [StaffPurchaseController::class, 'index'])->middleware('permission:manage_purchases');
+        Route::post('/purchases', [StaffPurchaseController::class, 'store'])->middleware('permission:manage_purchases');
+        Route::get('/purchases/{purchase}', [StaffPurchaseController::class, 'show'])->middleware('permission:manage_purchases');
     });
 
 });

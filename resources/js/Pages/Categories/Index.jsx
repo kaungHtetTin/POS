@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { AppBarActions } from '@/Components/AppBarPortal';
 import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -93,24 +94,18 @@ export default function CategoryIndex({ auth, categories }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            PRODUCT CATEGORIES
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
+                    <AppBarActions>
                         <CsvExportButton source={categories} filename="categories.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Category
                         </Button>
-                        </Stack>
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
+                        </AppBarActions>
 
                     <TableContainer>
                         <Table size="small">
@@ -119,7 +114,7 @@ export default function CategoryIndex({ auth, categories }) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Category Name</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Products</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -145,8 +140,10 @@ export default function CategoryIndex({ auth, categories }) {
                                                 sx={{ fontSize: '11px', height: '22px' }}
                                             />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
+                                        <TableActionCell sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <TableRowActions label={category.name}>
                                             <IconButton 
+                                                title="Edit category"
                                                 size="small" 
                                                 color="primary" 
                                                 onClick={() => handleOpen(category)}
@@ -154,6 +151,7 @@ export default function CategoryIndex({ auth, categories }) {
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                             <IconButton 
+                                                title="Delete category"
                                                 size="small" 
                                                 color="error" 
                                                 onClick={() => handleDelete(category)}
@@ -161,7 +159,8 @@ export default function CategoryIndex({ auth, categories }) {
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
                                 {categories.length === 0 && (

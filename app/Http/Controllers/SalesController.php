@@ -104,7 +104,7 @@ class SalesController extends Controller
             ->select('id', 'name', 'branch_id')
             ->with('branch:id,name')
             ->whereHas('roles', function ($q) {
-                $q->where('name', '!=', 'Root');
+                $q->whereNotIn('name', ['Owner', 'Root']);
             })
             ->where(function ($q) use ($accessibleBranchIds) {
                 $q->whereIn('branch_id', $accessibleBranchIds)
@@ -185,6 +185,7 @@ class SalesController extends Controller
             'items.unit:id,name,short_name',
             'items.focUnit:id,name,short_name',
             'items.batch:id,batch_number,expiry_date',
+            'customerPayments.user:id,name',
         ]);
 
         $returns = ReturnEntry::query()
@@ -198,9 +199,11 @@ class SalesController extends Controller
             ->latest()
             ->get();
 
-        $costTotal = (float) $sale->items->sum('cost_total');
-        $refundTotal = (float) $returns->where('status', 'Approved')->sum('refund_amount');
-        $netRevenue = (float) $sale->grand_total - (float) $sale->tax;
+        $approvedReturns = $returns->where('status', 'Approved');
+        $costTotal = (float) $sale->items->sum('cost_total') - (float) $approvedReturns->sum(fn ($return) => $return->items->sum('cost_total'));
+        $refundTotal = (float) $approvedReturns->sum('refund_amount');
+        $returnTax = (float) $approvedReturns->sum('tax_amount');
+        $netRevenue = (float) $sale->grand_total - (float) $sale->tax - $refundTotal + $returnTax;
 
         return Spa::render('Sales/Show', [
             'sale' => $sale,
@@ -213,6 +216,8 @@ class SalesController extends Controller
                 'gross_profit' => $netRevenue - $costTotal,
                 'approved_refunds' => $refundTotal,
                 'net_after_refunds' => (float) $sale->grand_total - $refundTotal,
+                'return_credit_amount' => (float) $sale->return_credit_amount,
+                'receivable_amount' => max((float) $sale->grand_total - (float) $sale->amount_received - (float) $sale->return_credit_amount, 0),
             ],
         ]);
     }
@@ -256,6 +261,10 @@ class SalesController extends Controller
 
             if ($lockedSale->status === 'Voided') {
                 return;
+            }
+
+            if (ReturnEntry::where('type', 'Customer')->where('reference_id', $lockedSale->id)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['void' => 'This sale has return records. Use the return flow instead.']);
             }
 
             foreach ($lockedSale->items as $item) {
@@ -344,7 +353,13 @@ class SalesController extends Controller
 
         $cashReceivedTotal = (float) ($totals?->cash_received_total ?? 0);
         $changeGivenTotal = (float) ($totals?->change_given_total ?? 0);
-        $netCashSales = $cashReceivedTotal - $changeGivenTotal;
+        $returnCash = \App\Models\ReturnSettlement::query()
+            ->join('returns', 'returns.id', '=', 'return_settlements.return_id')
+            ->where('return_settlements.cash_session_id', $session->id)
+            ->where('return_settlements.payment_method', 'Cash')
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Supplier' THEN return_settlements.amount ELSE -return_settlements.amount END), 0) as net")
+            ->first();
+        $netCashSales = $cashReceivedTotal - $changeGivenTotal + (float) ($returnCash?->net ?? 0);
         $expectedAmount = (float) $session->opening_amount + $netCashSales;
         $countedAmount = $session->closing_counted_amount !== null ? (float) $session->closing_counted_amount : null;
 

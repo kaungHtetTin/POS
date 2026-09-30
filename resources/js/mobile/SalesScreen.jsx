@@ -56,7 +56,9 @@ function ProductCard({ product, unitId, onUnitChange, onAdd, currency, priceType
     return (
         <article className={`product-card ${outOfStock ? 'product-card--disabled' : ''}`}>
             <button className="product-card__main" type="button" onClick={() => onAdd(product, unit)} disabled={outOfStock}>
-                <span className="product-avatar">{product.name?.slice(0, 2).toUpperCase()}</span>
+                {product.image_url
+                    ? <img className="product-avatar product-avatar--image" src={product.image_url} alt="" loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} />
+                    : <span className="product-avatar">{product.name?.slice(0, 2).toUpperCase()}</span>}
                 <span className="product-copy"><strong>{product.name}</strong><small>{product.generic_name || product.barcode || 'Medicine'}</small><span><b>{money(unitPrice(unit, priceType), currency)}</b><em>{outOfStock ? 'Out of stock' : `${available} ${unit?.unit_short_name || unit?.unit_name || 'units'} left`}</em></span></span>
                 <i className="add-circle"><Icon name="plus" size={19} /></i>
             </button>

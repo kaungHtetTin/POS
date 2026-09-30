@@ -28,7 +28,7 @@ class LogUserActivity
         if ($routeName === 'activity-logs.index') {
             return $response;
         }
-        if ($request->is('login') || $request->is('logout')) {
+        if ($request->is('login', 'logout', 'api/login', 'api/logout')) {
             return $response;
         }
 
@@ -41,10 +41,26 @@ class LogUserActivity
         );
 
         ActivityLogger::log($request, $action, $description, [
-            'payload' => $request->except(['_token']),
+            'payload' => $this->redactSensitiveValues($request->except(['_token'])),
             'status_code' => (int) $response->getStatusCode(),
         ]);
 
         return $response;
+    }
+
+    private function redactSensitiveValues(array $payload): array
+    {
+        foreach ($payload as $key => $value) {
+            if (preg_match('/password|token|secret|authorization|card[_-]?number|cvv|cvc|pin/i', (string) $key)) {
+                $payload[$key] = '[REDACTED]';
+                continue;
+            }
+
+            if (is_array($value)) {
+                $payload[$key] = $this->redactSensitiveValues($value);
+            }
+        }
+
+        return $payload;
     }
 }

@@ -26,7 +26,7 @@ export default function Guest({ children }) {
                     display: 'flex', 
                     flexDirection: 'column', 
                     borderRadius: 3,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                    boxShadow: '0 18px 50px rgba(12,74,58,0.12)'
                 }}>
                     {children}
                 </Paper>

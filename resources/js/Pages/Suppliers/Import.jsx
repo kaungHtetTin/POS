@@ -1,8 +1,9 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, Link, useForm } from '@/spa';
+import { Head, useForm } from '@/spa';
 import { Alert, Box, Button, LinearProgress, Paper, Stack, Typography } from '@mui/material';
-import { ArrowBack, Download, UploadFile } from '@mui/icons-material';
+import { Download, UploadFile } from '@mui/icons-material';
+import { AppBarBack } from '@/Components/AppBarPortal';
 
 export default function SupplierImport({ auth }) {
     const form = useForm({ file: null });
@@ -11,15 +12,12 @@ export default function SupplierImport({ auth }) {
     return (
         <MainLayout auth={auth} header="Import Suppliers">
             <Head title="Import Suppliers" />
-            <Stack spacing={2} sx={{ maxWidth: 820, mx: 'auto' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                        <Typography variant="h5" fontWeight={700}>Import suppliers</Typography>
-                        <Typography variant="body2" color="text.secondary">Download the template, fill in your suppliers, and save as CSV UTF-8.</Typography>
-                    </Box>
-                    <Button component={Link} href={route('suppliers.index')} startIcon={<ArrowBack />} sx={{ flexShrink: 0 }}>Suppliers</Button>
+            <AppBarBack href={route('suppliers.index')} label="Back to Suppliers" />
+            <Stack spacing={1.5} sx={{ maxWidth: 820, mx: 'auto' }}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems="flex-start">
+                    <Typography variant="body2" color="text.secondary">Download the template, fill in your suppliers, and save as CSV UTF-8.</Typography>
                 </Stack>
-                <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
                     <Stack spacing={2}>
                         <Typography variant="h6" fontWeight={700}>1. Prepare your file</Typography>
                         <Button component="a" href={route('suppliers.import.template')} variant="outlined" startIcon={<Download />} sx={{ alignSelf: 'flex-start' }}>Download supplier template</Button>

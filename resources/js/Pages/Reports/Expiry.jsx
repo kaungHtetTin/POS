@@ -1,17 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
 import { Head, router } from '@/spa';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { CompactDonutChart } from '@/Components/CompactReportChart';
 import {
-    Autocomplete,
     Box,
     Button,
     Chip,
     FormControl,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -30,19 +30,24 @@ import {
     WarningAmber as WarnIcon,
 } from '@mui/icons-material';
 
-export default function ExpiryReport({ auth, branches = [], products = [], batches = [], summary = {}, filters = {} }) {
+export default function ExpiryReport({ auth, branches = [], batches = [], summary = {}, filters = {} }) {
     const [branchId, setBranchId] = useState(filters.branch_id ?? auth.user?.current_branch_id ?? '');
-    const [productId, setProductId] = useState(filters.product_id ?? '');
+    const [search, setSearch] = useState(filters.search ?? '');
     const [fromDate, setFromDate] = useState(filters.from_date ?? '');
     const [toDate, setToDate] = useState(filters.to_date ?? '');
     const batchRows = batches?.data || batches || [];
+    const expiryChartData = [
+        { name: 'Expired', value: Number(summary.expired || 0) },
+        { name: 'Within 30 days', value: Number(summary.near30 || 0) },
+        { name: 'Later', value: Math.max(Number(summary.total || 0) - Number(summary.expired || 0) - Number(summary.near30 || 0), 0) },
+    ];
 
     const applyFilters = (page = undefined) => {
         router.get(
             route('reports.expiry'),
             {
                 branch_id: branchId || undefined,
-                product_id: productId || undefined,
+                search: search || undefined,
                 from_date: fromDate || undefined,
                 to_date: toDate || undefined,
                 page,
@@ -53,30 +58,10 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
 
     const resetFilters = () => {
         setBranchId(auth.user?.current_branch_id || '');
-        setProductId('');
+        setSearch('');
         setFromDate('');
         setToDate('');
         router.get(route('reports.expiry'));
-    };
-
-    const selectedProduct = useMemo(
-        () => products.find((product) => product.id === productId) || null,
-        [products, productId]
-    );
-
-    const filterProducts = (options, { inputValue }) => {
-        const query = inputValue.trim().toLowerCase();
-        if (!query) {
-            return options.slice(0, 50);
-        }
-
-        return options
-            .filter((product) => [
-                product.name,
-                product.generic_name,
-                product.barcode,
-            ].some((value) => String(value || '').toLowerCase().includes(query)))
-            .slice(0, 50);
     };
 
     return (
@@ -92,7 +77,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                         </Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Expiry report filters"
                         fieldKinds={['wide', 'date', 'date', 'search']}
                         onSubmit={applyFilters}
@@ -152,45 +137,17 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             }}
                         />
 
-                        <Autocomplete
+                        <TextField
+                            fullWidth
                             size="small"
-                            options={products}
-                            value={selectedProduct}
-                            onChange={(event, value) => setProductId(value?.id || '')}
-                            isOptionEqualToValue={(option, value) => option.id === value.id}
-                            getOptionLabel={(option) => option?.name || ''}
-                            filterOptions={filterProducts}
-                            autoHighlight
-                            clearOnEscape
-                            noOptionsText="No matching products"
-                            ListboxProps={{ style: { maxHeight: 320 } }}
+                            placeholder="Search medicine name, generic, or barcode..."
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            onKeyDown={(event) => event.key === 'Enter' && applyFilters()}
                             sx={{
                                 flex: { xs: '1 1 100%', sm: '2 1 320px', lg: '2 1 300px' },
                                 minWidth: 0,
                             }}
-                            renderOption={(props, option) => {
-                                const { key, ...optionProps } = props;
-
-                                return (
-                                    <Box component="li" key={key} {...optionProps}>
-                                        <Box sx={{ minWidth: 0 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-                                                {option.name}
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary" noWrap>
-                                                {[option.generic_name, option.barcode].filter(Boolean).join(' / ') || 'No barcode'}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                );
-                            }}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label="Product"
-                                    placeholder="Search name, generic, or barcode"
-                                />
-                            )}
                         />
 
                     </ReportFilterToolbar>
@@ -200,6 +157,10 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                         <Chip size="small" color="error" variant="outlined" label={`Expired: ${summary.expired}`} />
                         <Chip size="small" color="warning" variant="outlined" label={`<=30 days: ${summary.near30}`} />
                     </Stack>
+
+                    <Box sx={{ maxWidth: 520, mb: 1.5 }}>
+                        <CompactDonutChart title="Expiry Status" data={expiryChartData} colors={['#ce4444', '#b77700', '#0E684E']} height={168} />
+                    </Box>
 
                     <TableContainer>
                         <Table size="small">
@@ -244,17 +205,7 @@ export default function ExpiryReport({ auth, branches = [], products = [], batch
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(batches?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={batches.last_page}
-                                page={batches.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={batches} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
         </MainLayout>

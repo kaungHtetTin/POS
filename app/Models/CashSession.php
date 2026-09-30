@@ -58,4 +58,9 @@ class CashSession extends Model
     {
         return $this->hasMany(Sale::class);
     }
+
+    public function returnSettlements()
+    {
+        return $this->hasMany(ReturnSettlement::class);
+    }
 }

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import TransferFormDialog from '@/Pages/Inventory/Transfers/TransferFormDialog';
 import { Head, router } from '@/spa';
 import {
     Box,
     Button,
     Chip,
     InputAdornment,
-    Pagination,
     Paper,
     Stack,
     Table,
@@ -22,12 +24,12 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    CompareArrows as TransferIcon,
     Search as SearchIcon,
 } from '@mui/icons-material';
 
-export default function StockTransfers({ auth, transfers, filters }) {
+export default function StockTransfers({ auth, transfers, filters, branches = [], products = [], categories = [], open_transfer_modal = false }) {
     const [search, setSearch] = useState(filters?.search || '');
+    const [transferOpen, setTransferOpen] = useState(Boolean(open_transfer_modal));
     const transferRows = transfers?.data || transfers || [];
 
     const handleSearch = (page = undefined) => {
@@ -47,27 +49,13 @@ export default function StockTransfers({ auth, transfers, filters }) {
         <MainLayout auth={auth} header="Stock Transfers">
             <Head title="Stock Transfers" />
 
-            <Box sx={{ p: { xs: 1, md: 1.25 } }}>
+            <Box>
                 <Paper sx={{ p: 2 }}>
-                    <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        justifyContent="space-between"
-                        alignItems={{ xs: 'stretch', md: 'center' }}
-                        spacing={1.5}
-                        sx={{ mb: 2 }}
-                    >
-                        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <TransferIcon color="primary" />
-                            Branch-to-Branch Transfers
-                        </Typography>
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => router.visit(route('inventory.transfers.create'))}>New Transfer</Button>
-                    </Stack>
-
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Stock transfer filters"
                         fieldKinds={['search']}
                         onSubmit={() => handleSearch()}
-                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={transfers} dataKey="transfers" filename="stock-transfers.csv" /></>}
+                        actions={<><Button variant="outlined" type="submit">Search</Button><CsvExportButton source={transfers} dataKey="transfers" filename="stock-transfers.csv" /><Button variant="contained" startIcon={<AddIcon />} onClick={() => setTransferOpen(true)}>New Transfer</Button></>}
                     >
                         <TextField
                             size="small"
@@ -92,7 +80,11 @@ export default function StockTransfers({ auth, transfers, filters }) {
                             </TableHead>
                             <TableBody>
                                 {transferRows.map((transfer) => (
-                                    <TableRow key={transfer.id} hover>
+                                    <ClickableTableRow
+                                        key={transfer.id}
+                                        href={route('inventory.transfers.show', transfer.id)}
+                                        label={`View transfer ${transfer.reference_number}`}
+                                    >
                                         <TableCell sx={{ fontWeight: 800 }}>{transfer.reference_number}</TableCell>
                                         <TableCell>{transfer.from_branch?.name}</TableCell>
                                         <TableCell>{transfer.to_branch?.name}</TableCell>
@@ -101,7 +93,7 @@ export default function StockTransfers({ auth, transfers, filters }) {
                                         <TableCell align="center">
                                             <Chip size="small" label={transfer.status} color="success" variant="outlined" />
                                         </TableCell>
-                                    </TableRow>
+                                    </ClickableTableRow>
                                 ))}
                                 {transferRows.length === 0 && (
                                     <TableRow>
@@ -113,19 +105,26 @@ export default function StockTransfers({ auth, transfers, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(transfers?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={transfers.last_page}
-                                page={transfers.current_page}
-                                onChange={(event, page) => handleSearch(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={transfers} onPageChange={(page) => handleSearch(page)} />
                 </Paper>
             </Box>
+            <TransferFormDialog
+                open={transferOpen}
+                onClose={() => {
+                    setTransferOpen(false);
+                    if (typeof window !== 'undefined') {
+                        const url = new URL(window.location.href);
+                        if (url.searchParams.has('create')) {
+                            url.searchParams.delete('create');
+                            window.history.replaceState(window.history.state, '', url.toString());
+                        }
+                    }
+                }}
+                auth={auth}
+                branches={branches}
+                products={products}
+                categories={categories}
+            />
         </MainLayout>
     );
 }

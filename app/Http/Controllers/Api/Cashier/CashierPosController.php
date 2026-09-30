@@ -485,6 +485,8 @@ class CashierPosController extends Controller
                     'price_type' => $item['price_type'],
                     'discount_percentage' => $discountPercentage,
                     'discount_amount' => $lineDiscount,
+                    'tax_amount' => $taxAmount,
+                    'payable_total' => $product->tax_method === 'Inclusive' && $taxRate > 0 ? $lineNet : $lineNet + $taxAmount,
                 ];
             }
 
@@ -574,6 +576,9 @@ class CashierPosController extends Controller
                         'discount_percentage' => $line['discount_percentage'],
                         'discount_amount' => $line['discount_amount'] * ($quantityInUnit / (float) $line['quantity']),
                         'total_price' => $quantityInUnit * (float) $line['unit_price'],
+                        'payable_total' => $line['quantity'] > 0 ? $line['payable_total'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'tax_amount' => $line['quantity'] > 0 ? $line['tax_amount'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'financial_snapshot' => true,
                         'created_at' => now(),
                     ]);
 
@@ -841,11 +846,22 @@ class CashierPosController extends Controller
             ->pluck('total', 'payment_method');
         $cashReceived = (float) ($cash?->received ?? 0);
         $changeGiven = (float) ($cash?->change_given ?? 0);
+        $returnCash = \App\Models\ReturnSettlement::query()
+            ->join('returns', 'returns.id', '=', 'return_settlements.return_id')
+            ->where('return_settlements.cash_session_id', $session->id)
+            ->where('return_settlements.payment_method', 'Cash')
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Supplier' THEN return_settlements.amount ELSE 0 END), 0) as received")
+            ->selectRaw("COALESCE(SUM(CASE WHEN returns.type = 'Customer' THEN return_settlements.amount ELSE 0 END), 0) as paid")
+            ->first();
+        $returnReceived = (float) ($returnCash?->received ?? 0);
+        $returnPaid = (float) ($returnCash?->paid ?? 0);
 
         return [
             'cash_received_total' => $cashReceived,
             'change_given_total' => $changeGiven,
-            'net_cash_sales' => $cashReceived - $changeGiven,
+            'cash_return_received' => $returnReceived,
+            'cash_return_paid' => $returnPaid,
+            'net_cash_sales' => $cashReceived - $changeGiven + $returnReceived - $returnPaid,
             'cash_sales_total' => (float) ($paymentTotals['Cash'] ?? 0),
             'card_sales_total' => (float) ($paymentTotals['Card'] ?? 0),
             'mobile_sales_total' => (float) ($paymentTotals['Mobile'] ?? 0),
@@ -868,6 +884,8 @@ class CashierPosController extends Controller
             'opening_balance' => $session->opening_amount, // map DB column back to API field
             'cash_received_total' => $totals['cash_received_total'],
             'change_given_total' => $totals['change_given_total'],
+            'cash_return_received' => $totals['cash_return_received'],
+            'cash_return_paid' => $totals['cash_return_paid'],
             'net_cash_sales' => $totals['net_cash_sales'],
             'cash_sales_total' => $totals['cash_sales_total'],
             'card_sales_total' => $totals['card_sales_total'],

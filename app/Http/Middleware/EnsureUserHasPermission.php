@@ -13,19 +13,19 @@ class EnsureUserHasPermission
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse)  $next
-     * @param  string  $permission
+     * @param  string  ...$permissions
      * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      */
-    public function handle(Request $request, Closure $next, $permission)
+    public function handle(Request $request, Closure $next, ...$permissions)
     {
         if (!$request->user()) {
             return redirect()->route('login');
         }
 
-        if (Gate::allows($permission)) {
+        if (collect($permissions)->contains(fn ($permission) => Gate::allows($permission))) {
             return $next($request);
         }
 
-        abort(403, 'You do not have the required permission: ' . $permission);
+        abort(403, 'You do not have one of the required permissions: ' . implode(', ', $permissions));
     }
 }

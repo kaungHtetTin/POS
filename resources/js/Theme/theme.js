@@ -8,21 +8,24 @@ const statusColors = {
     neutral: '#7b8795',
 };
 
-export const getTheme = (mode, primaryColor = '#087f74') => {
+export const getTheme = (mode, primaryColor = '#0E684E') => {
     const isDark = mode === 'dark';
     const tokens = {
-        bg: isDark ? '#0b151d' : '#eef4f4',
-        surface: isDark ? '#101d28' : '#ffffff',
-        glass: isDark ? alpha('#101d28', 0.78) : alpha('#ffffff', 0.78),
-        border: isDark ? alpha('#e5eef2', 0.12) : alpha('#0f172a', 0.10),
-        text: isDark ? '#e7edf2' : '#172033',
-        muted: isDark ? '#9aa8b8' : '#69768a',
-        soft: isDark ? alpha('#e5eef2', 0.06) : '#f2f6f6',
-        shadow: isDark ? '0 14px 34px rgba(0, 0, 0, 0.28)' : '0 12px 30px rgba(16, 71, 67, 0.10)',
+        bg: isDark ? '#101915' : '#F6F8F7',
+        surface: isDark ? '#17221D' : '#FFFFFF',
+        glass: isDark ? '#17221D' : '#FFFFFF',
+        border: isDark ? alpha('#DDE5E1', 0.16) : '#DDE5E1',
+        text: isDark ? '#EDF4F0' : '#132238',
+        muted: isDark ? '#A9B7B0' : '#687486',
+        soft: isDark ? alpha('#DDE5E1', 0.07) : '#F6F8F7',
+        shadow: 'none',
         primarySoft: alpha(primaryColor, isDark ? 0.22 : 0.11),
     };
 
     return createTheme({
+        breakpoints: {
+            values: { xs: 0, sm: 600, md: 981, lg: 1200, xl: 1536 },
+        },
         palette: {
             mode,
             primary: {
@@ -95,9 +98,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         minHeight: '100%',
                         color: tokens.text,
                         backgroundColor: tokens.bg,
-                        backgroundImage: `radial-gradient(circle at 7% 4%, ${alpha(primaryColor, isDark ? 0.20 : 0.13)}, transparent 23rem),
-                            radial-gradient(circle at 92% 95%, ${alpha('#569cbf', isDark ? 0.16 : 0.12)}, transparent 27rem)`,
-                        backgroundAttachment: 'fixed',
+                        backgroundImage: 'none',
                         scrollbarColor: isDark ? '#415366 transparent' : '#b7c2c8 transparent',
                         '&::-webkit-scrollbar, & *::-webkit-scrollbar': {
                             width: 8,
@@ -123,22 +124,22 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiAppBar: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
-                        backdropFilter: 'blur(14px) saturate(125%)',
-                        WebkitBackdropFilter: 'blur(14px) saturate(125%)',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
                     },
                 },
             },
             MuiDrawer: {
                 styleOverrides: {
                     paper: {
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
                         borderColor: tokens.border,
-                        boxShadow: tokens.shadow,
-                        backdropFilter: 'blur(14px) saturate(125%)',
-                        WebkitBackdropFilter: 'blur(14px) saturate(125%)',
+                        boxShadow: 'none',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
                     },
                 },
             },
@@ -149,17 +150,17 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 styleOverrides: {
                     root: {
                         color: tokens.text,
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
                         borderRadius: 6,
-                        boxShadow: tokens.shadow,
-                        backdropFilter: 'blur(14px) saturate(125%)',
-                        WebkitBackdropFilter: 'blur(14px) saturate(125%)',
+                        boxShadow: 'none',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
                     },
                     outlined: {
-                        backgroundColor: isDark ? alpha(tokens.surface, 0.72) : alpha('#ffffff', 0.74),
+                        backgroundColor: tokens.surface,
                         borderColor: tokens.border,
                     },
                 },
@@ -171,21 +172,21 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 styleOverrides: {
                     root: {
                         color: tokens.text,
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
                         borderRadius: 6,
-                        boxShadow: tokens.shadow,
-                        backdropFilter: 'blur(14px) saturate(125%)',
-                        WebkitBackdropFilter: 'blur(14px) saturate(125%)',
+                        boxShadow: 'none',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
                     },
                 },
             },
             MuiCardContent: {
                 styleOverrides: {
                     root: {
-                        padding: '13px !important',
+                        padding: '10px !important',
                     },
                 },
             },
@@ -196,10 +197,10 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 },
                 styleOverrides: {
                     root: {
-                        minHeight: 36,
-                        borderRadius: 6,
-                        padding: '6px 12px',
-                        fontWeight: 800,
+                        minHeight: 32,
+                        borderRadius: 5,
+                        padding: '5px 9px',
+                        fontWeight: 600,
                         whiteSpace: 'nowrap',
                         '& .MuiButton-startIcon': {
                             marginRight: 7,
@@ -220,7 +221,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                     },
                     outlined: {
                         borderColor: tokens.border,
-                        backgroundColor: isDark ? alpha(tokens.surface, 0.54) : alpha('#ffffff', 0.72),
+                        backgroundColor: tokens.surface,
                     },
                     text: {
                         color: tokens.muted,
@@ -237,9 +238,9 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 },
                 styleOverrides: {
                     root: {
-                        width: 34,
-                        height: 34,
-                        borderRadius: 6,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 5,
                         color: tokens.muted,
                         transition: 'background-color 160ms ease, color 160ms ease, border-color 160ms ease',
                         '&:hover': {
@@ -269,7 +270,8 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 styleOverrides: {
                     root: {
                         color: tokens.muted,
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: 600,
                         '&.Mui-focused': {
                             color: primaryColor,
                         },
@@ -289,9 +291,9 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiOutlinedInput: {
                 styleOverrides: {
                     root: {
-                        minHeight: 39,
-                        borderRadius: 6,
-                        fontSize: 12,
+                        minHeight: 34,
+                        borderRadius: 4,
+                        fontSize: 13,
                         backgroundColor: isDark ? alpha(tokens.surface, 0.92) : '#ffffff',
                         '& .MuiOutlinedInput-notchedOutline': {
                             borderColor: tokens.border,
@@ -302,16 +304,16 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                             borderColor: primaryColor,
                             borderWidth: 1,
-                            boxShadow: `0 0 0 3px ${tokens.primarySoft}`,
+                            boxShadow: `0 0 0 2px ${tokens.primarySoft}`,
                         },
                     },
                     input: {
-                        padding: '8.5px 12px',
+                        padding: '6px 9px',
                     },
                     multiline: {
                         padding: 0,
                         '& textarea': {
-                            padding: '8.5px 12px',
+                            padding: '6px 9px',
                         },
                     },
                 },
@@ -322,7 +324,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 },
                 styleOverrides: {
                     select: {
-                        padding: '8.5px 12px',
+                        padding: '6px 9px',
                     },
                 },
             },
@@ -360,15 +362,19 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiTableContainer: {
                 styleOverrides: {
                     root: {
-                        borderRadius: 8,
+                        borderRadius: 6,
                         border: '1px solid',
                         borderColor: tokens.border,
-                        backgroundColor: isDark ? alpha(tokens.surface, 0.92) : alpha('#ffffff', 0.90),
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
                         boxShadow: 'none',
                         backdropFilter: 'none',
                         WebkitBackdropFilter: 'none',
                         overflowX: 'auto',
+                        '&:has(+ .data-table-footer)': {
+                            borderBottomLeftRadius: 0,
+                            borderBottomRightRadius: 0,
+                        },
                     },
                 },
             },
@@ -412,19 +418,19 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiTableCell: {
                 styleOverrides: {
                     root: {
-                        height: 34,
-                        padding: '7px 10px',
+                        height: 42,
+                        padding: '6px 9px',
                         borderColor: tokens.border,
                         color: tokens.text,
-                        fontSize: 11,
+                        fontSize: 12,
                         lineHeight: 1.35,
                         verticalAlign: 'middle',
                         '&:first-of-type': {
-                            paddingLeft: 12,
+                            paddingLeft: 10,
                         },
                         '&:last-of-type': {
-                            paddingRight: 12,
-                            minWidth: 78,
+                            paddingRight: 10,
+                            minWidth: 80,
                             whiteSpace: 'nowrap',
                         },
                         '&:last-of-type > .MuiStack-root': {
@@ -476,17 +482,17 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         },
                     },
                     head: {
-                        height: 30,
-                        paddingTop: 8,
-                        paddingBottom: 8,
+                        height: 34,
+                        paddingTop: 6,
+                        paddingBottom: 6,
                         color: `${tokens.muted} !important`,
                         backgroundColor: `${tokens.soft} !important`,
                         borderBottom: `1px solid ${tokens.border}`,
-                        fontSize: '9px !important',
-                        fontWeight: '800 !important',
-                        letterSpacing: '0.07em',
+                        fontSize: '10px !important',
+                        fontWeight: '650 !important',
+                        letterSpacing: 0,
                         lineHeight: 1.2,
-                        textTransform: 'uppercase',
+                        textTransform: 'none',
                         whiteSpace: 'nowrap',
                     },
                 },
@@ -512,9 +518,9 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         borderTop: '1px solid',
                         borderColor: tokens.border,
                         '& .MuiTablePagination-toolbar': {
-                            minHeight: 42,
-                            paddingLeft: 12,
-                            paddingRight: 8,
+                            minHeight: 44,
+                            paddingLeft: 10,
+                            paddingRight: 10,
                         },
                         '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
                             margin: 0,
@@ -544,10 +550,10 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiChip: {
                 styleOverrides: {
                     root: {
-                        minHeight: 20,
+                        minHeight: 24,
                         borderRadius: 99,
-                        fontSize: 10,
-                        fontWeight: 800,
+                        fontSize: 11,
+                        fontWeight: 700,
                     },
                     label: {
                         paddingLeft: 8,
@@ -592,11 +598,11 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         borderRadius: 8,
                         border: '1px solid',
                         borderColor: tokens.border,
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
-                        boxShadow: tokens.shadow,
-                        backdropFilter: 'blur(14px) saturate(125%)',
-                        WebkitBackdropFilter: 'blur(14px) saturate(125%)',
+                        boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.40)' : '0 18px 50px rgba(12,74,58,0.16)',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
                     },
                 },
             },
@@ -610,9 +616,10 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiDialogTitle: {
                 styleOverrides: {
                     root: {
-                        padding: '12px 16px !important',
-                        fontSize: 15,
-                        fontWeight: 800,
+                        minHeight: 48,
+                        padding: '9px 12px !important',
+                        fontSize: 16,
+                        fontWeight: 650,
                         borderBottom: '1px solid',
                         borderColor: tokens.border,
                     },
@@ -621,7 +628,7 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiDialogContent: {
                 styleOverrides: {
                     root: {
-                        padding: '14px 16px !important',
+                        padding: '12px !important',
                         '&.MuiDialogContent-dividers': {
                             borderColor: tokens.border,
                         },
@@ -631,16 +638,18 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
             MuiDialogActions: {
                 styleOverrides: {
                     root: {
-                        padding: '12px 16px !important',
+                        minHeight: 52,
+                        padding: '9px 12px !important',
                         borderTop: '1px solid',
                         borderColor: tokens.border,
+                        '& .MuiButton-root': { minWidth: 110, minHeight: 34 },
                     },
                 },
             },
             MuiMenu: {
                 styleOverrides: {
                     paper: {
-                        backgroundColor: tokens.glass,
+                        backgroundColor: tokens.surface,
                         backgroundImage: 'none',
                     },
                 },
@@ -651,8 +660,8 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                 },
                 styleOverrides: {
                     root: {
-                        minHeight: 34,
-                        borderRadius: 6,
+                        minHeight: 32,
+                        borderRadius: 4,
                         margin: '2px 6px',
                         fontSize: 12,
                     },
@@ -719,6 +728,46 @@ export const getTheme = (mode, primaryColor = '#087f74') => {
                         fontWeight: 800,
                     },
                 },
+            },
+            MuiAccordion: {
+                defaultProps: { elevation: 0, disableGutters: true },
+                styleOverrides: {
+                    root: {
+                        border: '1px solid',
+                        borderColor: tokens.border,
+                        borderRadius: '6px !important',
+                        backgroundImage: 'none',
+                        boxShadow: 'none',
+                        '&:before': { display: 'none' },
+                    },
+                },
+            },
+            MuiAccordionSummary: {
+                styleOverrides: {
+                    root: { minHeight: 38, padding: '0 10px' },
+                    content: { margin: '8px 0' },
+                },
+            },
+            MuiAccordionDetails: {
+                styleOverrides: { root: { padding: 10, borderTop: `1px solid ${tokens.border}` } },
+            },
+            MuiPaginationItem: {
+                styleOverrides: {
+                    root: { minWidth: 30, height: 30, borderRadius: 5, fontSize: 11, fontWeight: 600 },
+                },
+            },
+            MuiTooltip: {
+                styleOverrides: {
+                    tooltip: { borderRadius: 4, padding: '5px 7px', fontSize: 11, fontWeight: 600 },
+                },
+            },
+            MuiBadge: {
+                styleOverrides: {
+                    badge: { minWidth: 15, height: 15, padding: '0 3px', fontSize: 9, fontWeight: 800 },
+                },
+            },
+            MuiSkeleton: {
+                styleOverrides: { root: { borderRadius: 5 } },
             },
             MuiSvgIcon: {
                 styleOverrides: {

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import { Head, Link, useForm, usePage } from '@/spa';
 import {
     Alert,
@@ -28,7 +30,6 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    ArrowBack as BackIcon,
     CheckCircle as ConfirmIcon,
     CompareArrows as TransferIcon,
     Delete as DeleteIcon,
@@ -281,7 +282,7 @@ export default function CreateStockTransfer({ auth, branches = [], products = []
                         Search and add every product to transfer. Batch and quantity are handled in the next step.
                     </Alert>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Transfer product filters"
                         fieldKinds={['search', 'wide']}
                         actions={(
@@ -329,24 +330,11 @@ export default function CreateStockTransfer({ auth, branches = [], products = []
                         </TextField>
                     </ReportFilterToolbar>
 
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                        <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                            <Typography variant="caption" color="text.secondary">Selected</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{data.items.length}</Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                            <Typography variant="caption" color="text.secondary">Matching Products</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                {filteredAvailableProducts.length + selectedCatalogProducts.length}
-                            </Typography>
-                        </Paper>
-                        <Paper variant="outlined" sx={{ p: 1.5, flex: 1 }}>
-                            <Typography variant="caption" color="text.secondary">Source Branch</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }} noWrap>
-                                {branchName(data.from_branch_id)}
-                            </Typography>
-                        </Paper>
-                    </Stack>
+                    <StatCardGrid items={[
+                        { label: 'Selected', value: data.items.length },
+                        { label: 'Matching Products', value: filteredAvailableProducts.length + selectedCatalogProducts.length },
+                        { label: 'Source Branch', value: branchName(data.from_branch_id) },
+                    ]} sx={{ mb: 0 }} />
 
                     <Stack spacing={1.2}>
                         {visibleCatalogProducts.length === 0 ? (
@@ -594,30 +582,11 @@ export default function CreateStockTransfer({ auth, branches = [], products = []
     };
 
     return (
-        <MainLayout auth={auth} header="Stock Transfers">
+        <MainLayout auth={auth} header="Create Transfer">
             <Head title="Create Stock Transfer" />
+            <AppBarBack href={route('inventory.transfers.index')} label="Back to Transfers" />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
-                <Stack
-                    direction={{ xs: 'column', md: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'stretch', md: 'center' }}
-                    spacing={1.5}
-                    sx={{ mb: 2 }}
-                >
-                    <Box>
-                        <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            Stock transfer
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                            Create Transfer
-                        </Typography>
-                    </Box>
-                    <Button component={Link} href={route('inventory.transfers.index')} variant="outlined" startIcon={<BackIcon />}>
-                        Back to Transfers
-                    </Button>
-                </Stack>
-
                 <Paper sx={{ p: { xs: 1.5, md: 2 } }}>
                     <form onSubmit={submit}>
                         <Stack spacing={2.5}>

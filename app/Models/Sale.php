@@ -23,6 +23,7 @@ class Sale extends Model
         'tax',
         'grand_total',
         'amount_received',
+        'return_credit_amount',
         'change_due',
         'payment_method',
         'payment_status',
@@ -44,6 +45,7 @@ class Sale extends Model
         'tax' => 'decimal:2',
         'grand_total' => 'decimal:2',
         'amount_received' => 'decimal:2',
+        'return_credit_amount' => 'decimal:2',
         'change_due' => 'decimal:2',
         'voided_at' => 'datetime',
         'is_synced' => 'boolean',
@@ -53,13 +55,13 @@ class Sale extends Model
     public function scopeOutstanding($query)
     {
         return $query->whereIn('payment_status', ['Partial', 'Due'])
-            ->whereRaw('grand_total > COALESCE(amount_received, 0)')
+            ->whereRaw('grand_total > COALESCE(amount_received, 0) + COALESCE(return_credit_amount, 0)')
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'Voided'));
     }
 
     public function getReceivableStatusAttribute(): string
     {
-        if ($this->payment_status === 'Paid' || (float) $this->amount_received >= (float) $this->grand_total) {
+        if ($this->payment_status === 'Paid' || (float) $this->amount_received + (float) $this->return_credit_amount >= (float) $this->grand_total) {
             return 'Paid';
         }
         if ($this->due_date && $this->due_date->lt(today())) {
@@ -101,5 +103,10 @@ class Sale extends Model
     public function items()
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    public function customerPayments()
+    {
+        return $this->hasMany(CustomerPayment::class);
     }
 }

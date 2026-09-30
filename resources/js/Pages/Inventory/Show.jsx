@@ -1,7 +1,9 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router } from '@/spa';
+import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
+import { Head, router } from '@/spa';
 import {
     Alert,
     Box,
@@ -21,7 +23,6 @@ import {
     Typography,
 } from '@mui/material';
 import {
-    ArrowBack as BackIcon,
     Category as CategoryIcon,
     Inventory as StockIcon,
     QrCode as BarcodeIcon,
@@ -53,19 +54,15 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
     return (
         <MainLayout auth={auth} header="Inventory Detail">
             <Head title={`${product.name} Inventory`} />
+            <AppBarBack href={route('inventory.index', selectedBranchId ? { branch_id: selectedBranchId } : {})} label="Back to Stock Balance" />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
-                    <Button
-                        component={Link}
-                        href={route('inventory.index', selectedBranchId ? { branch_id: selectedBranchId } : {})}
-                        startIcon={<BackIcon />}
-                        variant="outlined"
-                        sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
-                    >
-                        Back
-                    </Button>
-
+                <ReportFilterToolbar
+                    appBar
+                    ariaLabel="Inventory detail filters"
+                    fieldKinds={['select']}
+                    actions={<CsvExportButton source={branchGroups.flatMap((group) => (group.batches || []).map((batch) => ({ ...batch, branch: group.branch?.name })))} filename="inventory-batches.csv" />}
+                >
                     <TextField
                         select
                         size="small"
@@ -88,7 +85,7 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
                             </MenuItem>
                         ))}
                     </TextField>
-                </Stack>
+                </ReportFilterToolbar>
 
                 <Paper sx={{ p: 2, mb: 2 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
@@ -133,9 +130,6 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
                 )}
 
                 <Paper sx={{ p: 2 }}>
-                    <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
-                        <CsvExportButton source={branchGroups.flatMap((group) => (group.batches || []).map((batch) => ({ ...batch, branch: group.branch?.name })))} filename="inventory-batches.csv" />
-                    </Stack>
                     <TableContainer>
                         <Table size="small">
                             <TableHead>

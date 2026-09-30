@@ -13,58 +13,83 @@ use App\Services\SupplierPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class StaffPurchaseController extends Controller
 {
     /**
      * List suppliers (for purchase creation).
-     * Requires: manage_inventory permission
+     * Requires: supplier, purchase, or payment management permission.
      */
     public function suppliers(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$this->canAccessSuppliers($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $suppliers = Supplier::select('id', 'name', 'phone', 'email', 'address', 'credit_limit', 'balance')
+        $branchIds = $this->accessibleBranchIds($request);
+        $suppliers = Supplier::select('id', 'name', 'phone', 'email', 'address', 'credit_limit')
+            ->withSum([
+                'purchases as accessible_due_amount' => fn ($query) => $query->whereIn('branch_id', $branchIds),
+            ], 'due_amount')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn ($supplier) => [
+                'id' => $supplier->id,
+                'name' => $supplier->name,
+                'phone' => $supplier->phone,
+                'email' => $supplier->email,
+                'address' => $supplier->address,
+                'credit_limit' => (float) $supplier->credit_limit,
+                'balance' => (float) ($supplier->accessible_due_amount ?? 0),
+            ]);
 
         return response()->json($suppliers);
     }
 
     /**
      * Supplier statement with purchases and payment history.
-     * Requires: manage_inventory permission
+     * Requires: supplier, purchase, or payment management permission.
      */
     public function supplierStatement(Request $request, Supplier $supplier)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$this->canAccessSuppliers($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $supplier->loadCount('purchases');
+        $branchIds = $this->accessibleBranchIds($request);
 
         $purchases = $supplier->purchases()
+            ->whereIn('branch_id', $branchIds)
             ->with(['branch:id,name'])
             ->withCount('items')
             ->latest()
             ->get();
 
         $payments = $supplier->payments()
+            ->whereIn('branch_id', $branchIds)
             ->with(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name'])
             ->latest('payment_date')
             ->latest()
             ->get();
 
         return response()->json([
-            'supplier' => $supplier,
+            'supplier' => [
+                'id' => $supplier->id,
+                'name' => $supplier->name,
+                'phone' => $supplier->phone,
+                'email' => $supplier->email,
+                'address' => $supplier->address,
+                'credit_limit' => (float) $supplier->credit_limit,
+                'purchases_count' => $purchases->count(),
+                'balance' => (float) $purchases->sum('due_amount'),
+            ],
             'summary' => [
                 'total_purchases' => (float) $purchases->sum('total_amount'),
                 'total_due' => (float) $purchases->sum('due_amount'),
                 'total_payments' => (float) $payments->sum('amount'),
-                'outstanding_balance' => (float) $supplier->balance,
+                'outstanding_balance' => (float) $purchases->sum('due_amount'),
             ],
             'purchases' => $purchases,
             'due_purchases' => $purchases->where('due_amount', '>', 0)->values(),
@@ -74,11 +99,11 @@ class StaffPurchaseController extends Controller
 
     /**
      * List supplier payments.
-     * Requires: manage_inventory permission
+     * Requires: manage_payments permission.
      */
     public function supplierPayments(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_payments')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -96,7 +121,7 @@ class StaffPurchaseController extends Controller
             'purchase:id,invoice_number',
             'branch:id,name',
             'user:id,name',
-        ]);
+        ])->whereIn('branch_id', $this->accessibleBranchIds($request));
 
         if (!empty($validated['supplier_id'])) {
             $query->where('supplier_id', $validated['supplier_id']);
@@ -127,11 +152,11 @@ class StaffPurchaseController extends Controller
 
     /**
      * Record a supplier payment.
-     * Requires: manage_inventory permission
+     * Requires: manage_payments permission.
      */
     public function storeSupplierPayment(Request $request, SupplierPaymentService $supplierPaymentService)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_payments')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -150,18 +175,24 @@ class StaffPurchaseController extends Controller
 
         return response()->json([
             'message' => 'Supplier payment recorded successfully.',
-            'supplier' => $result['supplier'],
+            'supplier' => [
+                'id' => $result['supplier']->id,
+                'name' => $result['supplier']->name,
+                'balance' => (float) Purchase::where('supplier_id', $result['supplier']->id)
+                    ->whereIn('branch_id', $this->accessibleBranchIds($request))
+                    ->sum('due_amount'),
+            ],
             'payments' => $result['payments']->load(['purchase:id,invoice_number', 'branch:id,name', 'user:id,name']),
         ], 201);
     }
 
     /**
      * List active products with their units (for purchase item selection).
-     * Requires: manage_inventory permission
+     * Requires: manage_purchases permission.
      */
     public function products(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -201,25 +232,28 @@ class StaffPurchaseController extends Controller
 
     /**
      * List branches (for purchase assignment).
-     * Requires: manage_inventory permission
+     * Requires: manage_purchases permission.
      */
     public function branches(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $branches = Branch::select('id', 'name', 'address', 'phone')->orderBy('name')->get();
+        $branches = Branch::select('id', 'name', 'address', 'phone')
+            ->whereIn('id', $this->accessibleBranchIds($request))
+            ->orderBy('name')
+            ->get();
         return response()->json($branches);
     }
 
     /**
      * Create a new purchase (with inventory batch creation).
-     * Requires: manage_inventory permission
+     * Requires: manage_purchases permission.
      */
     public function store(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -243,6 +277,10 @@ class StaffPurchaseController extends Controller
             'items.*.selling_price' => 'required|numeric|min:0.01',
             'items.*.wholesale_price' => 'nullable|numeric|min:0.01',
         ]);
+
+        if (!$this->accessibleBranchIds($request)->contains($validated['branch_id'])) {
+            return response()->json(['message' => 'You do not have access to the selected branch.'], 403);
+        }
 
         $userId = $request->user()->id;
 
@@ -271,7 +309,8 @@ class StaffPurchaseController extends Controller
                 $lineTotal = $paidQuantity * (float) $item['unit_price'];
 
                 return array_merge($item, [
-                    'batch_number' => trim((string) ($item['batch_number'] ?? '')) ?: 'BATCH-' . now()->format('YmdHis'),
+                    'batch_number' => trim((string) ($item['batch_number'] ?? ''))
+                        ?: 'BATCH-' . now()->format('YmdHis') . '-' . strtoupper(substr((string) Str::uuid(), 0, 8)),
                     'foc_quantity' => $focQuantity,
                     'base_quantity' => $baseQuantity,
                     'foc_base_quantity' => $focQuantity * $conversionFactor,
@@ -336,24 +375,40 @@ class StaffPurchaseController extends Controller
                     'created_at' => now(),
                 ]);
 
-                // Create inventory batch
-                \App\Models\InventoryBatch::create([
-                    'branch_id' => $validated['branch_id'],
-                    'product_id' => $item['product_id'],
-                    'batch_number' => $item['batch_number'],
-                    'expiry_date' => $item['expiry_date'],
-                    'quantity' => $item['base_quantity'],
-                    'purchase_price' => $item['base_unit_price'],
-                    'selling_price' => $item['base_selling_price'],
-                ]);
+                $batch = \App\Models\InventoryBatch::where('branch_id', $validated['branch_id'])
+                    ->where('product_id', $item['product_id'])
+                    ->where('batch_number', $item['batch_number'])
+                    ->whereDate('expiry_date', $item['expiry_date'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($batch) {
+                    $existingQuantity = (int) $batch->quantity;
+                    $incomingQuantity = (int) $item['base_quantity'];
+                    $newQuantity = $existingQuantity + $incomingQuantity;
+                    $batch->update([
+                        'quantity' => $newQuantity,
+                        'purchase_price' => (($existingQuantity * (float) $batch->purchase_price) + ($incomingQuantity * (float) $item['base_unit_price'])) / $newQuantity,
+                        'selling_price' => (($existingQuantity * (float) $batch->selling_price) + ($incomingQuantity * (float) $item['base_selling_price'])) / $newQuantity,
+                    ]);
+                } else {
+                    \App\Models\InventoryBatch::create([
+                        'branch_id' => $validated['branch_id'],
+                        'product_id' => $item['product_id'],
+                        'batch_number' => $item['batch_number'],
+                        'expiry_date' => $item['expiry_date'],
+                        'quantity' => $item['base_quantity'],
+                        'purchase_price' => $item['base_unit_price'],
+                        'selling_price' => $item['base_selling_price'],
+                    ]);
+                }
 
                 // Update or create inventory aggregate
-                $inventory = \App\Models\Inventory::firstOrNew([
+                $inventory = \App\Models\Inventory::firstOrCreate([
                     'branch_id' => $validated['branch_id'],
                     'product_id' => $item['product_id'],
-                ]);
-                $inventory->quantity = ($inventory->quantity ?? 0) + $item['base_quantity'];
-                $inventory->save();
+                ], ['quantity' => 0]);
+                $inventory->increment('quantity', $item['base_quantity']);
 
                 DB::table('product_units')
                     ->where('product_id', $item['product_id'])
@@ -381,11 +436,11 @@ class StaffPurchaseController extends Controller
 
     /**
      * List purchases (paginated).
-     * Requires: manage_inventory permission
+     * Requires: manage_purchases permission.
      */
     public function index(Request $request)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -395,7 +450,8 @@ class StaffPurchaseController extends Controller
             'items' => function ($q) {
                 $q->with(['product:id,name', 'unit:id,name,short_name']);
             }
-        ])->withCount('items');
+        ])->withCount('items')
+            ->whereIn('branch_id', $this->accessibleBranchIds($request));
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -413,11 +469,15 @@ class StaffPurchaseController extends Controller
 
     /**
      * Get single purchase details.
-     * Requires: manage_inventory permission
+     * Requires: manage_purchases permission.
      */
     public function show(Request $request, Purchase $purchase)
     {
-        if (!$request->user()->hasPermission('manage_inventory')) {
+        if (!$request->user()->hasPermission('manage_purchases')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if (!$this->accessibleBranchIds($request)->contains($purchase->branch_id)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -432,5 +492,33 @@ class StaffPurchaseController extends Controller
         ]);
 
         return response()->json($purchase);
+    }
+
+    private function canAccessSuppliers(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user->hasPermission('manage_suppliers')
+            || $user->hasPermission('manage_purchases')
+            || $user->hasPermission('manage_payments');
+    }
+
+    private function accessibleBranchIds(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->hasRole('Owner') || $user->hasRole('Root') || $user->hasPermission('manage_branches')) {
+            return Branch::pluck('id');
+        }
+
+        $branchIds = collect([$user->branch_id, $user->active_branch_id])->filter();
+
+        try {
+            $branchIds = $branchIds->merge($user->branches()->pluck('branches.id'));
+        } catch (\Throwable $e) {
+            // Keep direct branch assignments when the optional relation is unavailable.
+        }
+
+        return $branchIds->unique()->values();
     }
 }

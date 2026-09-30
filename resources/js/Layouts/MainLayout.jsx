@@ -1,13 +1,14 @@
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import { Link, usePage, router } from '@/spa';
 import PersistentShellContext from '@/contexts/PersistentShellContext';
-import ThemeControl from '@/Components/ThemeControl';
+import { ColorModeContext } from '@/contexts/ColorModeContext';
 import SimpleIcon from '@/Components/SimpleIcon';
 import PageContainer from '@/Components/PageContainer';
 import {
     Badge,
     AppBar,
     Box,
+    Button,
     CssBaseline,
     Divider,
     Drawer,
@@ -18,19 +19,66 @@ import {
     ListItemIcon,
     ListItemText,
     ListSubheader,
+    Menu,
+    MenuItem,
     Toolbar,
     Typography,
     Avatar,
-    Chip,
-    Menu,
-    MenuItem,
     Tooltip,
     Snackbar,
     Alert,
     Stack,
 } from '@mui/material';
 
-const drawerWidth = 214;
+const expandedDrawerWidth = 204;
+const collapsedDrawerWidth = 56;
+
+const pageDescriptions = {
+    'Pharmacy Dashboard': 'Monitor stock risks, returns, balances, and the next actions for today.',
+    'Medicine Management': 'Search, review, and maintain the medicines available across branches.',
+    'Add New Medicine': 'Create a medicine with its selling units, barcode, image, and stock rules.',
+    'Edit Medicine': 'Update medicine identity, units, pricing rules, and inventory settings.',
+    'Import Medicines': 'Validate and import medicine records from a prepared CSV file.',
+    'Category Management': 'Organize medicines into consistent groups for faster selling and reporting.',
+    'Tax Configuration': 'Maintain the tax rules applied to purchases and sales.',
+    'Inventory Stock Reports': 'Compare available stock by branch, batch, and medicine.',
+    'Inventory Detail': 'Review batch quantities, expiry dates, valuation, and movement history.',
+    'Inventory Control': 'Record auditable stock corrections for damage, loss, and counting differences.',
+    'Stock Transfers': 'Move stock between branches with clear source and destination records.',
+    'Supplier Management': 'Maintain supplier contacts, balances, purchases, and payment history.',
+    'Supplier Statement': 'Review supplier purchases, payments, credits, and the current balance.',
+    'Import Suppliers': 'Validate and import supplier contacts from a prepared CSV file.',
+    'Purchase Workflow': 'Receive stock, monitor purchase status, and manage supplier invoices.',
+    'Create Purchase': 'Record received batches, costs, free quantities, and supplier payment details.',
+    'Purchase Invoice': 'Review the purchase invoice, received lines, payments, and return activity.',
+    'Customer Management': 'Maintain customer contacts, credit balances, and account status.',
+    'Customer Detail': 'Review customer sales, returns, payments, and account activity.',
+    'Sale History': 'Find completed sales, review payment status, and open invoice details.',
+    'Sale Detail': 'Review sold items, payments, returns, and the financial result of this sale.',
+    'Returns & Refunds': 'Return individual invoice items and keep stock, credits, and refunds synchronized.',
+    'Financials': 'Record operating expenses with consistent categories and references.',
+    'Expense Categories': 'Maintain the categories used to classify operating expenses.',
+    'Amount Receivable': 'Track customer credit, due dates, collections, and remaining balances.',
+    'Outstanding Balance': 'Track supplier payables, payments, credits, and remaining balances.',
+    'Finance Report': 'Review sales, cost, returns, expenses, and profit for a selected period.',
+    'Sale Report': 'Analyze customer sales, returns, and net revenue over time.',
+    'Purchases Report': 'Analyze purchase value, supplier activity, and payment status.',
+    'Supplier Purchase Report': 'Compare purchasing and balances by supplier.',
+    'Cash Session Report': 'Reconcile shift sales, refunds, expected cash, and closing differences.',
+    'Expiry Report': 'Identify expired and near-expiry batches before they affect sales.',
+    'Low Balance Report': 'Identify medicines that need replenishment by branch.',
+    'Sale Representative': 'Review sales performance and totals by staff member.',
+    'Staff Management': 'Maintain employee access, branch assignments, and account status.',
+    'Role Management': 'Control reusable access roles and their assigned permissions.',
+    'Permission Reference': 'Review the permissions available throughout the application.',
+    'Branch Management': 'Maintain operating locations and branch status.',
+    'Activity Logs': 'Audit important user actions and operational changes.',
+    'System Settings': 'Configure business identity, localization, appearance, and POS behavior.',
+    'Profile Settings': 'Update your account details, password, and profile information.',
+    'System Operating Procedure (SOP)': 'Use the operating guide for routine sales, stock, and finance tasks.',
+};
+
+const descriptionFor = (header) => pageDescriptions[header] || 'Use the controls below to review and manage this workspace.';
 
 export default function MainLayout(props) {
     const persistentShell = useContext(PersistentShellContext);
@@ -43,19 +91,32 @@ export default function MainLayout(props) {
 }
 
 function EmbeddedPage({ children, header, shell }) {
+    const compactMedicineForm = header === 'Add New Medicine' || header === 'Edit Medicine';
+
     useLayoutEffect(() => {
         shell.setHeader(header || '');
     }, [header, shell]);
 
     return (
         <PageContainer normalizeLegacyPadding>
+            {header && (
+                <Box component="header" sx={{ mb: compactMedicineForm ? 0.75 : 1.75, minWidth: 0 }}>
+                    <Typography component="h1" sx={{ color: 'text.primary', fontSize: compactMedicineForm ? 18 : 22, fontWeight: 700, lineHeight: 1.18, letterSpacing: '-0.35px' }}>
+                        {header}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: compactMedicineForm ? 0.2 : 0.375, maxWidth: 760, fontSize: compactMedicineForm ? 11 : 12, lineHeight: 1.4 }}>
+                        {descriptionFor(header)}
+                    </Typography>
+                </Box>
+            )}
             {children}
         </PageContainer>
     );
 }
 
-function MainLayoutShell({ children, header }) {
+function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarget }) {
     const { auth, flash, settings = {}, nav_counts = {}, translations = {}, locale, ziggy = {} } = usePage().props;
+    const { mode = 'light', toggleColorMode } = useContext(ColorModeContext);
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
     const appBase = ziggy?.base || window.laravel_base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
@@ -64,9 +125,25 @@ function MainLayoutShell({ children, header }) {
     const __ = (key) => translations[key] || key;
 
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [anchorElUser, setAnchorElUser] = useState(null);
-    const [anchorElLang, setAnchorElLang] = useState(null);
+    const [desktopCollapsed, setDesktopCollapsed] = useState(() => window.localStorage.getItem('mkpos.sidebar.collapsed') === '1');
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [branchMenuAnchor, setBranchMenuAnchor] = useState(null);
+
+    const accessibleBranches = auth.user?.accessible_branches || [];
+    const currentBranchId = auth.user?.current_branch_id || '';
+    const currentBranch = accessibleBranches.find((branch) => String(branch.id) === String(currentBranchId));
+    const isPosScreen = route().current('pos.index');
+
+    const switchBranch = (branchId) => {
+        setBranchMenuAnchor(null);
+        if (String(branchId) === String(currentBranchId)) return;
+
+        router.post(
+            route('active-branch.update'),
+            { branch_id: branchId },
+            { preserveScroll: false },
+        );
+    };
 
     React.useEffect(() => {
         if (flash.success || flash.error) {
@@ -85,24 +162,17 @@ function MainLayoutShell({ children, header }) {
         setMobileOpen(!mobileOpen);
     };
 
-    const handleOpenUserMenu = (event) => {
-        setAnchorElUser(event.currentTarget);
+    const handleDesktopDrawerToggle = () => {
+        setDesktopCollapsed((current) => {
+            const next = !current;
+            window.localStorage.setItem('mkpos.sidebar.collapsed', next ? '1' : '0');
+            return next;
+        });
     };
 
-    const handleCloseUserMenu = () => {
-        setAnchorElUser(null);
-    };
-
-    const handleOpenLangMenu = (event) => {
-        setAnchorElLang(event.currentTarget);
-    };
-
-    const handleCloseLangMenu = () => {
-        setAnchorElLang(null);
-    };
+    const desktopDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : expandedDrawerWidth;
 
     const changeLanguage = (lang) => {
-        handleCloseLangMenu();
         router.action(route('language.switch'), { locale: lang });
     };
 
@@ -151,37 +221,38 @@ function MainLayoutShell({ children, header }) {
         pos: { text: 'POS', icon: 'card', href: route('pos.index'), routePattern: 'pos.index', permission: 'process_sale' },
 
         inventory: { text: 'Stock Balance', icon: 'box', href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
-        medicines: { text: 'Create New Items', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_inventory' },
-        categories: { text: 'Categories', icon: 'tag', href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_inventory' },
-        taxes: { text: 'Tax Calculation', icon: 'percent', href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_inventory' },
+        medicines: { text: 'Create New Items', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_products' },
+        categories: { text: 'Categories', icon: 'tag', href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_products' },
+        taxes: { text: 'Tax Calculation', icon: 'percent', href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_products' },
         lowBalanceReport: { text: 'Low Balance Report', icon: 'chart', href: route('reports.low-balance'), routePattern: 'reports.low-balance', permission: 'manage_inventory' },
 
-        suppliers: { text: 'Suppliers', icon: 'truck', href: route('suppliers.index'), routePattern: 'suppliers.*', permission: 'manage_inventory' },
-        purchases: { text: 'Purchases', icon: 'receipt', href: route('purchases.index'), routePattern: 'purchases.*', permission: 'manage_inventory' },
-        purchasesReport: { text: 'Purchases Report', icon: 'chart', href: route('reports.purchases'), routePattern: 'reports.purchases', permission: 'manage_inventory' },
+        suppliers: { text: 'Suppliers', icon: 'truck', href: route('suppliers.index'), routePattern: 'suppliers.*', permission: 'manage_suppliers' },
+        purchases: { text: 'Purchases', icon: 'receipt', href: route('purchases.index'), routePattern: 'purchases.*', permission: 'manage_purchases' },
+        purchasesReport: { text: 'Purchases Report', icon: 'chart', href: route('reports.purchases'), routePattern: 'reports.purchases', permission: 'view_financial_reports' },
 
-        adjustments: { text: 'Adjustments', icon: 'sliders', href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'manage_inventory' },
-        transfers: { text: 'Transfers', icon: 'arrows', href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'manage_inventory' },
+        adjustments: { text: 'Adjustments', icon: 'sliders', href: route('inventory.adjustments.index'), routePattern: 'inventory.adjustments.*', permission: 'adjust_stock' },
+        transfers: { text: 'Transfers', icon: 'arrows', href: route('inventory.transfers.index'), routePattern: 'inventory.transfers.*', permission: 'adjust_stock' },
 
         customers: { text: 'Customers', icon: 'users', href: route('customers.index'), routePattern: 'customers.*', permission: 'process_sale' },
-        amountReceivable: { text: 'Amount Receivable', icon: 'wallet', href: route('finance.amount-receivable'), routePattern: 'finance.amount-receivable.*', permission: 'view_financial_reports' },
+        amountReceivable: { text: 'Amount Receivable', icon: 'wallet', href: route('finance.amount-receivable'), routePattern: 'finance.amount-receivable.*', permission: 'manage_payments' },
 
         sales: { text: 'Sale History', icon: 'receipt', href: route('sales.index'), routePattern: 'sales.index', permission: 'view_financial_reports' },
+        returns: { text: 'Returns & Refunds', icon: 'rotate', href: route('returns.index'), routePattern: 'returns.*', anyPermission: ['process_sale', 'manage_payments'] },
         salesCustomerReport: { text: 'Sale Report', icon: 'chart', href: route('reports.sales-by-customers'), routePattern: 'reports.sales-by-customers', permission: 'view_financial_reports' },
-        expenses: { text: 'Expenses', icon: 'wallet', href: route('expenses.index'), routePattern: 'expenses.*', permission: 'view_financial_reports' },
-        expenseCategories: { text: 'Expense Category', icon: 'tag', href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'view_financial_reports' },
-        pendingPayments: { text: 'Outstanding Balance', icon: 'wallet', href: route('finance.outstanding-balance'), routePattern: 'finance.outstanding-balance', permission: 'view_financial_reports' },
+        expenses: { text: 'Expenses', icon: 'wallet', href: route('expenses.index'), routePattern: 'expenses.*', permission: 'manage_expenses' },
+        expenseCategories: { text: 'Expense Category', icon: 'tag', href: route('expense-categories.index'), routePattern: 'expense-categories.*', permission: 'manage_expenses' },
+        pendingPayments: { text: 'Outstanding Balance', icon: 'wallet', href: route('finance.outstanding-balance'), routePattern: 'finance.outstanding-balance', permission: 'manage_payments' },
         reports: { text: 'Finance Report', icon: 'chart', href: route('reports.index'), routePattern: 'reports.index', permission: 'view_financial_reports' },
         cashSessionReport: { text: 'Cash Session Report', icon: 'wallet', href: route('reports.cash-sessions'), routePattern: 'reports.cash-sessions', permission: 'view_financial_reports' },
         expiryReport: { text: 'Expired Report', icon: 'history', href: route('reports.expiry'), routePattern: 'reports.expiry', permission: 'manage_inventory' },
 
         salePersonReports: { text: 'Sale Representative', icon: 'chart', href: route('finance.sale-representative'), routePattern: 'finance.sale-representative', permission: 'view_financial_reports' },
-        administration: { text: 'Administration', icon: 'settings', href: route('administration.index'), routePattern: 'administration.index', permission: 'manage_users' },
-        roles: { text: 'Role Management', icon: 'id', href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_users' },
+        administration: { text: 'Staff Management', icon: 'settings', href: route('administration.index'), routePattern: 'administration.index', permission: 'manage_staff' },
+        roles: { text: 'Role Management', icon: 'id', href: route('roles.index'), routePattern: 'roles.*', permission: 'manage_roles_permissions' },
         branches: { text: 'Branch Management', icon: 'store', href: route('branches.index'), routePattern: 'branches.*', permission: 'manage_branches' },
-        permissions: { text: 'Permission', icon: 'shieldCheck', href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_users' },
-        activityLogs: { text: 'Activity Logs', icon: 'history', href: route('activity-logs.index'), routePattern: 'activity-logs.*', permission: 'manage_users' },
-        settings: { text: 'Settings', icon: 'settings', href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_branches' },
+        permissions: { text: 'Permission', icon: 'shieldCheck', href: route('permissions.index'), routePattern: 'permissions.*', permission: 'manage_roles_permissions' },
+        activityLogs: { text: 'Activity Logs', icon: 'history', href: route('activity-logs.index'), routePattern: 'activity-logs.*', permission: 'monitor_activity' },
+        settings: { text: 'Settings', icon: 'settings', href: route('settings.index'), routePattern: 'settings.*', permission: 'manage_settings' },
         manual: { text: 'SOP Manual', icon: 'book', href: route('manual.index'), routePattern: 'manual.index', permission: null },
     };
 
@@ -189,13 +260,17 @@ function MainLayoutShell({ children, header }) {
         { label: 'Main', keys: ['dashboard', 'pos'] },
         { label: 'Stock', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes'] },
         { label: 'Purchasing', keys: ['suppliers', 'purchases', 'purchasesReport'] },
-        { label: 'Sales', keys: ['customers', 'sales', 'salesCustomerReport'] },
+        { label: 'Sales', keys: ['customers', 'sales', 'returns', 'salesCustomerReport'] },
         { label: 'Finance', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },
         { label: 'Administration', keys: ['administration', 'roles', 'branches', 'permissions', 'activityLogs', 'manual'] },
         { label: 'Setting', keys: ['settings'] },
     ];
 
-    const canSee = (item) => !item.permission || auth.user?.permissions?.includes(item.permission);
+    const canSee = (item) => {
+        const userPermissions = auth.user?.permissions || [];
+        if (item.anyPermission) return item.anyPermission.some((permission) => userPermissions.includes(permission));
+        return !item.permission || userPermissions.includes(item.permission);
+    };
 
     const visibleMenuGroups = menuGroups
         .map((group) => ({
@@ -221,19 +296,19 @@ function MainLayoutShell({ children, header }) {
         transition: 'all 180ms ease',
     });
 
-    const drawer = (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ px: 1.5, py: 1.5 }}>
-                <Stack direction="row" alignItems="center" spacing={1.25}>
+    const renderDrawer = (collapsed = false) => (
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: '10px 8px', bgcolor: '#0C4A3A', color: '#E4EFE9' }}>
+            <Box sx={{ minHeight: 42, mb: 1.25, display: 'flex', alignItems: 'center' }}>
+                <Stack direction="row" alignItems="center" justifyContent={collapsed ? 'center' : 'flex-start'} spacing={collapsed ? 0 : 1.25}>
                     <Box
                         sx={{
                             width: 34,
                             height: 34,
                             borderRadius: 1.5,
-                            bgcolor: 'primary.soft',
-                            color: 'primary.main',
+                            bgcolor: 'rgba(255,255,255,0.12)',
+                            color: '#FFFFFF',
                             border: '1px solid',
-                            borderColor: 'divider',
+                            borderColor: 'rgba(255,255,255,0.18)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -252,35 +327,35 @@ function MainLayoutShell({ children, header }) {
                             <SimpleIcon name="bag" size={18} />
                         )}
                     </Box>
-                    <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="subtitle2" noWrap sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+                    <Box sx={{ minWidth: 0, display: collapsed ? 'none' : 'block' }}>
+                        <Typography variant="subtitle2" noWrap sx={{ fontSize: 17, fontWeight: 800, lineHeight: 1.1, letterSpacing: '0.2px' }}>
                             {pharmacyName}
                         </Typography>
-                        <Typography variant="caption" noWrap display="block" color="text.secondary">
-                            Office dashboard
+                        <Typography variant="caption" noWrap display="block" sx={{ mt: 0.25, color: 'rgba(255,255,255,0.66)', fontSize: 10 }}>
+                            Business operations
                         </Typography>
                     </Box>
                 </Stack>
             </Box>
 
-            <Divider />
-
-            <Box sx={{ flex: 1, overflowY: 'auto', py: 0.75 }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
                 {visibleMenuGroups.map((group, groupIndex) => (
                     <Box key={group.label}>
                         <List
                             dense
+                            sx={{ py: 0 }}
                             subheader={
                                 <ListSubheader
                                     component="div"
                                     disableSticky
                                     sx={{
+                                        display: collapsed ? 'none' : 'block',
                                         px: 1.5,
                                         py: 0.6,
                                         lineHeight: 1.2,
                                         fontSize: 10,
                                         fontWeight: 800,
-                                        color: 'text.secondary',
+                                        color: 'rgba(255,255,255,0.62)',
                                         bgcolor: 'transparent',
                                         textTransform: 'uppercase',
                                         letterSpacing: '0.075em',
@@ -299,23 +374,31 @@ function MainLayoutShell({ children, header }) {
                                             component={Link}
                                             href={item.href}
                                             selected={isActive}
+                                            title={collapsed ? __(item.text) : undefined}
+                                            aria-label={__(item.text)}
                                             sx={{
-                                                minHeight: 34,
-                                                py: 0.45,
-                                                px: 1,
-                                                mx: 0.75,
-                                                borderRadius: 1,
-                                                color: isActive ? 'primary.main' : 'text.secondary',
+                                                minHeight: 36,
+                                                py: '7px',
+                                                px: collapsed ? '9px' : '9px',
+                                                mx: 0,
+                                                borderRadius: '6px',
+                                                justifyContent: collapsed ? 'center' : 'flex-start',
+                                                color: isActive ? '#0C4A3A' : 'rgba(255,255,255,0.76)',
                                                 '&.Mui-selected': {
-                                                    bgcolor: 'primary.soft',
-                                                    color: 'primary.main',
+                                                    bgcolor: '#DDF5E9',
+                                                    color: '#0C4A3A',
                                                 },
                                                 '&.Mui-selected:hover': {
-                                                    bgcolor: 'primary.soft',
+                                                    bgcolor: '#DDF5E9',
+                                                    color: '#0C4A3A',
+                                                },
+                                                '&:hover': {
+                                                    bgcolor: 'rgba(255,255,255,0.10)',
+                                                    color: '#FFFFFF',
                                                 },
                                             }}
                                         >
-                                            <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                                            <ListItemIcon sx={{ minWidth: collapsed ? 0 : 34, color: 'inherit', justifyContent: 'center' }}>
                                                 <Badge
                                                     badgeContent={item.count}
                                                     max={99}
@@ -343,28 +426,30 @@ function MainLayoutShell({ children, header }) {
                                                 primaryTypographyProps={{
                                                     variant: 'body2',
                                                     noWrap: true,
-                                                    fontWeight: isActive ? 700 : 600,
+                                                    fontSize: 13,
+                                                    fontWeight: isActive ? 650 : 500,
                                                 }}
+                                                sx={{ display: collapsed ? 'none' : 'block' }}
                                             />
                                         </ListItemButton>
                                     </ListItem>
                                 );
                             })}
                         </List>
-                        {groupIndex < visibleMenuGroups.length - 1 && <Divider sx={{ my: 0.5, mx: 1.25 }} />}
+                        {groupIndex < visibleMenuGroups.length - 1 && (
+                            <Divider sx={{ my: 0.5, mx: 1.25, borderColor: 'rgba(255,255,255,0.14)' }} />
+                        )}
                     </Box>
                 ))}
             </Box>
 
-            <Divider />
-
-            <Box sx={{ px: 1.25, py: 1.25 }}>
-                <Stack direction="row" alignItems="center" spacing={1.1}>
+            <Box sx={{ mt: 1.5, pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+                <Stack direction="row" alignItems="center" justifyContent={collapsed ? 'center' : 'flex-start'} spacing={collapsed ? 0 : 1.1}>
                     <Badge
                         overlap="circular"
                         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                         badgeContent={
-                            auth.user?.roles?.includes('Root') ? (
+                            auth.user?.roles?.some((role) => ['Owner', 'Root'].includes(role)) ? (
                                 <Box sx={{ color: '#2874bc', bgcolor: 'background.paper', borderRadius: '50%', display: 'flex' }}>
                                     <SimpleIcon name="shieldCheck" size={14} />
                                 </Box>
@@ -384,23 +469,39 @@ function MainLayoutShell({ children, header }) {
                             {auth.user?.name?.charAt(0).toUpperCase()}
                         </Avatar>
                     </Badge>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Box sx={{ minWidth: 0, flex: 1, display: collapsed ? 'none' : 'block' }}>
                         <Typography variant="body2" noWrap sx={{ fontWeight: 800, lineHeight: 1.1 }}>
                             {auth.user?.name}
                         </Typography>
-                        <Typography variant="caption" noWrap display="block" color="text.secondary">
+                        <Typography variant="caption" noWrap display="block" sx={{ color: 'rgba(255,255,255,0.66)', fontSize: 10 }}>
                             {auth.user?.roles?.map((roleName) => __(roleName)).join(', ') || auth.user?.email}
                         </Typography>
                     </Box>
                     <Tooltip title={__('Logout')}>
-                        <IconButton
+                        <Button
                             size="small"
-                            color="error"
                             onClick={() => router.post(route('logout'))}
                             aria-label={__('Logout')}
+                            startIcon={<SimpleIcon name="logout" size={16} />}
+                            sx={{
+                                display: collapsed ? 'none' : 'inline-flex',
+                                minWidth: 0,
+                                minHeight: 28,
+                                height: 28,
+                                px: 0.75,
+                                gap: 0.25,
+                                fontSize: 11,
+                                lineHeight: 1,
+                                color: '#FFFFFF',
+                                border: '1px solid rgba(255,255,255,0.19)',
+                                bgcolor: 'transparent',
+                                '& .MuiButton-startIcon': { mr: 0.5, ml: 0 },
+                                '& .MuiButton-startIcon svg': { width: 14, height: 14 },
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.30)' },
+                            }}
                         >
-                            <SimpleIcon name="logout" size={16} />
-                        </IconButton>
+                            {!collapsed && __('Logout')}
+                        </Button>
                     </Tooltip>
                 </Stack>
             </Box>
@@ -413,178 +514,199 @@ function MainLayoutShell({ children, header }) {
             <AppBar
                 position="fixed"
                 sx={{
-                    width: { sm: `calc(100% - ${drawerWidth}px)` },
-                    ml: { sm: `${drawerWidth}px` },
+                    width: { md: `calc(100% - ${desktopDrawerWidth}px)` },
+                    ml: { md: `${desktopDrawerWidth}px` },
                     color: 'text.primary',
-                    boxShadow: 'none',
+                    boxShadow: '0 1px 4px rgba(19,34,56,0.04)',
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     borderRadius: 0,
                     zIndex: (muiTheme) => muiTheme.zIndex.drawer - 1,
+                    transition: 'width 180ms cubic-bezier(.2,.75,.25,1), margin-left 180ms cubic-bezier(.2,.75,.25,1)',
+                    '& .MuiButton-root': {
+                        minHeight: 30,
+                        height: 30,
+                        px: 1,
+                        borderRadius: '5px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        lineHeight: 1,
+                        letterSpacing: 0,
+                        textTransform: 'none',
+                        whiteSpace: 'nowrap',
+                        boxShadow: 'none',
+                        '& .MuiButton-startIcon': { mr: 0.75 },
+                        '& .MuiButton-startIcon .MuiSvgIcon-root, & .MuiButton-startIcon svg': {
+                            width: 15,
+                            height: 15,
+                            fontSize: 15,
+                        },
+                    },
+                    '& .MuiButton-contained': {
+                        color: '#fff',
+                        bgcolor: 'primary.main',
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        '&:hover': { bgcolor: 'primary.dark', borderColor: 'primary.dark', boxShadow: 'none' },
+                    },
+                    '& .MuiButton-outlined, & .MuiButton-text': {
+                        color: 'text.primary',
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': {
+                            color: 'primary.main',
+                            bgcolor: 'primary.soft',
+                            borderColor: 'primary.main',
+                        },
+                    },
+                    '& .MuiButton-root.Mui-disabled': {
+                        color: 'text.disabled',
+                        bgcolor: 'action.disabledBackground',
+                        borderColor: 'divider',
+                    },
+                    '& .MuiIconButton-root': {
+                        width: 30,
+                        minWidth: 30,
+                        height: 30,
+                        borderRadius: '5px',
+                        color: 'text.primary',
+                        '& svg': { width: 16, height: 16 },
+                    },
+                    '& .MuiIconButton-root:not(.mkpos-bare-action)': {
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                        '&:hover': { color: 'primary.main', bgcolor: 'primary.soft', borderColor: 'primary.main' },
+                    },
                 }}
             >
-                <Toolbar sx={{ minHeight: '54px !important', px: { xs: 1.5, sm: 2.5 } }}>
+                <Toolbar sx={{ minHeight: '44px !important', height: 44, px: { xs: 1, md: '14px' }, gap: 1 }}>
                     <IconButton
                         color="inherit"
                         aria-label="open drawer"
                         edge="start"
                         onClick={handleDrawerToggle}
-                        sx={{ mr: 1, display: { sm: 'none' } }}
+                        sx={{ display: { md: 'none' } }}
                     >
                         <SimpleIcon name="menu" size={20} />
                     </IconButton>
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                        <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.075em', lineHeight: 1 }}>
-                            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </Typography>
-                        <Typography variant="h6" noWrap component="div" sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1.25 }}>
-                            {header}
-                        </Typography>
-                    </Box>
+                    <Tooltip title={desktopCollapsed ? __('Expand navigation') : __('Collapse navigation')}>
+                        <IconButton
+                            color="inherit"
+                            aria-label={desktopCollapsed ? __('Expand navigation') : __('Collapse navigation')}
+                            onClick={handleDesktopDrawerToggle}
+                            sx={{ display: { xs: 'none', md: 'inline-flex' } }}
+                        >
+                            <SimpleIcon name="sidebar" size={18} />
+                        </IconButton>
+                    </Tooltip>
+                    <Box
+                        ref={setAppBarBackTarget}
+                        id="mkpos-appbar-back"
+                        sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                    />
+                    <Box
+                        ref={setAppBarTarget}
+                        id="mkpos-appbar-tools"
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: 0.75,
+                            minWidth: 0,
+                            flex: 1,
+                            maxWidth: '100%',
+                            overflowX: 'auto',
+                            scrollbarWidth: 'none',
+                            '&::-webkit-scrollbar': { display: 'none' },
+                        }}
+                    />
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {settings.invoice?.logo_path && (
-                            <Box 
-                                component="img" 
-                                src={storageUrl(settings.invoice.logo_path)}
-                                sx={{ height: 24, width: 'auto', objectFit: 'contain', mr: 1 }} 
-                            />
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        flexShrink: 0,
+                        ml: 0.75,
+                    }}>
+                        {isPosScreen && accessibleBranches.length > 0 && (
+                            <>
+                                <Tooltip title={__('Switch branch')}>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={<SimpleIcon name="store" size={15} />}
+                                        onClick={(event) => setBranchMenuAnchor(event.currentTarget)}
+                                        aria-haspopup="menu"
+                                        aria-expanded={Boolean(branchMenuAnchor)}
+                                        sx={{
+                                            maxWidth: { xs: 118, md: 180 },
+                                            justifyContent: 'flex-start',
+                                            '& .MuiButton-startIcon': { flexShrink: 0 },
+                                        }}
+                                    >
+                                        <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {currentBranch?.name || __('Select branch')}
+                                        </Box>
+                                    </Button>
+                                </Tooltip>
+                                <Menu
+                                    anchorEl={branchMenuAnchor}
+                                    open={Boolean(branchMenuAnchor)}
+                                    onClose={() => setBranchMenuAnchor(null)}
+                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                    slotProps={{ paper: { sx: { mt: 0.5, minWidth: 220, maxHeight: 360 } } }}
+                                >
+                                    {accessibleBranches.map((branch) => (
+                                        <MenuItem
+                                            key={branch.id}
+                                            selected={String(branch.id) === String(currentBranchId)}
+                                            onClick={() => switchBranch(branch.id)}
+                                            sx={{ gap: 1, fontSize: 12.5 }}
+                                        >
+                                            <SimpleIcon name="store" size={16} />
+                                            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {branch.name}
+                                            </Box>
+                                        </MenuItem>
+                                    ))}
+                                </Menu>
+                            </>
                         )}
-                        <ThemeControl label={__('Theme')} />
-                        
-                        <Tooltip title={__('Language')}>
+                        <Tooltip title={locale === 'my' ? __('Change language to English') : __('Change language to Myanmar')}>
                             <IconButton
-                                onClick={handleOpenLangMenu}
+                                onClick={() => changeLanguage(locale === 'my' ? 'en' : 'my')}
                                 color="inherit"
                                 size="small"
-                                sx={{
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'background.paper',
-                                }}
+                                aria-label={locale === 'my' ? __('Change language to English') : __('Change language to Myanmar')}
                             >
                                 <SimpleIcon name="globe" size={17} />
                             </IconButton>
                         </Tooltip>
-                        <Menu
-                            sx={{ mt: '45px' }}
-                            id="menu-lang"
-                            anchorEl={anchorElLang}
-                            anchorOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right',
-                            }}
-                            keepMounted
-                            transformOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right',
-                            }}
-                            open={Boolean(anchorElLang)}
-                            onClose={handleCloseLangMenu}
-                        >
-                            <MenuItem onClick={() => changeLanguage('en')} selected={locale === 'en'}>
-                                <Typography variant="body2">English</Typography>
-                            </MenuItem>
-                            <MenuItem onClick={() => changeLanguage('my')} selected={locale === 'my'}>
-                                <Typography variant="body2">မြန်မာ (Myanmar)</Typography>
-                            </MenuItem>
-                        </Menu>
-
-                        <Tooltip title={__('User menu')}>
-                            <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.25 }}>
-                                <Avatar 
-                                    alt={auth.user?.name || 'User'} 
-                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
-                                    sx={{ width: 32, height: 32 }}
-                                />
+                        <Tooltip title={mode === 'dark' ? __('Switch to light mode') : __('Switch to dark mode')}>
+                            <IconButton
+                                onClick={toggleColorMode}
+                                color="inherit"
+                                size="small"
+                                aria-label={mode === 'dark' ? __('Switch to light mode') : __('Switch to dark mode')}
+                            >
+                                <SimpleIcon name={mode === 'dark' ? 'sun' : 'moon'} size={17} />
                             </IconButton>
                         </Tooltip>
-                        <Menu
-                            sx={{ mt: '45px' }}
-                            id="menu-appbar"
-                            anchorEl={anchorElUser}
-                            anchorOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right',
-                            }}
-                            keepMounted
-                            transformOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right',
-                            }}
-                            open={Boolean(anchorElUser)}
-                            onClose={handleCloseUserMenu}
-                            slotProps={{
-                                paper: {
-                                    sx: {
-                                        width: 260,
-                                        mt: 0.5,
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                    },
-                                },
-                            }}
-                        >
-                            <Box sx={{ px: 1.5, py: 1.25, display: 'flex', gap: 1.25, alignItems: 'center' }}>
-                                <Avatar
-                                    alt={auth.user?.name || 'User'}
-                                    src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
-                                    sx={{ width: 38, height: 38, bgcolor: 'primary.main', fontWeight: 700 }}
-                                >
-                                    {auth.user?.name?.charAt(0).toUpperCase()}
-                                </Avatar>
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
-                                        {auth.user?.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                                        {auth.user?.email}
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                        {auth.user?.roles?.map((roleName) => (
-                                            <Chip key={roleName} label={__(roleName)} size="small" sx={{ height: 17, fontSize: '0.6rem' }} />
-                                        ))}
-                                    </Box>
-                                </Box>
-                            </Box>
-                            <Divider />
-                            <MenuItem component={Link} href={route('dashboard')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><SimpleIcon name="grid" size={17} /></ListItemIcon>
-                                <Typography variant="body2">{__('Dashboard')}</Typography>
-                            </MenuItem>
-                            {auth.user?.permissions?.includes('process_sale') && (
-                                <MenuItem component={Link} href={route('pos.index')} onClick={handleCloseUserMenu}>
-                                    <ListItemIcon><SimpleIcon name="card" size={17} /></ListItemIcon>
-                                    <Typography variant="body2">{__('POS')}</Typography>
-                                </MenuItem>
-                            )}
-                            <MenuItem component={Link} href={route('profile.edit')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><SimpleIcon name="user" size={17} /></ListItemIcon>
-                                <Typography variant="body2">{__('Profile')}</Typography>
-                            </MenuItem>
-                            {auth.user?.permissions?.includes('manage_branches') && (
-                                <MenuItem component={Link} href={route('settings.index')} onClick={handleCloseUserMenu}>
-                                    <ListItemIcon><SimpleIcon name="settings" size={17} /></ListItemIcon>
-                                    <Typography variant="body2">{__('Settings')}</Typography>
-                                </MenuItem>
-                            )}
-                            <MenuItem component={Link} href={route('manual.index')} onClick={handleCloseUserMenu}>
-                                <ListItemIcon><SimpleIcon name="book" size={17} /></ListItemIcon>
-                                <Typography variant="body2">{__('SOP Manual')}</Typography>
-                            </MenuItem>
-                            <Divider />
-                            <MenuItem onClick={() => { handleCloseUserMenu(); router.post(route('logout')); }} sx={{ color: 'error.main' }}>
-                                <ListItemIcon><SimpleIcon name="logout" size={17} /></ListItemIcon>
-                                <Typography variant="body2">{__('Logout')}</Typography>
-                            </MenuItem>
-                        </Menu>
+                        <Tooltip title={__('Refresh')}>
+                            <IconButton onClick={() => router.reload()} color="inherit" size="small" aria-label={__('Refresh')}>
+                                <SimpleIcon name="rotate" size={17} />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
                 </Toolbar>
             </AppBar>
             <Box
                 component="nav"
-                sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-                aria-label="mailbox folders"
+                sx={{ width: { md: desktopDrawerWidth }, flexShrink: { md: 0 }, transition: 'width 180ms cubic-bezier(.2,.75,.25,1)' }}
+                aria-label="Primary navigation"
             >
                 <Drawer
                     variant="temporary"
@@ -594,31 +716,33 @@ function MainLayoutShell({ children, header }) {
                         keepMounted: true,
                     }}
                     sx={{
-                        display: { xs: 'block', sm: 'none' },
+                        display: { xs: 'block', md: 'none' },
                         '& .MuiDrawer-paper': {
                             boxSizing: 'border-box',
-                            width: drawerWidth,
-                            borderRightColor: 'divider',
+                            width: expandedDrawerWidth,
+                            borderRightColor: 'rgba(255,255,255,0.12)',
                             borderRadius: 0,
                         },
                     }}
                 >
-                    {drawer}
+                    {renderDrawer(false)}
                 </Drawer>
                 <Drawer
                     variant="permanent"
                     sx={{
-                        display: { xs: 'none', sm: 'block' },
+                        display: { xs: 'none', md: 'block' },
                         '& .MuiDrawer-paper': {
                             boxSizing: 'border-box',
-                            width: drawerWidth,
-                            borderRightColor: 'divider',
+                            width: desktopDrawerWidth,
+                            borderRightColor: 'rgba(255,255,255,0.12)',
                             borderRadius: 0,
+                            overflowX: 'hidden',
+                            transition: 'width 180ms cubic-bezier(.2,.75,.25,1)',
                         },
                     }}
                     open
                 >
-                    {drawer}
+                    {renderDrawer(desktopCollapsed)}
                 </Drawer>
             </Box>
             <Box
@@ -626,13 +750,13 @@ function MainLayoutShell({ children, header }) {
                 sx={{
                     flexGrow: 1,
                     p: 0,
-                    width: { sm: `calc(100% - ${drawerWidth}px)` },
+                    width: { md: `calc(100% - ${desktopDrawerWidth}px)` },
                     minWidth: 0,
                     minHeight: '100vh',
                     bgcolor: 'transparent',
                 }}
             >
-                <Toolbar sx={{ minHeight: '54px !important' }} />
+                <Toolbar sx={{ minHeight: '44px !important' }} />
                 {children}
             </Box>
 

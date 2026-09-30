@@ -148,10 +148,10 @@ class CustomerController extends Controller
                 $q->where('returns.branch_id', $branchScope['branch_id']);
             })
             ->when($fromDate, function ($q) use ($fromDate) {
-                $q->where('returns.created_at', '>=', $fromDate);
+                $q->where('returns.approved_at', '>=', $fromDate);
             })
             ->when($toDate, function ($q) use ($toDate) {
-                $q->where('returns.created_at', '<=', $toDate);
+                $q->where('returns.approved_at', '<=', $toDate);
             });
 
         $customerReturns = (clone $returnsBase)

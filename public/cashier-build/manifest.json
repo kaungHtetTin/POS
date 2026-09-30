@@ -1,13 +1,13 @@
 {
   "resources/js/mobile/main.css": {
-    "file": "assets/main-62e1750c.css",
+    "file": "assets/main-517966ad.css",
     "src": "resources/js/mobile/main.css"
   },
   "resources/js/mobile/main.jsx": {
     "css": [
-      "assets/main-62e1750c.css"
+      "assets/main-517966ad.css"
     ],
-    "file": "assets/main-eb31a293.js",
+    "file": "assets/main-6050ae7b.js",
     "isEntry": true,
     "src": "resources/js/mobile/main.jsx"
   }

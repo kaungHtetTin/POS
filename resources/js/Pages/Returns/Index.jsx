@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -7,6 +9,7 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
@@ -14,11 +17,11 @@ import {
     DialogTitle,
     Divider,
     FormControl,
+    FormControlLabel,
     IconButton,
     InputAdornment,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -29,27 +32,35 @@ import {
     TableHead,
     TableRow,
     TextField,
-    Tooltip,
     Typography,
 } from '@mui/material';
 import {
     Add as AddIcon,
-    Block as RejectIcon,
-    CheckCircle as ApproveIcon,
     Close as CloseIcon,
     Refresh as LookupIcon,
     AssignmentReturn as ReturnIcon,
     Search as SearchIcon,
 } from '@mui/icons-material';
 
-export default function ReturnsIndex({ auth, returns, branches, filters }) {
+export default function ReturnsIndex({ auth, returns, branches, filters, settlementSummary }) {
     const [open, setOpen] = useState(false);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
     const [reference, setReference] = useState(null);
     const [lineEdits, setLineEdits] = useState({});
+    const [reviewing, setReviewing] = useState(false);
+    const [selectedReturn, setSelectedReturn] = useState(null);
+    const [settlementOpen, setSettlementOpen] = useState(false);
+    const [settlementAmount, setSettlementAmount] = useState('');
+    const [settlementMethod, setSettlementMethod] = useState('Cash');
+    const [settlementReference, setSettlementReference] = useState('');
+    const [actionError, setActionError] = useState('');
+    const [actionProcessing, setActionProcessing] = useState(false);
 
-    const canApproveReturns = (auth?.user?.permissions || []).includes('approve_returns');
+    const userPermissions = auth?.user?.permissions || [];
+    const canCreateReturns = userPermissions.includes('process_sale');
+    const canApproveReturns = userPermissions.includes('approve_returns');
+    const canManagePayments = userPermissions.includes('manage_payments');
 
     const [typeFilter, setTypeFilter] = useState(filters?.type || '');
     const [statusFilter, setStatusFilter] = useState(filters?.status || '');
@@ -65,17 +76,21 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
         reason: '',
         reference_id: '',
         items: [],
+        payment_method: 'Cash',
+        payment_reference: '',
     });
 
     const selectedItems = useMemo(() => {
         const items = [];
         for (const [id, v] of Object.entries(lineEdits || {})) {
             const qty = Number(v.quantity || 0);
-            if (qty > 0) {
+            const focQty = Number(v.foc_quantity || 0);
+            if (qty > 0 || focQty > 0) {
                 items.push({
                     reference_item_id: id,
                     quantity: qty,
-                    refund_price: Number(v.refund_price || 0),
+                    foc_quantity: focQty,
+                    restock: Boolean(v.restock),
                 });
             }
         }
@@ -83,8 +98,38 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
     }, [lineEdits]);
 
     const computedRefundAmount = useMemo(() => {
-        return selectedItems.reduce((sum, i) => sum + Number(i.quantity || 0) * Number(i.refund_price || 0), 0);
-    }, [selectedItems]);
+        return selectedItems.reduce((sum, i) => {
+            const source = reference?.items?.find((item) => item.id === i.reference_item_id);
+            return sum + Number(i.quantity || 0) * Number(source?.unit_price || 0);
+        }, 0);
+    }, [selectedItems, reference]);
+
+    const estimatedCreditAmount = useMemo(() => {
+        if (!reference) return 0;
+
+        if (data.type === 'Customer') {
+            if (!reference.customer_id) return 0;
+            const due = Math.max(
+                Number(reference.grand_total || 0)
+                    - Number(reference.amount_received || 0)
+                    - Number(reference.return_credit_amount || 0),
+                0
+            );
+            return Math.min(computedRefundAmount, due);
+        }
+
+        return Math.min(computedRefundAmount, Math.max(Number(reference.due_amount || 0), 0));
+    }, [computedRefundAmount, data.type, reference]);
+
+    const estimatedImmediateSettlement = Math.max(computedRefundAmount - estimatedCreditAmount, 0);
+    const paymentReferenceRequired = estimatedImmediateSettlement > 0 && data.payment_method !== 'Cash';
+
+    const selectionError = selectedItems.some((item) => {
+        const edit = lineEdits[item.reference_item_id];
+        return Number(item.quantity) < 0 || Number(item.foc_quantity) < 0
+            || Number(item.quantity) > Number(edit?.max || 0)
+            || Number(item.foc_quantity) > Number(edit?.foc_max || 0);
+    });
 
     const applyFilters = (page = undefined) => {
         router.get(
@@ -110,6 +155,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
         setLookupError('');
         setReference(null);
         setLineEdits({});
+        setReviewing(false);
         reset();
         setData({
             type: defaultType,
@@ -117,6 +163,8 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
             reason: '',
             reference_id: '',
             items: [],
+            payment_method: 'Cash',
+            payment_reference: '',
         });
         setOpen(true);
     };
@@ -126,6 +174,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
         setLookupError('');
         setReference(null);
         setLineEdits({});
+        setReviewing(false);
         reset();
     };
 
@@ -147,14 +196,23 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
             }
             const payload = await response.json();
             setReference(payload);
-            setData('reference_id', payload.id);
+            setData((current) => ({
+                ...current,
+                reference_id: payload.id,
+                payment_method: data.type === 'Customer' && ['Cash', 'Card', 'Mobile', 'Wallet'].includes(payload.payment_method)
+                    ? payload.payment_method
+                    : current.payment_method,
+                payment_reference: '',
+            }));
 
             const initial = {};
             (payload.items || []).forEach((it) => {
                 initial[it.id] = {
-                    quantity: 0,
-                    refund_price: it.unit_price ?? 0,
-                    max: data.type === 'Supplier' ? (it.received_quantity ?? it.quantity ?? 0) : (it.quantity ?? 0),
+                    quantity: '',
+                    foc_quantity: '',
+                    restock: false,
+                    max: data.type === 'Supplier' ? (it.remaining_paid_quantity ?? 0) : (it.quantity ?? 0),
+                    foc_max: data.type === 'Supplier' ? (it.remaining_foc_quantity ?? 0) : 0,
                 };
             });
             setLineEdits(initial);
@@ -167,19 +225,57 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
 
     const submit = (e) => {
         e.preventDefault();
-        setData('items', selectedItems);
+        if (!reviewing) {
+            if (!reference || selectedItems.length === 0 || selectionError || !data.reason.trim()) return;
+            setReviewing(true);
+            return;
+        }
         post(route('returns.store'), {
+            data: {
+                type: data.type,
+                reference_id: data.reference_id,
+                reason: data.reason.trim(),
+                items: selectedItems,
+                payment_method: data.payment_method,
+                payment_reference: data.payment_reference.trim() || null,
+            },
             preserveScroll: true,
             onSuccess: () => handleClose(),
         });
     };
 
     const updateStatus = (ret, status) => {
+        setActionError('');
+        setActionProcessing(true);
         router.post(
             route('returns.status', ret.id),
             { status },
-            { preserveScroll: true }
+            { preserveScroll: true, onSuccess: () => setSelectedReturn(null), onError: (errors) => setActionError(Object.values(errors || {})[0] || 'Unable to update this return.'), onFinish: () => setActionProcessing(false) }
         );
+    };
+
+    const openSettlement = (ret) => {
+        setSelectedReturn(ret);
+        setSettlementAmount((Number(ret.settlement_due || 0) - Number(ret.settlement_paid || 0)).toFixed(2));
+        setSettlementMethod('Cash');
+        setSettlementReference('');
+        setActionError('');
+        setSettlementOpen(true);
+    };
+
+    const recordSettlement = () => {
+        setActionError('');
+        setActionProcessing(true);
+        router.post(route('returns.settle', selectedReturn.id), {
+            amount: settlementAmount,
+            payment_method: settlementMethod,
+            reference_number: settlementReference || null,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { setSettlementOpen(false); setSelectedReturn(null); },
+            onError: (errors) => setActionError(Object.values(errors || {})[0] || 'Unable to record settlement.'),
+            onFinish: () => setActionProcessing(false),
+        });
     };
 
     const formatDateTime = (value) => {
@@ -207,18 +303,14 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                             <ReturnIcon fontSize="small" color="primary" />
                             RETURNS & REFUNDS
                         </Typography>
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={handleOpen}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                        >
-                            New Return
-                        </Button>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+                        <Chip variant="outlined" color="warning" label={`Customer refunds to pay: ${Number(settlementSummary?.customer_refunds_due || 0).toFixed(2)}`} />
+                        <Chip variant="outlined" color="info" label={`Supplier refunds to receive: ${Number(settlementSummary?.supplier_refunds_due || 0).toFixed(2)}`} />
+                    </Stack>
+
+                    <ReportFilterToolbar appBar
                         ariaLabel="Return filters"
                         fieldKinds={['select', 'select', 'wide']}
                         onSubmit={() => applyFilters()}
@@ -227,6 +319,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                 <Button variant="contained" size="small" type="submit">Filter</Button>
                                 <Button variant="outlined" size="small" onClick={clearFilters}>Clear</Button>
                                 <CsvExportButton source={returns} dataKey="returns" filename="returns.csv" />
+                                {canCreateReturns && <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleOpen}>New Return</Button>}
                             </>
                         )}
                     >
@@ -264,8 +357,6 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
 
                     </ReportFilterToolbar>
 
-                    <Divider sx={{ mb: 2 }} />
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -277,8 +368,10 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                     <TableCell sx={{ fontWeight: 700 }} align="right">
                                         Refund
                                     </TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }} align="right">Invoice credit</TableCell>
+                                    <TableCell sx={{ fontWeight: 700 }} align="right">To settle</TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
-                                    <TableCell />
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -308,43 +401,27 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                         <TableCell align="right" sx={{ fontWeight: 800 }}>
                                             {Number(r.refund_amount || 0).toFixed(2)}
                                         </TableCell>
+                                        <TableCell align="right">{r.status === 'Approved' ? Number(r.credit_applied || 0).toFixed(2) : '—'}</TableCell>
+                                        <TableCell align="right">{r.status === 'Approved' ? (Number(r.settlement_due || 0) - Number(r.settlement_paid || 0)).toFixed(2) : '—'}</TableCell>
                                         <TableCell>
                                             <Typography variant="caption" color="text.secondary">
                                                 {formatDateTime(r.created_at)}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell align="right">
-                                            {r.status === 'Pending' && canApproveReturns && (
-                                                <Stack direction="row" spacing={0.75} justifyContent="flex-end">
-                                                    <Tooltip title="Approve return">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="success"
-                                                            aria-label={`Approve return ${r.return_number}`}
-                                                            onClick={() => updateStatus(r, 'Approved')}
-                                                        >
-                                                            <ApproveIcon fontSize="inherit" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Reject return">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="error"
-                                                            aria-label={`Reject return ${r.return_number}`}
-                                                            onClick={() => updateStatus(r, 'Rejected')}
-                                                        >
-                                                            <RejectIcon fontSize="inherit" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Stack>
-                                            )}
-                                        </TableCell>
+                                        <TableActionCell>
+                                            <TableRowActions label={r.reference_number || r.reference_id}>
+                                                <Button title="View return details" size="small" onClick={() => { setActionError(''); setSelectedReturn(r); }}>Details</Button>
+                                                {r.status === 'Approved' && canManagePayments && Number(r.settlement_due || 0) > Number(r.settlement_paid || 0) && (
+                                                    <Button title={r.type === 'Customer' ? 'Pay refund' : 'Receive refund'} size="small" variant="outlined" onClick={() => openSettlement(r)}>{r.type === 'Customer' ? 'Pay refund' : 'Receive refund'}</Button>
+                                                )}
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
 
                                 {returnRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                                             <Typography variant="body2" color="text.secondary italic">
                                                 No returns found.
                                             </Typography>
@@ -354,17 +431,7 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(returns?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={returns.last_page}
-                                page={returns.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={returns} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
 
@@ -379,6 +446,33 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                     <DialogContent dividers>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {lookupError && <Alert severity="error">{lookupError}</Alert>}
+                            {selectionError && <Alert severity="error">A return quantity exceeds the amount available on the invoice.</Alert>}
+                            {Object.keys(errors).length > 0 && <Alert severity="error">{Object.values(errors).map((error, index) => <div key={index}>{error}</div>)}</Alert>}
+                            {reviewing ? (
+                                <>
+                                    <Alert severity="warning">Submitting will immediately approve this return, update stock and invoice balances, and complete the remaining refund.</Alert>
+                                    <Typography variant="subtitle2">{data.type === 'Customer' ? 'Sale return' : 'Purchase return'} · {reference?.invoice_number}</Typography>
+                                    <Typography variant="body2">{reference?.party_name} · {reference?.branch_name}</Typography>
+                                    <Typography variant="body2">Reason: {data.reason}</Typography>
+                                    {selectedItems.map((item) => {
+                                        const source = reference?.items?.find((row) => row.id === item.reference_item_id);
+                                        return <Typography variant="body2" key={item.reference_item_id}>{source?.product_name}: {item.quantity} paid{data.type === 'Supplier' ? `, ${item.foc_quantity} free` : item.restock ? ' · restock' : ' · do not restock'} · {(Number(item.quantity) * Number(source?.unit_price || 0)).toFixed(2)}</Typography>;
+                                    })}
+                                    <Typography variant="subtitle2">Estimated return value: {computedRefundAmount.toFixed(2)}</Typography>
+                                    <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Applied to invoice balance</Typography><Typography variant="body2">{estimatedCreditAmount.toFixed(2)}</Typography></Stack>
+                                    <Stack direction="row" justifyContent="space-between"><Typography variant="body2" fontWeight={700}>{data.type === 'Customer' ? 'Refund to customer now' : 'Refund received now'}</Typography><Typography variant="body2" fontWeight={700}>{estimatedImmediateSettlement.toFixed(2)}</Typography></Stack>
+                                    {estimatedImmediateSettlement > 0 && <>
+                                        <FormControl fullWidth size="small" error={!!errors.payment_method}>
+                                            <InputLabel>Refund method</InputLabel>
+                                            <Select value={data.payment_method} label="Refund method" onChange={(e) => setData('payment_method', e.target.value)}>
+                                                {['Cash', 'Card', 'Mobile', 'Wallet'].map((method) => <MenuItem key={method} value={method}>{method}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                        {data.payment_method !== 'Cash' && <TextField size="small" label="Payment reference" value={data.payment_reference} onChange={(e) => setData('payment_reference', e.target.value)} error={!!errors.payment_reference} helperText={errors.payment_reference} required fullWidth />}
+                                        {data.payment_method === 'Cash' && <Alert severity="info">A cash refund requires your open cash shift at this branch.</Alert>}
+                                    </>}
+                                </>
+                            ) : <>
 
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                                 <FormControl size="small" sx={{ minWidth: 180 }} error={!!errors.type} required>
@@ -390,43 +484,48 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                             setReference(null);
                                             setLineEdits({});
                                             setLookupError('');
-                                            setData('type', e.target.value);
-                                            setData('reference_id', '');
+                                            setData((current) => ({
+                                                ...current,
+                                                type: e.target.value,
+                                                invoice_number: '',
+                                                reference_id: '',
+                                                payment_method: 'Cash',
+                                                payment_reference: '',
+                                            }));
                                         }}
                                     >
-                                        <MenuItem value="Customer">Customer</MenuItem>
-                                        <MenuItem value="Supplier">Supplier</MenuItem>
+                                        <MenuItem value="Customer">Sale return</MenuItem>
+                                        <MenuItem value="Supplier">Purchase return</MenuItem>
                                     </Select>
                                 </FormControl>
 
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label={data.type === 'Supplier' ? 'Purchase Invoice Number' : 'Sale Invoice Number'}
-                                    value={data.invoice_number}
-                                    onChange={(e) => setData('invoice_number', e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && lookup()}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <SearchIcon fontSize="small" />
-                                            </InputAdornment>
-                                        ),
-                                        endAdornment: (
-                                            <InputAdornment position="end">
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<LookupIcon fontSize="small" />}
-                                                    onClick={lookup}
-                                                    disabled={lookupLoading}
-                                                >
-                                                    Lookup
-                                                </Button>
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                />
+                                <Box sx={{ display: 'flex', flex: 1, minWidth: 0, gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
+                                    <TextField
+                                        size="small"
+                                        label={data.type === 'Supplier' ? 'Purchase Invoice Number' : 'Sale Invoice Number'}
+                                        value={data.invoice_number}
+                                        onChange={(e) => setData('invoice_number', e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); lookup(); } }}
+                                        sx={{ flex: 1, minWidth: 0 }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <SearchIcon fontSize="small" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<LookupIcon fontSize="small" />}
+                                        onClick={lookup}
+                                        disabled={lookupLoading}
+                                        sx={{ flexShrink: 0 }}
+                                    >
+                                        Lookup
+                                    </Button>
+                                </Box>
                             </Stack>
 
                             <TextField
@@ -449,23 +548,23 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                             {reference.invoice_number}
                                         </Typography>
                                         <Typography variant="caption" color="text.secondary">
-                                            {reference.branch_name}
+                                            {reference.party_name} · {reference.branch_name}
                                         </Typography>
                                     </Stack>
+                                    <Typography variant="caption" color="text.secondary">{data.type === 'Customer' ? `Original total ${Number(reference.grand_total || 0).toFixed(2)} · Received ${Number(reference.amount_received || 0).toFixed(2)} · Prior invoice credit ${Number(reference.return_credit_amount || 0).toFixed(2)}` : `Original total ${Number(reference.total_amount || 0).toFixed(2)} · Paid ${Number(reference.paid_amount || 0).toFixed(2)} · Due ${Number(reference.due_amount || 0).toFixed(2)}`}</Typography>
+                                    {data.type === 'Customer' && <Alert severity="info" sx={{ mt: 1 }}>Select Restock only for sellable medicine. Damaged or expired items stay out of inventory.</Alert>}
 
                                     <Divider sx={{ my: 1.5 }} />
 
-                                    <Table size="small">
+                                    <TableContainer sx={{ overflowX: 'auto' }}><Table size="small" sx={{ minWidth: 720 }}>
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 700 }}>Item</TableCell>
                                                 <TableCell sx={{ fontWeight: 700 }}>Unit</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                    Max
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                    Qty
-                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }} align="right">Available</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }} align="right">Return qty</TableCell>
+                                                {data.type === 'Supplier' && <TableCell sx={{ fontWeight: 700 }} align="right">Free qty</TableCell>}
+                                                {data.type === 'Customer' && <TableCell sx={{ fontWeight: 700 }}>Inventory</TableCell>}
                                                 <TableCell sx={{ fontWeight: 700 }} align="right">
                                                     Price
                                                 </TableCell>
@@ -476,10 +575,10 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                         </TableHead>
                                         <TableBody>
                                             {(reference.items || []).map((it) => {
-                                                const v = lineEdits[it.id] || { quantity: 0, refund_price: it.unit_price || 0, max: it.quantity || 0 };
+                                                const v = lineEdits[it.id] || { quantity: '', foc_quantity: '', max: it.quantity || 0, foc_max: 0 };
                                                 const qty = Number(v.quantity || 0);
-                                                const price = Number(v.refund_price || 0);
-                                                const max = Number(v.max || it.quantity || 0);
+                                                const price = Number(it.unit_price || 0);
+                                                const max = Number(v.max ?? it.quantity ?? 0);
                                                 const lineTotal = qty * price;
 
                                                 return (
@@ -493,9 +592,10 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                                                     Batch: {it.batch_number} {it.expiry_date ? `| Exp: ${it.expiry_date}` : ''}
                                                                 </Typography>
                                                             )}
+                                                            {Number(it.previously_returned_quantity || 0) > 0 && <Typography variant="caption" color="text.secondary" display="block">Previously returned: {it.previously_returned_quantity}</Typography>}
                                                             {data.type === 'Supplier' && Number(it.foc_quantity || 0) > 0 && (
                                                                 <Typography variant="caption" color="text.secondary" display="block">
-                                                                    Paid: {it.quantity} | FOC: {it.foc_quantity}
+                                                                    Free available: {it.remaining_foc_quantity}
                                                                 </Typography>
                                                             )}
                                                         </TableCell>
@@ -511,32 +611,22 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                                             <TextField
                                                                 size="small"
                                                                 type="number"
-                                                                value={qty}
+                                                                value={v.quantity ?? ''}
+                                                                placeholder="0"
                                                                 onChange={(e) =>
                                                                     setLineEdits((prev) => ({
                                                                         ...prev,
                                                                         [it.id]: { ...v, quantity: e.target.value },
                                                                     }))
                                                                 }
-                                                                inputProps={{ min: 0, max, step: data.type === 'Supplier' ? 1 : '0.01' }}
+                                                                inputProps={{ min: 0, max, step: data.type === 'Supplier' ? 1 : '0.01', 'aria-label': `Return quantity for ${it.product_name}` }}
                                                                 sx={{ width: 90 }}
                                                             />
                                                         </TableCell>
+                                                        {data.type === 'Supplier' && <TableCell align="right"><TextField size="small" type="number" value={v.foc_quantity ?? ''} placeholder="0" onChange={(e) => setLineEdits((prev) => ({ ...prev, [it.id]: { ...v, foc_quantity: e.target.value } }))} inputProps={{ min: 0, max: v.foc_max, step: 1, 'aria-label': `Return free quantity for ${it.product_name}` }} sx={{ width: 90 }} /></TableCell>}
+                                                        {data.type === 'Customer' && <TableCell><FormControlLabel label={it.expiry_date && it.expiry_date < new Date().toISOString().slice(0, 10) ? 'Expired' : 'Restock'} control={<Checkbox size="small" disabled={Boolean(it.expiry_date && it.expiry_date < new Date().toISOString().slice(0, 10))} checked={Boolean(v.restock)} onChange={(e) => setLineEdits((prev) => ({ ...prev, [it.id]: { ...v, restock: e.target.checked } }))} />} /></TableCell>}
                                                         <TableCell align="right">
-                                                            <TextField
-                                                                size="small"
-                                                                type="number"
-                                                                value={price}
-                                                                disabled={data.type === 'Customer'}
-                                                                onChange={(e) =>
-                                                                    setLineEdits((prev) => ({
-                                                                        ...prev,
-                                                                        [it.id]: { ...v, refund_price: e.target.value },
-                                                                    }))
-                                                                }
-                                                                inputProps={{ min: 0, step: '0.01' }}
-                                                                sx={{ width: 110 }}
-                                                            />
+                                                            {price.toFixed(2)}
                                                         </TableCell>
                                                         <TableCell align="right" sx={{ fontWeight: 800 }}>
                                                             {lineTotal.toFixed(2)}
@@ -545,13 +635,13 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                                 );
                                             })}
                                         </TableBody>
-                                    </Table>
+                                    </Table></TableContainer>
 
                                     <Divider sx={{ my: 1.5 }} />
 
                                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                            Refund Amount
+                                            Estimated refund amount
                                         </Typography>
                                         <Typography variant="body2" sx={{ fontWeight: 800 }}>
                                             {computedRefundAmount.toFixed(2)}
@@ -559,22 +649,66 @@ export default function ReturnsIndex({ auth, returns, branches, filters }) {
                                     </Stack>
                                 </Paper>
                             )}
+                            </>}
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={handleClose} size="small">
-                            Cancel
+                        <Button onClick={reviewing ? () => setReviewing(false) : handleClose} size="small">
+                            {reviewing ? 'Back' : 'Cancel'}
                         </Button>
                         <Button
                             type="submit"
                             size="small"
                             variant="contained"
-                            disabled={processing || !reference || selectedItems.length === 0}
+                            disabled={processing || !reference || selectedItems.length === 0 || selectionError || !data.reason.trim() || (paymentReferenceRequired && !data.payment_reference.trim())}
                         >
-                            Create Return
+                            {reviewing ? 'Approve & complete refund' : 'Review return'}
                         </Button>
                     </DialogActions>
                 </form>
+            </Dialog>
+            <Dialog open={Boolean(selectedReturn) && !settlementOpen} onClose={() => setSelectedReturn(null)} maxWidth="sm" fullWidth>
+                <DialogTitle>{selectedReturn?.type === 'Customer' ? 'Sale return' : 'Purchase return'} · {selectedReturn?.reference_number}</DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={1.5}>
+                        {actionError && <Alert severity="error">{actionError}</Alert>}
+                        <Typography variant="body2">Status: <strong>{selectedReturn?.status}</strong> · Branch: {selectedReturn?.branch?.name}</Typography>
+                        <Typography variant="body2">Reason: {selectedReturn?.reason}</Typography>
+                        <Divider />
+                        {(selectedReturn?.items || []).map((item) => <Stack key={item.id} direction="row" justifyContent="space-between"><Typography variant="body2">{item.product?.name} · {item.quantity} {item.unit?.short_name || item.unit?.name}{selectedReturn.type === 'Customer' ? item.restock ? ' · Restock' : ' · Do not restock' : ''}</Typography><Typography variant="body2">{Number(item.refund_amount || 0).toFixed(2)}</Typography></Stack>)}
+                        <Divider />
+                        <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Return value</Typography><Typography variant="body2" fontWeight={700}>{Number(selectedReturn?.refund_amount || 0).toFixed(2)}</Typography></Stack>
+                        {selectedReturn?.status === 'Approved' && <>
+                            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Applied to invoice balance</Typography><Typography variant="body2">{Number(selectedReturn.credit_applied || 0).toFixed(2)}</Typography></Stack>
+                            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">{selectedReturn.type === 'Customer' ? 'Refund paid' : 'Refund received'}</Typography><Typography variant="body2">{Number(selectedReturn.settlement_paid || 0).toFixed(2)}</Typography></Stack>
+                            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Still to settle</Typography><Typography variant="body2" fontWeight={700}>{(Number(selectedReturn.settlement_due || 0) - Number(selectedReturn.settlement_paid || 0)).toFixed(2)}</Typography></Stack>
+                            {(selectedReturn.settlements || []).map((payment) => <Typography key={payment.id} variant="caption" color="text.secondary">{formatDateTime(payment.settled_at)} · {payment.payment_method} · {Number(payment.amount).toFixed(2)}{payment.reference_number ? ` · ${payment.reference_number}` : ''}</Typography>)}
+                        </>}
+                        {selectedReturn?.status === 'Pending' && <Alert severity="info">Approval adjusts the original invoice balance and the stock shown above. Any remaining refund must be recorded when money actually changes hands.</Alert>}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSelectedReturn(null)}>Close</Button>
+                    {selectedReturn?.status === 'Pending' && canApproveReturns && <>
+                        <Button color="error" disabled={actionProcessing} onClick={() => updateStatus(selectedReturn, 'Rejected')}>Reject</Button>
+                        <Button variant="contained" disabled={actionProcessing} onClick={() => updateStatus(selectedReturn, 'Approved')}>Approve return</Button>
+                    </>}
+                    {selectedReturn?.status === 'Approved' && canManagePayments && Number(selectedReturn.settlement_due || 0) > Number(selectedReturn.settlement_paid || 0) && <Button variant="contained" onClick={() => openSettlement(selectedReturn)}>{selectedReturn.type === 'Customer' ? 'Pay refund' : 'Receive refund'}</Button>}
+                </DialogActions>
+            </Dialog>
+            <Dialog open={settlementOpen} onClose={() => setSettlementOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>{selectedReturn?.type === 'Customer' ? 'Record customer refund paid' : 'Record supplier refund received'}</DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                        {actionError && <Alert severity="error">{actionError}</Alert>}
+                        <Alert severity="info">Record this only after the payment has actually occurred. Cash payments require an open shift at this branch.</Alert>
+                        <Typography variant="body2">Remaining: {(Number(selectedReturn?.settlement_due || 0) - Number(selectedReturn?.settlement_paid || 0)).toFixed(2)}</Typography>
+                        <TextField label="Amount" type="number" value={settlementAmount} onChange={(e) => setSettlementAmount(e.target.value)} inputProps={{ min: 0.01, max: Number(selectedReturn?.settlement_due || 0) - Number(selectedReturn?.settlement_paid || 0), step: 0.01 }} fullWidth required />
+                        <FormControl fullWidth><InputLabel>Payment method</InputLabel><Select value={settlementMethod} label="Payment method" onChange={(e) => setSettlementMethod(e.target.value)}>{['Cash', 'Card', 'Mobile', 'Wallet'].map((method) => <MenuItem key={method} value={method}>{method}</MenuItem>)}</Select></FormControl>
+                        <TextField label="Payment reference" value={settlementReference} onChange={(e) => setSettlementReference(e.target.value)} required={settlementMethod !== 'Cash'} fullWidth />
+                    </Stack>
+                </DialogContent>
+                <DialogActions><Button onClick={() => setSettlementOpen(false)}>Cancel</Button><Button variant="contained" disabled={actionProcessing || (settlementMethod !== 'Cash' && !settlementReference.trim()) || Number(settlementAmount) <= 0 || Number(settlementAmount) > Number(selectedReturn?.settlement_due || 0) - Number(selectedReturn?.settlement_paid || 0)} onClick={recordSettlement}>Record payment</Button></DialogActions>
             </Dialog>
         </MainLayout>
     );

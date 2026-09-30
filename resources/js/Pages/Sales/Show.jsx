@@ -1,12 +1,13 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link } from '@/spa';
+import { AppBarActions, AppBarBack } from '@/Components/AppBarPortal';
+import { Head } from '@/spa';
 import {
     Alert, Box, Button, Chip, Divider, Paper, Stack, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Typography,
 } from '@mui/material';
-import { ArrowBack, Person, Receipt } from '@mui/icons-material';
+import { Person, Receipt } from '@mui/icons-material';
 
 const money = (value) => Number(value || 0).toFixed(2);
 const dateTime = (value) => value ? new Intl.DateTimeFormat('en-GB', {
@@ -38,15 +39,16 @@ function Metric({ label, value, color = 'text.primary', soft = 'action.hover' })
 export default function SaleShow({ auth, sale, returns = [], summary = {} }) {
     const isVoided = (sale.status || 'Completed') === 'Voided';
     const items = sale.items || [];
+    const customerPayments = sale.customer_payments || [];
 
     return (
         <MainLayout auth={auth} header="Sale Detail">
             <Head title={`Sale ${sale.invoice_number}`} />
+            <AppBarBack href={route('sales.index')} label="Back to Sales" />
             <Stack spacing={1.5}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1}>
-                    <Button component={Link} href={route('sales.index')} variant="outlined" size="small" startIcon={<ArrowBack />}>Back to Sales</Button>
+                <AppBarActions>
                     <CsvExportButton source={items} filename={`${sale.invoice_number}-items.csv`} />
-                </Stack>
+                </AppBarActions>
 
                 {isVoided && <Alert severity="error">Voided by {sale.voided_by_user?.name || 'Unknown'} on {dateTime(sale.voided_at)}. {sale.void_reason}</Alert>}
 
@@ -106,6 +108,8 @@ export default function SaleShow({ auth, sale, returns = [], summary = {} }) {
                                 <MoneyRow label="Tax collected" value={sale.tax} />
                                 <Divider sx={{ my: 0.65 }} />
                                 <MoneyRow label="Approved refunds" value={summary.approved_refunds} color={Number(summary.approved_refunds || 0) > 0 ? 'error.main' : 'text.primary'} />
+                                <MoneyRow label="Return credit applied" value={summary.return_credit_amount} />
+                                <MoneyRow label="Remaining receivable" value={summary.receivable_amount} />
                             </Box>
                             <Box sx={{ mt: 1, px: 1.1, py: 0.9, bgcolor: 'primary.soft', border: '1px solid', borderColor: 'primary.main' }}>
                                 <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
@@ -116,6 +120,28 @@ export default function SaleShow({ auth, sale, returns = [], summary = {} }) {
                         </Paper>
                     </Stack>
                 </Box>
+
+                {customerPayments.length > 0 && (
+                    <Paper sx={{ p: 1.5 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Receivable Collections</Typography>
+                            <CsvExportButton source={customerPayments} filename={`${sale.invoice_number}-collections.csv`} />
+                        </Stack>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Method</TableCell><TableCell>Recorded By</TableCell><TableCell align="right">Amount</TableCell></TableRow></TableHead>
+                                <TableBody>{customerPayments.map((payment) => (
+                                    <TableRow key={payment.id}>
+                                        <TableCell>{dateTime(payment.payment_date)}</TableCell>
+                                        <TableCell>{payment.payment_method}</TableCell>
+                                        <TableCell>{payment.user?.name || '-'}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 800 }}>${money(payment.amount)}</TableCell>
+                                    </TableRow>
+                                ))}</TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
+                )}
 
                 <Paper sx={{ p: 1.5 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Customer Returns</Typography><CsvExportButton source={returns} filename={`${sale.invoice_number}-returns.csv`} /></Stack>

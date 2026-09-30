@@ -29,44 +29,32 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
             sx={{
                 width: size,
                 height: size,
-                borderRadius: '50%',
-                p: '2px',
-                position: 'relative',
+                borderRadius: 2,
+                p: 0.75,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: '50%',
-                    background: `conic-gradient(${theme.palette.primary.light}, #ffffff, ${theme.palette.primary.main}, #ffffff, ${theme.palette.primary.dark})`,
-                    animation: 'logoBorderSpin 3.2s linear infinite',
-                },
-                '@keyframes logoBorderSpin': {
-                    from: { transform: 'rotate(0deg)' },
-                    to: { transform: 'rotate(360deg)' },
-                },
+                color: '#0C4A3A',
+                background: '#FFFFFF',
+                border: '1px solid rgba(255,255,255,0.38)',
             }}
         >
             <Box
                 sx={{
                     width: '100%',
                     height: '100%',
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.94)',
+                    borderRadius: 1.25,
+                    bgcolor: '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
-                    position: 'relative',
-                    zIndex: 1,
                 }}
             >
                 {logoPath ? (
                     <Box component="img" src={logoPath} alt={pharmacyName} sx={{ width: '80%', height: '80%', objectFit: 'contain' }} />
                 ) : (
-                    <ApplicationLogo sx={{ width: '74%', height: '74%', color: theme.palette.primary.main }} />
+                    <ApplicationLogo sx={{ width: '74%', height: '74%', color: '#0C4A3A' }} />
                 )}
             </Box>
         </Box>
@@ -87,10 +75,10 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                     sx={{
                         width: '45%',
                         maxWidth: 560,
-                        color: 'text.primary',
-                        bgcolor: 'background.paper',
+                        color: '#FFFFFF',
+                        bgcolor: '#0C4A3A',
                         borderRight: '1px solid',
-                        borderColor: 'divider',
+                        borderColor: 'rgba(255,255,255,0.14)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
@@ -105,7 +93,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                         <Link href="/" style={{ display: 'flex' }}>
                             <LogoBadge size={48} />
                         </Link>
-                        <Typography variant="h6" fontWeight={700}>
+                        <Typography variant="h6" fontWeight={800}>
                             {pharmacyName}
                         </Typography>
                     </Stack>
@@ -114,7 +102,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                         <Typography variant="h4" fontWeight={800} sx={{ mb: 1.5, lineHeight: 1.2 }}>
                             Manage Your Pharmacy{'\n'}With Confidence
                         </Typography>
-                        <Typography variant="body1" color="text.secondary" sx={{ mb: 5, lineHeight: 1.7 }}>
+                        <Typography variant="body1" sx={{ mb: 5, lineHeight: 1.7, color: 'rgba(255,255,255,0.72)' }}>
                             Streamline sales, track every batch, and run operations with secure role-based access control.
                         </Typography>
 
@@ -126,8 +114,8 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                                         sx={{
                                             p: 1,
                                             borderRadius: 1.5,
-                                            bgcolor: 'primary.soft',
-                                            color: 'primary.main',
+                                            bgcolor: 'rgba(255,255,255,0.12)',
+                                            color: '#FFFFFF',
                                             display: 'flex',
                                             flexShrink: 0,
                                         }}
@@ -138,7 +126,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                                         <Typography variant="subtitle2" fontWeight={700}>
                                             {f.title}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
                                             {f.desc}
                                         </Typography>
                                     </Box>
@@ -204,7 +192,7 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
                         py: 4,
                     }}
                 >
-                    <Box sx={{ width: '100%', maxWidth: 400 }}>
+                    <Box sx={{ width: '100%', maxWidth: 420, p: { xs: 2.5, sm: 3.5 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 3, boxShadow: '0 18px 50px rgba(12,74,58,0.12)' }}>
                         {/* Heading from sample style */}
                         <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
                             {title}

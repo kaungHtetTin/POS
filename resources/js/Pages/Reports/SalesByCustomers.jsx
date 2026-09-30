@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { CompactBarChart, CompactLineChart } from '@/Components/CompactReportChart';
 import { Head, router, usePage } from '@/spa';
 import {
     Box,
@@ -28,18 +30,6 @@ import {
     FilterAlt as FilterIcon,
     RestartAlt as ResetIcon,
 } from '@mui/icons-material';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip as ChartTooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 
 const toInputDate = (date) => {
     const year = date.getFullYear();
@@ -184,15 +174,7 @@ export default function SalesByCustomersReport({
             <Head title={__('Sale Report')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                    <Box>
-                        <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            {__('Sales')}
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                            {__('Sale Report')}
-                        </Typography>
-                    </Box>
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
                     <Chip
                         icon={<CalendarIcon fontSize="small" />}
                         label={`${formatDate(filters.from_date)} ${__('to')} ${formatDate(filters.to_date)}`}
@@ -204,10 +186,10 @@ export default function SalesByCustomersReport({
                 <Paper sx={{ p: 2, mb: 2 }}>
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
                         <ReportIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('CUSTOMER SALES ANALYSIS')}</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('Customer sales analysis')}</Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel={__('Customer sales report filters')}
                         fieldKinds={['wide', 'select', 'date', 'date']}
                         onSubmit={() => applyFilters()}
@@ -265,64 +247,25 @@ export default function SalesByCustomersReport({
                         <CsvExportButton source={top_products} filename="top-products.csv" label={__('Export Products')} />
                     </Stack>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(6, 1fr)' }, gap: 1.2 }}>
-                        {[
+                    <StatCardGrid items={[
                             ['Sales', summary.sale_count || 0],
                             ['Customers', summary.customer_count || 0],
                             ['Gross Sales', `$${money(summary.grand_total)}`],
                             ['Customer Returns', `$${money(summary.customer_returns)}`],
                             ['Net Amount', `$${money(summary.net_amount)}`],
                             ['Avg Sale', `$${money(summary.average_sale)}`],
-                        ].map(([label, value]) => (
-                            <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
-                            </Paper>
-                        ))}
-                    </Box>
+                        ].map(([label, value]) => ({ label: __(label), value }))} sx={{ mb: 0 }} />
                 </Paper>
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 2, mb: 2 }}>
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>{__('Sales Trend')}</Typography>
-                        <Box sx={{ height: 250 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="period" tick={{ fontSize: 11 }} tickFormatter={formatShortDate} />
-                                    <YAxis tick={{ fontSize: 11 }} />
-                                    <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'total' ? `$${money(value)}` : value} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#087f74" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="customers" name={__('Customers')} stroke="#2874bc" strokeWidth={2} dot={false} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 1.25, mb: 1.5 }}>
+                    <CompactLineChart title={__('Sales Trend')} data={trendData} xKey="period" xFormatter={formatShortDate} series={[
+                        { key: 'total', label: __('Sales Amount'), color: '#0E684E' },
+                        { key: 'customers', label: __('Customers'), color: '#2874bc' },
+                    ]} valueFormatter={(value, name) => name === __('Sales Amount') ? `$${money(value)}` : value} />
 
-                    <Paper sx={{ p: 2 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('Top Product Sale Rate')}</Typography>
-                            <Chip size="small" variant="outlined" label={`${topProductData.length} ${__('products')}`} />
-                        </Stack>
-                        <Box sx={{ height: 250, mb: 1 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={topProductData} layout="vertical" margin={{ top: 8, right: 20, left: 42, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
-                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={126} />
-                                    <ChartTooltip
-                                        formatter={(value, name) => {
-                                            if (name === 'Share') return [`${Number(value || 0).toFixed(1)}%`, __(name)];
-                                            return [`$${money(value)}`, __(name)];
-                                        }}
-                                    />
-                                    <Legend />
-                                    <Bar dataKey="total" name={__('Sale Amount')} fill="#087f74" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                        <TableContainer sx={{ maxHeight: 190 }}>
+                    <Box sx={{ display: 'grid', gap: 1 }}>
+                        <CompactBarChart title={__('Top Product Sale Rate')} subtitle={`${topProductData.length} ${__('products')}`} data={topProductData} xKey="name" series={[{ key: 'total', label: __('Sale Amount'), color: '#0E684E' }]} valueFormatter={(value) => `$${money(value)}`} height={160} />
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 190 }}>
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow>
@@ -358,28 +301,15 @@ export default function SalesByCustomersReport({
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                    </Paper>
+                    </Box>
                 </Box>
 
-                <Paper sx={{ p: 2, mb: 2 }}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1} sx={{ mb: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{__('Top Customers by Sale Amount')}</Typography>
-                        <Chip size="small" variant="outlined" label={`${__('Known customer sales')}: ${percent(summary.known_customer_grand_total, summary.grand_total)}`} />
-                    </Stack>
-                    <Box sx={{ height: 280 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={topCustomerData} layout="vertical" margin={{ top: 8, right: 20, left: 48, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
-                                <ChartTooltip formatter={(value) => `$${money(value)}`} />
-                                <Legend />
-                                <Bar dataKey="total" name={__('Sale Amount')} fill="#087f74" />
-                                <Bar dataKey="net" name={__('Net After Returns')} fill="#2874bc" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </Box>
-                </Paper>
+                <Box sx={{ mb: 1.5 }}>
+                    <CompactBarChart title={__('Top Customers by Sale Amount')} subtitle={`${__('Known customer sales')}: ${percent(summary.known_customer_grand_total, summary.grand_total)}`} data={topCustomerData} xKey="name" series={[
+                        { key: 'total', label: __('Sale Amount'), color: '#0E684E' },
+                        { key: 'net', label: __('Net After Returns'), color: '#2874bc' },
+                    ]} valueFormatter={(value) => `$${money(value)}`} />
+                </Box>
 
             </Box>
         </MainLayout>

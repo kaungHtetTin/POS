@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import CsvExportButton from '@/Components/CsvExportButton';
+import { AppBarActions } from '@/Components/AppBarPortal';
 import { Head, useForm } from '@/spa';
 import {
     Box,
     Paper,
     Typography,
-    Divider,
     Table,
     TableBody,
     TableCell,
@@ -112,24 +113,18 @@ export default function RolesIndex({ auth, roles, permissions }) {
 
             <Box sx={{ flexGrow: 1 }}>
                 <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            AVAILABLE SYSTEM ROLES
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
+                    <AppBarActions>
                         <CsvExportButton source={roles} filename="roles.csv" />
                         <Button 
                             variant="contained" 
                             size="small" 
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                             Add New Role
                         </Button>
-                        </Stack>
-                    </Box>
-                    <Divider sx={{ mb: 2 }} />
+                        </AppBarActions>
 
                     <TableContainer>
                         <Table size="small">
@@ -138,7 +133,7 @@ export default function RolesIndex({ auth, roles, permissions }) {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Role Name</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Accessible Permissions</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Users</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -177,24 +172,28 @@ export default function RolesIndex({ auth, roles, permissions }) {
                                         <TableCell align="center" sx={{ verticalAlign: 'top', pt: 1.5 }}>
                                             <Chip label={role.users_count} size="small" variant="outlined" />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ verticalAlign: 'top', pt: 1 }}>
+                                        <TableActionCell sx={{ verticalAlign: 'top', pt: 1 }}>
+                                            <TableRowActions label={role.name}>
                                             <IconButton 
+                                                title="Edit role"
                                                 size="small" 
                                                 color="primary" 
                                                 onClick={() => handleOpen(role)}
-                                                disabled={role.name === 'Root'}
+                                                disabled={['Owner', 'Root'].includes(role.name)}
                                             >
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                             <IconButton 
+                                                title="Delete role"
                                                 size="small" 
                                                 color="error" 
                                                 onClick={() => handleDelete(role)}
-                                                disabled={role.name === 'Root' || role.users_count > 0}
+                                                disabled={['Owner', 'Root'].includes(role.name) || role.users_count > 0}
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

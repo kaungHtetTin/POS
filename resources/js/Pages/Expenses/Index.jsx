@@ -1,22 +1,22 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
 import MainLayout from '@/Layouts/MainLayout';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
+import StatCardGrid from '@/Components/StatCardGrid';
 import { Head, useForm, router } from '@/spa';
 import {
     Box,
     Button,
-    Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
-    Divider,
     FormControl,
     IconButton,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -36,6 +36,8 @@ import {
     Edit as EditIcon,
     Payments as ExpenseIcon,
     Search as SearchIcon,
+    ReceiptLongOutlined as EntryIcon,
+    PaymentsOutlined as TotalIcon,
 } from '@mui/icons-material';
 
 export default function ExpenseIndex({ auth, expenses, branches, categories, filters, summary = {} }) {
@@ -160,23 +162,20 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Paper sx={{ p: 2 }}>
+                    <StatCardGrid
+                        items={[
+                            { label: 'Filtered Entries', value: Number(summary.entries_count ?? expenses?.total ?? expenseRows.length).toLocaleString(), icon: <EntryIcon /> },
+                            { label: 'Filtered Total', value: Number(totalAmount || 0).toFixed(2), icon: <TotalIcon />, tone: 'warning' },
+                        ]}
+                    />
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <ExpenseIcon fontSize="small" color="primary" />
                             EXPENSE TRACKING
                         </Typography>
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={() => handleOpen()}
-                            sx={{ height: 40, px: 2, whiteSpace: 'nowrap', flexShrink: 0 }}
-                        >
-                            Add Expense
-                        </Button>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Expense filters"
                         fieldKinds={['search', 'wide', 'wide', 'date', 'date']}
                         onSubmit={() => applyFilters()}
@@ -185,6 +184,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                                 <Button variant="contained" size="small" type="submit">Filter</Button>
                                 <Button variant="outlined" size="small" onClick={clearFilters}>Clear</Button>
                                 <CsvExportButton source={expenses} dataKey="expenses" filename="expenses.csv" />
+                                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => handleOpen()}>Add Expense</Button>
                             </>
                         )}
                     >
@@ -245,22 +245,6 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
 
                     </ReportFilterToolbar>
 
-                    <Divider sx={{ mb: 2 }} />
-
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                        <Chip
-                            size="small"
-                            label={`Entries: ${summary.entries_count ?? expenses?.total ?? expenseRows.length}`}
-                            variant="outlined"
-                        />
-                        <Chip
-                            size="small"
-                            label={`Total: ${Number(totalAmount || 0).toFixed(2)}`}
-                            color="primary"
-                            variant="outlined"
-                        />
-                    </Stack>
-
                     <TableContainer>
                         <Table size="small">
                             <TableHead>
@@ -273,7 +257,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                                         Amount
                                     </TableCell>
                                     <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
-                                    <TableCell />
+                                    <TableActionHead>Actions</TableActionHead>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -305,14 +289,16 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                                                 {e.notes || '-'}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell align="right">
-                                            <IconButton size="small" color="primary" onClick={() => handleOpen(e)}>
+                                        <TableActionCell>
+                                            <TableRowActions label={e.title}>
+                                            <IconButton title="Edit expense" size="small" color="primary" onClick={() => handleOpen(e)}>
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
-                                            <IconButton size="small" color="error" onClick={() => handleDelete(e)}>
+                                            <IconButton title="Delete expense" size="small" color="error" onClick={() => handleDelete(e)}>
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
-                                        </TableCell>
+                                            </TableRowActions>
+                                        </TableActionCell>
                                     </TableRow>
                                 ))}
 
@@ -328,17 +314,7 @@ export default function ExpenseIndex({ auth, expenses, branches, categories, fil
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(expenses?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={expenses.last_page}
-                                page={expenses.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={expenses} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
 

@@ -69,7 +69,7 @@ class HandleSpaRequests
                 'app' => [
                     'currency_symbol' => Setting::get('app.currency_symbol', '$'),
                     'date_format' => Setting::get('app.date_format', 'Y-m-d'),
-                    'theme_primary_color' => Setting::get('app.theme_primary_color', '#00796b'),
+                    'theme_primary_color' => Setting::get('app.theme_primary_color', '#0E684E'),
                 ],
                 'invoice' => [
                     'pharmacy_name' => Setting::get('invoice.pharmacy_name', config('app.name')),
@@ -138,7 +138,11 @@ class HandleSpaRequests
                 $counts['expiryReport'] = InventoryBatch::query()->join('products', 'inventory_batches.product_id', '=', 'products.id')
                     ->whereIn('inventory_batches.branch_id', $branchIds)->where('inventory_batches.quantity', '>', 0)
                     ->whereRaw('DATEDIFF(inventory_batches.expiry_date, ?) <= COALESCE(products.expiry_alert_days, ?)', [$today, $expiryAlertDays])->count();
+            }
+            if ($permissions->contains('manage_purchases')) {
                 $counts['purchases'] = Purchase::whereIn('branch_id', $branchIds)->where('payment_status', '!=', 'Paid')->count();
+            }
+            if ($permissions->contains('adjust_stock')) {
                 $counts['transfers'] = StockTransfer::where(function ($query) use ($branchIds) {
                     $query->whereIn('from_branch_id', $branchIds)->orWhereIn('to_branch_id', $branchIds);
                 })->where('status', 'Pending')->count();

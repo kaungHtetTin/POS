@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
+use App\Support\PharmacyAccess;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class RoleSeeder extends Seeder
 {
@@ -12,16 +14,20 @@ class RoleSeeder extends Seeder
      *
      * @return void
      */
-    public function run()
+    public function run(): void
     {
-        $roles = [
-            'Root',
-            'Manager',
-            'Cashier',
-        ];
+        DB::transaction(function () {
+            $legacyRoot = Role::where('name', 'Root')->first();
+            $owner = Role::firstOrCreate(['name' => PharmacyAccess::OWNER]);
 
-        foreach ($roles as $role) {
-            Role::firstOrCreate(['name' => $role]);
-        }
+            if ($legacyRoot && $legacyRoot->isNot($owner)) {
+                $owner->users()->syncWithoutDetaching($legacyRoot->users()->pluck('users.id'));
+                $legacyRoot->delete();
+            }
+
+            foreach (PharmacyAccess::ROLES as $role) {
+                Role::firstOrCreate(['name' => $role]);
+            }
+        });
     }
 }

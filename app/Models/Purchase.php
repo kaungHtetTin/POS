@@ -21,6 +21,7 @@ class Purchase extends Model
         'total_amount',
         'paid_amount',
         'due_amount',
+        'return_credit_amount',
         'payment_status',
         'notes',
         'is_synced',
@@ -33,6 +34,7 @@ class Purchase extends Model
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
+        'return_credit_amount' => 'decimal:2',
         'is_synced' => 'boolean',
         'synced_at' => 'datetime',
     ];

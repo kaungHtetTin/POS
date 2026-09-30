@@ -1,17 +1,20 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
+import ClickableTableRow from '@/Components/ClickableTableRow';
 import MainLayout from '@/Layouts/MainLayout';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router } from '@/spa';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { CompactBarChart, CompactDonutChart, CompactLineChart } from '@/Components/CompactReportChart';
+import { Head, router } from '@/spa';
 import {
     Box,
     Button,
     Chip,
     FormControl,
-    IconButton,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -22,32 +25,14 @@ import {
     TableHead,
     TableRow,
     TextField,
-    Tooltip,
     Typography,
 } from '@mui/material';
 import {
-    ArrowBack as BackIcon,
     FilterAlt as FilterIcon,
     LocalShipping as SupplierIcon,
     ReceiptLong as PurchaseIcon,
     RestartAlt as ResetIcon,
-    Visibility as ViewIcon,
 } from '@mui/icons-material';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Line,
-    LineChart,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip as ChartTooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 
 export default function PurchaseSupplierReport({
     auth,
@@ -114,11 +99,12 @@ export default function PurchaseSupplierReport({
     })), [category_summary]);
 
     const currentPurchases = purchases?.data || [];
-    const statusColors = ['#087f74', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
+    const statusColors = ['#0E684E', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
 
     return (
         <MainLayout auth={auth} header="Supplier Purchase Report">
             <Head title={`${supplier.name || 'Supplier'} Purchase Report`} />
+            <AppBarBack href={route('reports.purchases')} label="Back to Purchase Reports" />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
@@ -133,18 +119,15 @@ export default function PurchaseSupplierReport({
                             {supplier.phone || 'No phone'} | {supplier.payment_terms || 'No payment terms'} | Balance ${money(supplier.balance)}
                         </Typography>
                     </Box>
-                    <Button component={Link} href={route('reports.purchases')} variant="outlined" startIcon={<BackIcon />}>
-                        Back to Report
-                    </Button>
                 </Stack>
 
                 <Paper sx={{ p: 2, mb: 2 }}>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                         <SupplierIcon fontSize="small" color="primary" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>SUPPLIER PURCHASE ANALYSIS</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Supplier purchase analysis</Typography>
                     </Stack>
 
-                    <ReportFilterToolbar
+                    <ReportFilterToolbar appBar
                         ariaLabel="Supplier purchase filters"
                         fieldKinds={['wide', 'date', 'date', 'select']}
                         onSubmit={() => applyFilters()}
@@ -195,75 +178,26 @@ export default function PurchaseSupplierReport({
                         </FormControl>
                     </ReportFilterToolbar>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(6, 1fr)' }, gap: 1.2 }}>
-                        {[
+                    <StatCardGrid items={[
                             ['Purchases', summary.purchase_count || 0],
                             ['Total', `$${money(summary.total_amount)}`],
                             ['Paid', `$${money(summary.paid_amount)}`],
                             ['Due', `$${money(summary.due_amount)}`],
                             ['Received Qty', Number(summary.quantity || 0) + Number(summary.foc_quantity || 0)],
                             ['Payments', `$${money(summary.payment_total)}`],
-                        ].map(([label, value]) => (
-                            <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                <Typography variant="caption" color="text.secondary">{label}</Typography>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
-                            </Paper>
-                        ))}
-                    </Box>
+                        ].map(([label, value]) => ({ label, value }))} sx={{ mb: 0 }} />
                 </Paper>
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.45fr 1fr' }, gap: 2, mb: 2 }}>
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Purchase Trend</Typography>
-                        <Box sx={{ height: 250 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 11 }} />
-                                    <ChartTooltip formatter={(value, name) => name === 'purchases' ? value : `$${money(value)}`} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="total" stroke="#087f74" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="due" stroke="#b77700" strokeWidth={2} dot={false} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
-
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Payment Status Mix</Typography>
-                        <Box sx={{ height: 250 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={statusData} dataKey="total" nameKey="name" innerRadius={48} outerRadius={82} paddingAngle={3}>
-                                        {statusData.map((entry, index) => (
-                                            <Cell key={entry.name} fill={statusColors[index % statusColors.length]} />
-                                        ))}
-                                    </Pie>
-                                    <ChartTooltip formatter={(value) => `$${money(value)}`} />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' }, gap: 1.25, mb: 1.5 }}>
+                    <CompactLineChart title="Purchase Trend" data={trendData} xKey="period" series={[
+                        { key: 'total', label: 'Total', color: '#0E684E' },
+                        { key: 'due', label: 'Due', color: '#b77700' },
+                    ]} valueFormatter={(value) => `$${money(value)}`} />
+                    <CompactDonutChart title="Payment Status Mix" data={statusData} valueKey="total" colors={statusColors} valueFormatter={(value) => `$${money(value)}`} />
                 </Box>
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 2, mb: 2 }}>
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Category Summary</Typography>
-                        <Box sx={{ height: 250 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={categoryData} layout="vertical" margin={{ top: 8, right: 20, left: 40, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                                    <ChartTooltip formatter={(value, name) => name === 'qty' ? value : `$${money(value)}`} />
-                                    <Legend />
-                                    <Bar dataKey="total" fill="#087f74" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 1.25, mb: 1.5 }}>
+                    <CompactBarChart title="Category Summary" data={categoryData} xKey="name" series={[{ key: 'total', label: 'Total', color: '#0E684E' }]} valueFormatter={(value) => `$${money(value)}`} />
 
                     <Paper sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Top Products</Typography>
@@ -342,12 +276,11 @@ export default function PurchaseSupplierReport({
                                         <TableCell>Status</TableCell>
                                         <TableCell align="right">Total</TableCell>
                                         <TableCell align="right">Due</TableCell>
-                                        <TableCell align="right">Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {currentPurchases.map((purchase) => (
-                                        <TableRow key={purchase.id} hover>
+                                        <ClickableTableRow key={purchase.id} href={route('purchases.show', { purchase: purchase.id })} label={`View purchase ${purchase.invoice_number}`}>
                                             <TableCell>
                                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>{purchase.invoice_number}</Typography>
                                                 <Typography variant="caption" color="text.secondary">{purchase.branch_name}</Typography>
@@ -358,18 +291,11 @@ export default function PurchaseSupplierReport({
                                             </TableCell>
                                             <TableCell align="right">${money(purchase.total_amount)}</TableCell>
                                             <TableCell align="right">${money(purchase.due_amount)}</TableCell>
-                                            <TableCell align="right">
-                                                <Tooltip title="View purchase">
-                                                    <IconButton component={Link} href={route('purchases.show', { purchase: purchase.id })} size="small" color="primary">
-                                                        <ViewIcon fontSize="inherit" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </TableCell>
-                                        </TableRow>
+                                        </ClickableTableRow>
                                     ))}
                                     {currentPurchases.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                            <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                                                 <Typography variant="body2" color="text.secondary">No purchases found for this supplier.</Typography>
                                             </TableCell>
                                         </TableRow>
@@ -378,16 +304,7 @@ export default function PurchaseSupplierReport({
                             </Table>
                         </TableContainer>
 
-                        {Number(purchases.last_page || 1) > 1 && (
-                            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                                <Pagination
-                                    size="small"
-                                    count={purchases.last_page}
-                                    page={purchases.current_page}
-                                    onChange={(event, page) => applyFilters(page)}
-                                />
-                            </Stack>
-                        )}
+                        <DataTableFooter paginator={purchases} onPageChange={(page) => applyFilters(page)} />
                     </Paper>
                 </Box>
             </Box>

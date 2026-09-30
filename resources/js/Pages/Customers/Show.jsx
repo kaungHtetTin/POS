@@ -1,8 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import DataTableFooter from '@/Components/DataTableFooter';
 import MainLayout from '@/Layouts/MainLayout';
+import { AppBarBack } from '@/Components/AppBarPortal';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
-import { Head, Link, router, usePage } from '@/spa';
+import StatCardGrid from '@/Components/StatCardGrid';
+import { Head, router, usePage } from '@/spa';
 import {
     Box,
     Button,
@@ -11,7 +14,6 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
-    Pagination,
     Paper,
     Select,
     Stack,
@@ -25,7 +27,6 @@ import {
     Typography,
 } from '@mui/material';
 import {
-    ArrowBack as ArrowBackIcon,
     CalendarMonth as CalendarIcon,
     FilterAlt as FilterIcon,
     Person as PersonIcon,
@@ -139,20 +140,11 @@ export default function CustomerShow({
     return (
         <MainLayout auth={auth} header={__('Customer Detail')}>
             <Head title={`${customer.name} - ${__('Customer Detail')}`} />
+            <AppBarBack href={route('customers.index')} label={__('Back to Customers')} />
 
             <Box sx={{ p: { xs: 1, md: 1.25 } }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
                     <Stack direction="row" spacing={1.25} alignItems="center">
-                        <Button
-                            component={Link}
-                            href={route('customers.index')}
-                            variant="outlined"
-                            size="small"
-                            startIcon={<ArrowBackIcon />}
-                            sx={{ flexShrink: 0 }}
-                        >
-                            {__('Back')}
-                        </Button>
                         <Box sx={{ minWidth: 0 }}>
                             <Typography variant="caption" color="primary" sx={{ fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                                 {__('Customer')}
@@ -205,7 +197,7 @@ export default function CustomerShow({
                             <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{__('CUSTOMER SALES REPORT')}</Typography>
                         </Stack>
 
-                        <ReportFilterToolbar
+                        <ReportFilterToolbar appBar
                             ariaLabel={__('Customer sales filters')}
                             fieldKinds={['wide', 'date', 'date']}
                             onSubmit={applyFilters}
@@ -246,20 +238,13 @@ export default function CustomerShow({
                             />
                         </ReportFilterToolbar>
 
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 1.2 }}>
-                            {[
+                        <StatCardGrid items={[
                                 ['Sales', summary.sale_count || 0],
                                 ['Gross Sales', `$${money(summary.grand_total)}`],
                                 ['Returns', `$${money(summary.customer_returns)}`],
                                 ['Net Amount', `$${money(summary.net_amount)}`],
                                 ['Avg Sale', `$${money(summary.average_sale)}`],
-                            ].map(([label, value]) => (
-                                <Paper key={label} variant="outlined" sx={{ p: 1.25 }}>
-                                    <Typography variant="caption" color="text.secondary">{__(label)}</Typography>
-                                    <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{value}</Typography>
-                                </Paper>
-                            ))}
-                        </Box>
+                            ].map(([label, value]) => ({ label: __(label), value }))} sx={{ mb: 0 }} />
                     </Paper>
                 </Box>
 
@@ -274,7 +259,7 @@ export default function CustomerShow({
                                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
                                     <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'sales' ? value : `$${money(value)}`} />
                                     <Legend />
-                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#087f74" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#0E684E" strokeWidth={2} dot={false} />
                                     <Line type="monotone" dataKey="tax" name={__('Tax')} stroke="#b77700" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -291,7 +276,7 @@ export default function CustomerShow({
                                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={128} />
                                     <ChartTooltip formatter={(value) => `$${money(value)}`} />
                                     <Legend />
-                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#087f74" />
+                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#0E684E" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -381,17 +366,7 @@ export default function CustomerShow({
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    {Number(sales?.last_page || 1) > 1 && (
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-                            <Pagination
-                                size="small"
-                                count={sales.last_page}
-                                page={sales.current_page}
-                                onChange={(event, page) => applyFilters(page)}
-                                color="primary"
-                            />
-                        </Stack>
-                    )}
+                    <DataTableFooter paginator={sales} onPageChange={(page) => applyFilters(page)} />
                 </Paper>
             </Box>
         </MainLayout>

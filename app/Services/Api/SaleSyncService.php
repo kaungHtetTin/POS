@@ -27,6 +27,12 @@ class SaleSyncService
 
         $existing = Sale::where('client_reference', $clientReference)->first();
         if ($existing) {
+            if (!$this->userCanAccessBranch($user, $existing->branch_id)) {
+                throw ValidationException::withMessages([
+                    'client_reference' => 'This synchronized sale is not available in your branch scope.',
+                ]);
+            }
+
             return [
                 'client_reference' => $clientReference,
                 'created' => false,
@@ -158,6 +164,8 @@ class SaleSyncService
                     'price_type' => $item['price_type'],
                     'discount_percentage' => $discountPercentage,
                     'discount_amount' => $lineDiscount,
+                    'tax_amount' => $taxAmount,
+                    'payable_total' => $product->tax_method === 'Inclusive' && $taxRate > 0 ? $lineNet : $lineNet + $taxAmount,
                 ];
             }
 
@@ -251,6 +259,9 @@ class SaleSyncService
                             ? $line['discount_amount'] * ($quantityInUnit / (float) $line['quantity'])
                             : 0,
                         'total_price' => $quantityInUnit * (float) $line['unit_price'],
+                        'payable_total' => $line['quantity'] > 0 ? $line['payable_total'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'tax_amount' => $line['quantity'] > 0 ? $line['tax_amount'] * ($quantityInUnit / (float) $line['quantity']) : 0,
+                        'financial_snapshot' => true,
                         'created_at' => now(),
                     ]);
 

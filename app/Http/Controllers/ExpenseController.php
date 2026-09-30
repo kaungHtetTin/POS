@@ -114,7 +114,10 @@ class ExpenseController extends Controller
             'notes' => 'nullable|string|max:2000',
         ]);
 
-        if (!$this->canAccessAllBranches($request->user()) && !$request->user()->canAccessBranch($validated['branch_id'])) {
+        if (!$this->canAccessAllBranches($request->user()) && (
+            !$request->user()->canAccessBranch($expense->branch_id)
+            || !$request->user()->canAccessBranch($validated['branch_id'])
+        )) {
             abort(403);
         }
 

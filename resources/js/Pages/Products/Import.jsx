@@ -1,11 +1,12 @@
 import React from 'react';
 import MainLayout from '@/Layouts/MainLayout';
-import { Head, router, useForm } from '@/spa';
+import { Head, useForm } from '@/spa';
 import {
     Alert, Box, Button, Checkbox, Chip, FormControlLabel, LinearProgress,
     Paper, Stack, Typography, Accordion, AccordionSummary, AccordionDetails,
 } from '@mui/material';
-import { ArrowBack, Download, ExpandMore, UploadFile } from '@mui/icons-material';
+import { Download, ExpandMore, UploadFile } from '@mui/icons-material';
+import { AppBarBack } from '@/Components/AppBarPortal';
 
 function UploadForm({ form, field, label, routeName, children, disabled }) {
     const errors = Object.values(form.errors).flat().filter(Boolean);
@@ -38,15 +39,14 @@ export default function ProductImport({ auth, categories, taxes }) {
     return (
         <MainLayout auth={auth} header="Import Medicines">
             <Head title="Import Medicines" />
-            <Stack spacing={2} sx={{ maxWidth: 1100, mx: 'auto' }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                    <Box><Typography variant="h5" fontWeight={700}>Import medicines, units and prices</Typography>
-                        <Typography variant="body2" color="text.secondary">Download a template, edit it in Excel, then save as CSV UTF-8.</Typography></Box>
-                    <Button startIcon={<ArrowBack />} onClick={() => router.visit(route('products.index'))} sx={{ flexShrink: 0 }}>Medicines</Button>
+            <AppBarBack href={route('products.index')} label="Back to Medicines" />
+            <Stack spacing={1.5} sx={{ maxWidth: 1100, mx: 'auto' }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+                    <Typography variant="body2" color="text.secondary">Download a template, edit it in Excel, then save as CSV UTF-8.</Typography>
                 </Stack>
                 <Alert severity="info">You can upload the downloaded product template or a medicines.csv file created by Product Export. Exported products with a matching Id are updated; other rows create products. Keep the column names unchanged. Format barcodes as text to preserve leading zeros. If any row fails validation, the entire import is rolled back.</Alert>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, alignItems: 'start' }}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.5, alignItems: 'start' }}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
                         <Stack spacing={2}>
                             <Box><Chip label="New medicines" size="small" sx={{ mb: 1 }} /><Typography variant="h6" fontWeight={700}>Import products</Typography></Box>
                             <Typography variant="body2" color="text.secondary">One row creates one medicine with a base unit, starting buying cost, selling price and wholesale price. Type the unit name and short name in the CSV; new unit pairs are created automatically.</Typography>
@@ -61,7 +61,7 @@ export default function ProductImport({ auth, categories, taxes }) {
                             </UploadForm>
                         </Stack>
                     </Paper>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
                         <Stack spacing={2}>
                             <Box><Chip label="Existing medicines" size="small" sx={{ mb: 1 }} /><Typography variant="h6" fontWeight={700}>Import units and prices</Typography></Box>
                             <Typography variant="body2" color="text.secondary">Download current units and prices, edit the prices or add rows for new units, then upload. Each row contains both selling and wholesale prices. Imported amounts switch those unit prices to Manual mode.</Typography>
