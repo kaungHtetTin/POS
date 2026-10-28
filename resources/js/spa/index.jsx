@@ -162,6 +162,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
     const [page, setPage] = useState(initialPage);
     const [PageComponent, setPageComponent] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [preservingState, setPreservingState] = useState(false);
     const [navigationError, setNavigationError] = useState('');
     const requestRef = useRef(null);
     const pageRef = useRef(initialPage);
@@ -196,6 +197,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
         const controller = new AbortController();
         requestRef.current = controller;
         setNavigationError('');
+        setPreservingState(Boolean(options.preserveState));
         setLoading(true);
         options.onStart?.();
         emit('start', { url: target, method });
@@ -241,6 +243,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
             }
 
             const component = await loadComponent(payload.component);
+            if (controller.signal.aborted) return null;
             const finalUrl = normalizeUrl(response.url || payload.url || target);
             if (!isGet || finalUrl !== target) window.history.replaceState({}, '', finalUrl);
 
@@ -289,7 +292,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
 
     return (
         <SpaContext.Provider value={context}>
-            {children({ PageComponent, page, loading, navigationError })}
+            {children({ PageComponent, page, loading, preservingState, navigationError })}
         </SpaContext.Provider>
     );
 }

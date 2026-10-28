@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
+import CategorySelect from '@/Components/CategorySelect';
 import MergedTablePanel from '@/Components/MergedTablePanel';
 import DataTableFooter from '@/Components/DataTableFooter';
 import TableRowActions, { TableActionCell, TableActionHead } from '@/Components/TableRowActions';
@@ -39,6 +40,7 @@ import {
     FormControlLabel,
     Switch,
     FormHelperText,
+    LinearProgress,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -60,7 +62,7 @@ import {
 } from '@mui/icons-material';
 
 export default function ProductIndex({ auth, products, categories, taxes, units, filters, summary = {}, default_tax_id: defaultTaxId }) {
-    const { ziggy = {} } = usePage().props;
+    const { props: { ziggy = {} }, loading } = usePage();
     const appBase = ziggy?.base || '';
     const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
     const storageUrl = (path) => withBase(`/storage/${String(path || '').replace(/^\/+/, '')}`);
@@ -160,7 +162,6 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
         setSearch('');
         setSelectedCategory('');
         setSelectedStatus('');
-        router.get(route('products.index'));
     };
 
     const handlePageChange = (page) => {
@@ -393,7 +394,8 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                         </ReportFilterToolbar>
                     }
                 >
-                    <TableContainer>
+                    <TableContainer aria-busy={loading} sx={{ position: 'relative' }}>
+                        {loading && <LinearProgress aria-label="Loading medicines" sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
@@ -604,25 +606,13 @@ export default function ProductIndex({ auth, products, categories, taxes, units,
                                         required
                                         sx={{ gridColumn: { xs: '1', md: '2 / span 2' } }}
                                     />
-                                    <FormControl
-                                        fullWidth
-                                        size="small"
-                                        error={!!errors.category_id}
-                                        required
+                                    <CategorySelect
+                                        categories={categories}
+                                        value={data.category_id}
+                                        onChange={(categoryId) => setData('category_id', categoryId)}
+                                        error={errors.category_id}
                                         sx={{ gridColumn: { xs: '1', md: '4 / span 2' } }}
-                                    >
-                                        <InputLabel>Category</InputLabel>
-                                        <Select
-                                            value={data.category_id}
-                                            label="Category"
-                                            onChange={e => setData('category_id', e.target.value)}
-                                        >
-                                            {categories.map(cat => (
-                                                <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                                            ))}
-                                        </Select>
-                                        {errors.category_id && <FormHelperText>{errors.category_id}</FormHelperText>}
-                                    </FormControl>
+                                    />
                                     <TextField
                                         label="Generic Name"
                                         fullWidth

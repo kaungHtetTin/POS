@@ -196,10 +196,10 @@ function Application() {
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 <SpaProvider initialPage={initialPage} resolve={resolvePage}>
-                    {({ PageComponent, page, loading, navigationError }) => {
+                    {({ PageComponent, page, loading, preservingState, navigationError }) => {
                         if (!PageComponent) return <PageLoadingState initial />;
                         const content = (
-                            <ContentTransition loading={loading} error={navigationError}>
+                            <ContentTransition loading={loading && !preservingState} error={navigationError}>
                                 <PageComponent {...page.props} />
                             </ContentTransition>
                         );

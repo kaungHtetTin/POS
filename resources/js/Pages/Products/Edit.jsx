@@ -1,6 +1,7 @@
 import React from 'react';
 import { automaticPrice } from '@/Utils/automaticPricing';
 import MainLayout from '@/Layouts/MainLayout';
+import CategorySelect from '@/Components/CategorySelect';
 import { AppBarBack } from '@/Components/AppBarPortal';
 import { Head, useForm, router, usePage } from '@/spa';
 import { compressImage } from '@/Utils/compressImage';
@@ -252,19 +253,13 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                                         required
                                         sx={{ gridColumn: { xs: '1', md: '2 / span 2' } }}
                                     />
-                                    <FormControl
-                                        fullWidth
-                                        size="small"
-                                        error={!!errors.category_id}
-                                        required
+                                    <CategorySelect
+                                        categories={categories}
+                                        value={data.category_id}
+                                        onChange={(categoryId) => setData('category_id', categoryId)}
+                                        error={errors.category_id}
                                         sx={{ gridColumn: { xs: '1', md: '4 / span 2' } }}
-                                    >
-                                        <InputLabel>Category</InputLabel>
-                                        <Select value={data.category_id} label="Category" onChange={e => setData('category_id', e.target.value)}>
-                                            {categories.map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
-                                        </Select>
-                                        {errors.category_id && <FormHelperText>{errors.category_id}</FormHelperText>}
-                                    </FormControl>
+                                    />
                                     <TextField
                                         fullWidth
                                         size="small"
