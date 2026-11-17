@@ -2,6 +2,14 @@ import React from 'react';
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 
+export const statCardGridSx = {
+    display: 'grid',
+    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(auto-fill, minmax(min(100%, 220px), 260px))' },
+    gap: 1.25,
+    alignItems: 'stretch',
+    mb: 1.5,
+};
+
 const tones = {
     default: 'primary',
     success: 'success',
@@ -10,23 +18,24 @@ const tones = {
     info: 'info',
 };
 
-export function StatCard({ label, value, icon, tone = 'default', component, href, onClick, sx = {} }) {
+export function StatCard({ label, value, icon, tone = 'default', component, href, onClick, description, sx = {} }) {
     const paletteKey = tones[tone] || tones.default;
 
     return (
         <Paper
+            data-stat-card
             component={component}
             href={href}
             onClick={onClick}
             variant="outlined"
             sx={{
                 minWidth: 0,
-                minHeight: 76,
+                minHeight: 92,
                 p: '12px',
                 borderRadius: '10px',
                 boxShadow: 'none',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'stretch',
                 color: 'inherit',
                 textDecoration: 'none',
                 ...(href || onClick ? {
@@ -37,32 +46,14 @@ export function StatCard({ label, value, icon, tone = 'default', component, href
                 ...sx,
             }}
         >
-            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ width: '100%', minWidth: 0 }}>
-                {icon && (
-                    <Box
-                        aria-hidden="true"
-                        sx={{
-                            width: 32,
-                            height: 32,
-                            flex: '0 0 32px',
-                            borderRadius: '12px',
-                            display: 'grid',
-                            placeItems: 'center',
-                            color: `${paletteKey}.main`,
-                            bgcolor: (theme) => alpha(theme.palette[paletteKey].main, theme.palette.mode === 'dark' ? 0.2 : 0.1),
-                            '& .MuiSvgIcon-root': { fontSize: 19 },
-                        }}
-                    >
-                        {icon}
-                    </Box>
-                )}
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography color="text.secondary" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.25 }} noWrap>
-                        {label}
-                    </Typography>
-                    <Typography sx={{ mt: 0.75, fontSize: 22, fontWeight: 800, lineHeight: 1.15, color: 'text.primary' }} noWrap>
-                        {value}
-                    </Typography>
+            <Stack spacing={1} sx={{ width: '100%', minWidth: 0 }}>
+                <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ minWidth: 0 }}>
+                    <Typography color="text.secondary" sx={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{label}</Typography>
+                    {icon && <Box aria-hidden="true" sx={{ width: 28, height: 28, flex: '0 0 28px', borderRadius: '8px', display: 'grid', placeItems: 'center', color: (theme) => theme.palette.mode === 'dark' ? theme.palette[paletteKey].light : theme.palette[paletteKey].main, bgcolor: (theme) => alpha(theme.palette[paletteKey].main, theme.palette.mode === 'dark' ? 0.2 : 0.1), '& .MuiSvgIcon-root': { fontSize: 17 } }}>{icon}</Box>}
+                </Stack>
+                <Box sx={{ mt: 'auto !important', pt: 0.5, minWidth: 0 }}>
+                    <Typography data-stat-value sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 750, lineHeight: 1.2, color: 'text.primary', fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>{value}</Typography>
+                    {description && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontSize: 10.5, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{description}</Typography>}
                 </Box>
             </Stack>
         </Paper>
@@ -74,15 +65,9 @@ export default function StatCardGrid({ items = [], sx = {} }) {
 
     return (
         <Box
+            data-stat-grid
             sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(2, minmax(0, 1fr))',
-                    lg: 'repeat(4, minmax(0, 1fr))',
-                },
-                gap: 1.25,
-                mb: 1.5,
+                ...statCardGridSx,
                 ...sx,
             }}
         >

@@ -11,6 +11,7 @@ import {
     TableCell,
     Tooltip,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 function actionElements(children, inheritedLabel = '') {
@@ -100,6 +101,7 @@ export function TableActionCell({ children, sx = {}, ...props }) {
 
 export default function TableRowActions({ label, children, disabled = false }) {
     const [anchorEl, setAnchorEl] = React.useState(null);
+    const menuId = React.useId();
     const closeTimer = React.useRef(null);
     const openedByHover = React.useRef(false);
     const actions = actionElements(children);
@@ -151,22 +153,21 @@ export default function TableRowActions({ label, children, disabled = false }) {
                 type="button"
                 aria-label={`Actions for ${label}`}
                 aria-haspopup="menu"
+                aria-controls={open ? menuId : undefined}
                 aria-expanded={open ? 'true' : undefined}
                 disabled={disabled || actions.length === 0}
                 onClick={toggle}
+                onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); openedByHover.current = false; cancelScheduledClose(); setAnchorEl(event.currentTarget); } }}
                 onPointerEnter={openFromHover}
                 onPointerLeave={scheduleHoverClose}
                 sx={{
-                    width: 28,
-                    minWidth: 28,
-                    height: 28,
-                    minHeight: 28,
+                    '&&': { width: { xs: 34, md: 30 }, minWidth: { xs: 34, md: 30 }, height: { xs: 34, md: 30 }, minHeight: { xs: 34, md: 30 }, border: '1px solid', borderColor: open ? 'primary.main' : 'divider', borderRadius: '7px', color: open ? 'primary.main' : 'text.secondary', bgcolor: open ? 'primary.soft' : 'background.paper', '&:hover': { bgcolor: 'primary.soft', borderColor: 'primary.main' }, '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 } },
                     p: 0,
                     border: 0,
                     borderRadius: '5px',
-                    bgcolor: open ? '#EDF7F1' : 'transparent',
+                    bgcolor: open ? 'primary.soft' : 'transparent',
                     color: open ? 'primary.main' : 'text.primary',
-                    '&:hover': { bgcolor: '#EDF7F1', color: 'primary.main' },
+                    '&:hover': { bgcolor: 'primary.soft', color: 'primary.main' },
                 }}
             >
                 <MoreVertIcon sx={{ fontSize: 18 }} />
@@ -193,18 +194,22 @@ export default function TableRowActions({ label, children, disabled = false }) {
                         onPointerEnter={cancelScheduledClose}
                         onPointerLeave={scheduleHoverClose}
                         sx={{
-                            minWidth: 176,
+                            minWidth: 196,
+                            maxWidth: 'calc(100vw - 24px)',
+                            p: 0.5,
                             border: 1,
                             borderColor: 'divider',
-                            borderRadius: '6px',
+                            borderRadius: '10px',
                             boxShadow: '0 10px 28px rgba(19, 34, 56, 0.16)',
                         }}
                     >
                         <MenuList
                             dense
+                            id={menuId}
                             autoFocusItem={!openedByHover.current}
                             aria-label={`Actions for ${label}`}
                             onKeyDown={(event) => {
+                                if (event.key === 'Tab') { close(); anchorEl?.focus(); return; }
                                 if (event.key !== 'Escape') return;
                                 event.preventDefault();
                                 close();
@@ -233,13 +238,15 @@ export default function TableRowActions({ label, children, disabled = false }) {
                                             child.props.onClick?.(event);
                                         }}
                                         sx={{
-                                            minHeight: 32,
+                                            minHeight: { xs: 40, md: 34 },
+                                            py: 0.75,
                                             px: 1,
                                             gap: 1,
-                                            borderRadius: '4px',
+                                            borderRadius: '6px',
+                                            ...(isDanger && index > 0 ? { mt: 0.5, borderTop: '1px solid', borderColor: 'divider' } : {}),
                                             color: isDanger ? 'error.main' : 'text.primary',
                                             fontSize: 12,
-                                            '&:hover': { bgcolor: isDanger ? 'error.soft' : '#EDF7F1' },
+                                            '&:hover, &.Mui-focusVisible': { bgcolor: (theme) => isDanger ? alpha(theme.palette.error.main, 0.1) : theme.palette.primary.soft },
                                         }}
                                     >
                                         {React.isValidElement(icon) && (

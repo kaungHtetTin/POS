@@ -1,4 +1,5 @@
 import React from 'react';
+import SimpleIcon from '@/Components/SimpleIcon';
 import { Box, Button, Stack, Typography } from '@mui/material';
 
 export default function DataTableFooter({ paginator, onPageChange, loading = false, label = 'records' }) {
@@ -21,6 +22,7 @@ export default function DataTableFooter({ paginator, onPageChange, loading = fal
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 1,
+                flexWrap: 'wrap',
                 mt: '-1px',
                 border: 1,
                 borderColor: 'divider',
@@ -29,26 +31,30 @@ export default function DataTableFooter({ paginator, onPageChange, loading = fal
                 color: 'text.secondary',
             }}
         >
-            <Typography component="span" sx={{ fontSize: 10, fontWeight: 650 }}>
+            <Typography component="span" sx={{ fontSize: 11, fontWeight: 600 }}>
                 {from}–{to} of {total} {label}
             </Typography>
-            <Stack direction="row" alignItems="center" spacing={0.875} aria-label="Table pagination">
+            <Stack direction="row" alignItems="center" spacing={0.5} component="nav" aria-label="Table pagination">
                 <Button
                     type="button"
                     disabled={loading || page <= 1}
+                    aria-label="Previous page"
+                    startIcon={<Box sx={{ display: 'flex', transform: 'rotate(180deg)' }}><SimpleIcon name="chevronRight" size={13} /></Box>}
                     onClick={() => onPageChange?.(page - 1)}
-                    sx={{ minWidth: 54, minHeight: 28, height: 28, border: 0, bgcolor: 'transparent', fontSize: 10, boxShadow: 'none' }}
+                    sx={{ minWidth: 54, minHeight: { xs: 34, md: 28 }, border: '1px solid', borderColor: 'divider', borderRadius: '6px', bgcolor: 'background.paper', fontSize: 10.5, boxShadow: 'none' }}
                 >
                     Prev
                 </Button>
-                <Typography component="span" sx={{ minWidth: 56, textAlign: 'center', fontSize: 10, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>
+                <Typography component="span" aria-live="polite" sx={{ px: 0.75, minWidth: 50, textAlign: 'center', fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                     {page} / {lastPage}
                 </Typography>
                 <Button
                     type="button"
                     disabled={loading || page >= lastPage}
+                    aria-label="Next page"
+                    endIcon={<SimpleIcon name="chevronRight" size={13} />}
                     onClick={() => onPageChange?.(page + 1)}
-                    sx={{ minWidth: 54, minHeight: 28, height: 28, border: 0, bgcolor: 'transparent', fontSize: 10, boxShadow: 'none' }}
+                    sx={{ minWidth: 54, minHeight: { xs: 34, md: 28 }, border: '1px solid', borderColor: 'divider', borderRadius: '6px', bgcolor: 'background.paper', fontSize: 10.5, boxShadow: 'none' }}
                 >
                     Next
                 </Button>

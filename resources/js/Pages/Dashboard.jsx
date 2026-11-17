@@ -1,3 +1,4 @@
+import StatCardGrid from '@/Components/StatCardGrid';
 import React, { useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import CsvExportButton from '@/Components/CsvExportButton';
@@ -36,16 +37,10 @@ export default function Dashboard({ auth, stats = {}, lowStockAlerts = [], expir
             {branches.length > 1 && <Stack component="form" onSubmit={(event) => { event.preventDefault(); router.get(route('dashboard'), { branch_id: branchId }, { preserveState: true, preserveScroll: true }); }} direction="row" spacing={1} alignItems="center">
                 <TextField select label="Branch scope" value={branchId} onChange={(event) => setBranchId(event.target.value)} sx={{ maxWidth: 280 }}><MenuItem value="">All accessible branches</MenuItem>{branches.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}</TextField><Button type="submit" variant="outlined">Apply</Button>
             </Stack>}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 1.25 }}>
-                {cards.map((card) => <Paper key={card.label} component={can(card.permission) ? Link : 'div'} href={can(card.permission) ? card.url : undefined} sx={{ p: 1.5, textDecoration: 'none', color: 'inherit', transition: 'border-color 160ms', '&:hover': { borderColor: 'primary.main' } }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center"><Box sx={{ width: 28, height: 28, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: 'primary.soft', color: 'primary.main' }}><SimpleIcon name={card.icon} size={20} /></Box>{can(card.permission) && <SimpleIcon name="arrowRight" size={16} />}</Stack>
-                    <Typography sx={{ mt: 1, fontSize: 24, fontWeight: 700, letterSpacing: '-1px' }}>{Number(card.value).toLocaleString()}</Typography><Typography variant="body2" fontWeight={600}>{card.label}</Typography><Typography variant="caption" color="text.secondary">{card.detail}</Typography>
-                </Paper>)}
-                <Paper sx={{ p: 1.5, bgcolor: '#173C34', color: '#FFFFFF', borderColor: '#173C34', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <Stack direction="row" spacing={1} alignItems="center"><SimpleIcon name="shieldCheck" size={19} /><Typography variant="body2" sx={{ color: '#D3E8DF' }}>Stock watch</Typography></Stack>
-                    <Box sx={{ mt: 1 }}><Typography sx={{ fontSize: 24, fontWeight: 700, letterSpacing: '-1px' }}>{lowStockAlerts.length + expiryAlerts.length}</Typography><Typography variant="body2">Items and batches needing attention</Typography><Typography variant="caption" sx={{ color: '#BAD4C8' }}>{branchLabel}</Typography></Box>
-                </Paper>
-            </Box>
+            <StatCardGrid sx={{ mb: 0 }} items={[
+                ...cards.map((card) => ({ label: card.label, value: Number(card.value).toLocaleString(), description: card.detail, icon: <SimpleIcon name={card.icon} size={17} />, component: can(card.permission) ? Link : undefined, href: can(card.permission) ? card.url : undefined })),
+                { label: 'Stock watch', value: lowStockAlerts.length + expiryAlerts.length, description: `Items and batches needing attention · ${branchLabel}`, icon: <SimpleIcon name="shieldCheck" size={17} />, tone: 'warning' },
+            ]} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 260px' }, gap: 1.5, alignItems: 'start' }}>
                 <Paper sx={{ overflow: 'hidden' }}>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ p: 1.5 }}><Box><Typography component="h2" variant="h6">Inventory attention desk</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Resolve stock risks before they interrupt your day.</Typography></Box><CsvExportButton source={currentRows} filename={riskTab === 'stock' ? 'low-stock-alerts.csv' : 'expiry-alerts.csv'} /></Stack>
