@@ -159,7 +159,7 @@ export default function ExpiryReport({ auth, branches = [], batches = [], summar
                     </Stack>
 
                     <Box sx={{ maxWidth: 520, mb: 1.5 }}>
-                        <CompactDonutChart title="Expiry Status" data={expiryChartData} colors={['#ce4444', '#b77700', '#0E684E']} height={168} />
+                        <CompactDonutChart title="Expiry Status" data={expiryChartData} colors={['#ce4444', '#b77700', '#176B5B']} height={168} />
                     </Box>
 
                     <TableContainer>

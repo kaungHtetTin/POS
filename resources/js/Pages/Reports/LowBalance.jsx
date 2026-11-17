@@ -207,7 +207,7 @@ export default function LowBalanceReport({ auth, branches = [], categories = [],
                     </Stack>
 
                     <Box sx={{ maxWidth: 520, mb: 1.5 }}>
-                        <CompactDonutChart title="Stock Status" data={stockChartData} colors={['#ce4444', '#b77700', '#0E684E']} height={168} />
+                        <CompactDonutChart title="Stock Status" data={stockChartData} colors={['#ce4444', '#b77700', '#176B5B']} height={168} />
                     </Box>
 
                     <TableContainer>

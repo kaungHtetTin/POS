@@ -53,6 +53,12 @@ class Handler extends ExceptionHandler
     {
         $response = parent::render($request, $e);
 
+        // API calls and unmatched routes can fail before session middleware runs.
+        // Keep Laravel's response when SPA props cannot safely read a session.
+        if ($request->expectsJson() || $request->is('api/*') || !$request->hasSession()) {
+            return $response;
+        }
+
         if ($response->status() === 403) {
             return Spa::render('Error', [
                 'status' => 403,

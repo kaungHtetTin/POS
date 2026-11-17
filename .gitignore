@@ -14,3 +14,9 @@ yarn-error.log
 /.idea
 /.vscode
 /docs/
+
+/.phpunit.cache
+/phpunit.xml.bak
+
+# Private hosting account metadata
+/.hostinger/

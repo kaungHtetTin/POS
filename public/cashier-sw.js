@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'cashier-shell-v1';
+const CACHE_VERSION = 'cashier-shell-v2';
 const APP_SCOPE = new URL(self.registration.scope).pathname;
 const APP_SHELL = APP_SCOPE;
 

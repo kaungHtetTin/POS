@@ -16,7 +16,7 @@ import {
     YAxis,
 } from 'recharts';
 
-const defaultColors = ['#0E684E', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
+const defaultColors = ['#176B5B', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
 
 const compactNumber = (value) => new Intl.NumberFormat('en', {
     notation: 'compact',

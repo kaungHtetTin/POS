@@ -212,7 +212,7 @@ export default function SaleRepresentative({
                 </Paper>
 
                 <Box sx={{ mb: 1.5 }}>
-                    <CompactBarChart title={__('Staff Sales Power')} data={salesPowerChartData} xKey="name" series={[{ key: 'sale_power', label: __('Sale Power'), color: '#0E684E' }]} valueFormatter={formatMoney} />
+                    <CompactBarChart title={__('Staff Sales Power')} data={salesPowerChartData} xKey="name" series={[{ key: 'sale_power', label: __('Sale Power'), color: '#176B5B' }]} valueFormatter={formatMoney} />
                 </Box>
 
                 <Paper sx={{ p: 2 }}>

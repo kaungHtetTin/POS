@@ -993,8 +993,9 @@ export default function PosIndex({
 
             <Box
                 sx={{
-                    p: { xs: 1, md: 0.75 },
-                    height: { md: 'calc(100vh - 44px)' },
+                    p: { xs: 1.25, md: 1.5 },
+                    bgcolor: 'background.default',
+                    height: { md: 'calc(100dvh - 48px)' },
                     minHeight: 0,
                     overflow: { md: 'hidden' },
                     display: { md: 'flex' },
@@ -1043,17 +1044,17 @@ export default function PosIndex({
                     sx={{
                         display: { xs: mobileStep === 'checkout' ? 'none' : 'flex', md: 'flex' },
                         flexDirection: { xs: 'column', md: 'row' },
-                        gap: { xs: 2, md: 0.75 },
+                        gap: { xs: 1.5, md: 1.5 },
                         alignItems: { xs: 'flex-start', md: 'stretch' },
                         flex: { md: 1 },
                         minHeight: 0,
                     }}
                 >
-                    <Paper sx={{ p: { xs: 1.5, md: 0.75 }, flex: { xs: '1 1 auto', md: '1 1 48%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'products' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: { xs: 1, md: 0.35 } }}>
-                            <ScanIcon color="primary" sx={{ fontSize: { md: 18 } }} />
-                            <Typography variant="subtitle2" sx={{ fontSize: { md: 12 }, fontWeight: 800 }}>
-                                {__('Product Search / Barcode Scan')}
+                    <Paper className="pos-catalog" sx={{ borderRadius: '12px', border: '1px solid', borderColor: 'divider', p: { xs: 1.5, md: 1.5 }, flex: { xs: '1 1 auto', md: '1 1 52%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'products' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5, gap: 0.5, minHeight: 38, flexWrap: 'wrap' }}>
+                            <Box sx={{ display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: '9px', bgcolor: 'primary.soft', color: 'primary.main' }}><ScanIcon sx={{ fontSize: 19 }} /></Box>
+                            <Typography variant="subtitle2" sx={{ fontSize: { md: 15 }, fontWeight: 700 }}>
+                                {__('Medicine desk')}
                             </Typography>
                             <Box sx={{ flex: 1 }} />
                             <ToggleButtonGroup
@@ -1065,10 +1066,10 @@ export default function PosIndex({
                                 }}
                                 sx={{ '& .MuiToggleButton-root': { width: 28, height: 26, p: 0.35 } }}
                             >
-                                <ToggleButton value="table">
+                                <ToggleButton value="table" aria-label="List view">
                                     <ListViewIcon fontSize="small" />
                                 </ToggleButton>
-                                <ToggleButton value="grid">
+                                <ToggleButton value="grid" aria-label="Grid view">
                                     <GridViewIcon fontSize="small" />
                                 </ToggleButton>
                             </ToggleButtonGroup>
@@ -1085,11 +1086,10 @@ export default function PosIndex({
                             sx={{
                                 display: 'grid',
                                 gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 180px' },
-                                gap: 0.5,
-                                p: 0.45,
-                                mb: 0.4,
-                                bgcolor: 'action.hover',
-                                borderRadius: 1,
+                                gap: 0.75,
+                                p: 0,
+                                mb: 1,
+                                borderRadius: '8px',
                             }}
                         >
                             <Box sx={{ minWidth: 0 }}>
@@ -1113,7 +1113,7 @@ export default function PosIndex({
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ '& .MuiInputBase-root': { height: 32, bgcolor: 'background.paper', fontSize: 11.5 } }}
+                                    sx={{ '& .MuiInputBase-root': { height: 36, bgcolor: 'background.paper', fontSize: 12 } }}
                                 />
                             </Box>
                             <Box sx={{ minWidth: 0 }}>
@@ -1123,7 +1123,7 @@ export default function PosIndex({
                                     size="small"
                                     value={String(selectedCategoryId)}
                                     onChange={(event) => setSelectedCategoryId(event.target.value)}
-                                    sx={{ '& .MuiInputBase-root': { height: 32, bgcolor: 'background.paper', fontSize: 11.5 } }}
+                                    sx={{ '& .MuiInputBase-root': { height: 36, bgcolor: 'background.paper', fontSize: 12 } }}
                                 >
                                     <MenuItem value="">{__('All categories')}</MenuItem>
                                     {catalogCategories.map((cat) => (
@@ -1140,8 +1140,9 @@ export default function PosIndex({
                             value={salePriceType}
                             onChange={(event, next) => changeSalePriceType(next)}
                             sx={{
-                                mb: 0.4,
-                                p: 0.2,
+                                mb: 1.25,
+                                borderRadius: '8px',
+                                p: 0.4,
                                 bgcolor: 'action.hover',
                                 '& .MuiToggleButton-root': {
                                     height: 28,
@@ -1151,7 +1152,7 @@ export default function PosIndex({
                                     fontWeight: 800,
                                     textTransform: 'none',
                                 },
-                                '& .Mui-selected': {
+                                '& .MuiToggleButton-root.Mui-selected': {
                                     bgcolor: 'primary.main !important',
                                     color: 'primary.contrastText !important',
                                 },
@@ -1327,8 +1328,8 @@ export default function PosIndex({
                                 sx={{
                                     mt: { xs: 0.75, md: 0.5 },
                                     display: 'grid',
-                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' },
-                                    gap: { xs: 1, md: 0.5 },
+                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+                                    gap: { xs: 1, md: 0.75 },
                                     flex: 1,
                                     minHeight: 0,
                                     overflowY: { md: 'auto' },
@@ -1357,8 +1358,11 @@ export default function PosIndex({
                                                 borderColor: outOfStock ? 'error.main' : undefined,
                                                 bgcolor: outOfStock ? 'error.lighter' : undefined,
                                                 minHeight: 116,
-                                                borderLeft: '3px solid',
-                                                borderLeftColor: outOfStock ? 'error.main' : 'success.light',
+                                                borderRadius: '10px',
+                                                border: '1px solid',
+                                                borderColor: outOfStock ? 'error.main' : 'divider',
+                                                transition: 'border-color 150ms, box-shadow 150ms',
+                                                '&:hover': { borderColor: outOfStock ? 'error.main' : 'primary.main', boxShadow: '0 3px 12px rgba(0,0,0,0.06)' },
                                             }}
                                         >
                                             <CardActionArea
@@ -1369,7 +1373,7 @@ export default function PosIndex({
                                                     flexDirection: 'column',
                                                     alignItems: 'stretch',
                                                     height: '100%',
-                                                    p: 0.65,
+                                                    p: 1.5,
                                                     textAlign: 'left',
                                                 }}
                                             >
@@ -1481,21 +1485,24 @@ export default function PosIndex({
                         </Box>
                     </Paper>
 
-                    <Paper sx={{ p: { xs: 1.25, md: 0 }, flex: { xs: '1 1 auto', md: '1 1 52%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'cart' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
+                    <Paper className="pos-order" sx={{ borderRadius: '12px', border: '1px solid', borderColor: 'divider', p: { xs: 1.5, md: 0 }, flex: { xs: '1 1 auto', md: '1 1 48%' }, width: '100%', height: { md: '100%' }, display: { xs: mobileStep === 'cart' ? 'flex' : 'none', md: 'flex' }, flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: { md: 'hidden' } }}>
                         <Stack
                             direction="row"
                             alignItems="center"
                             justifyContent="space-between"
                             sx={{
-                                p: { md: 1 },
-                                minHeight: { md: 52 },
-                                bgcolor: { md: 'primary.main' },
-                                color: { md: 'primary.contrastText' },
+                                p: { md: 1.5 },
+                                minHeight: { md: 66 },
+                                bgcolor: 'background.paper',
+                                color: 'text.primary',
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                                gap: 1,
                             }}
                         >
                             <Box>
                                 <Typography variant="h6" sx={{ fontSize: { md: 17 }, fontWeight: 800, lineHeight: 1.1 }}>
-                                    {__('Cart')}
+                                    {__('Current sale')}
                                 </Typography>
                                 <Typography variant="caption" sx={{ display: 'block', fontSize: { md: 10.5 }, color: { md: 'inherit' }, opacity: 0.82 }}>
                                     {cart.length} {cart.length === 1 ? __('item') : __('items')}
@@ -1508,7 +1515,7 @@ export default function PosIndex({
                                         variant="outlined"
                                         color="inherit"
                                         onClick={() => setCart([])}
-                                        sx={{ minHeight: { md: 30 }, px: { md: 1.25 }, fontSize: { md: 11.5 }, bgcolor: { md: 'background.paper' }, color: { md: 'error.main' }, borderColor: { md: 'rgba(255,255,255,0.55)' } }}
+                                        sx={{ minHeight: { md: 30 }, px: { md: 1.25 }, fontSize: { md: 11.5 }, bgcolor: { md: 'background.paper' }, color: { md: 'error.main' }, borderColor: 'divider' }}
                                     >
                                         {__('Clear')}
                                     </Button>
@@ -1522,10 +1529,10 @@ export default function PosIndex({
                                         minHeight: { md: 30 },
                                         px: { md: 1.25 },
                                         fontSize: { md: 11.5 },
-                                        color: { md: '#fff' },
-                                        borderColor: { md: 'rgba(255,255,255,0.5)' },
-                                        bgcolor: { md: 'rgba(255,255,255,0.08)' },
-                                        '&:hover': { bgcolor: { md: 'rgba(255,255,255,0.16)' }, borderColor: { md: '#fff' } },
+                                        color: 'text.primary',
+                                        borderColor: 'divider',
+                                        bgcolor: 'primary.soft',
+                                        '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
                                     }}
                                 >
                                     {hasActiveSession ? __('Shift Active') : __('Start Shift')}
@@ -1924,7 +1931,7 @@ export default function PosIndex({
 
                         <Divider sx={{ my: { xs: 2, md: 0 } }} />
 
-                        <Box sx={{ p: { xs: 1.5, md: 0.75 }, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', borderInline: { md: 0 } }}>
+                        <Box sx={{ p: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderInline: { md: 0 } }}>
                         <Stack spacing={0.3}>
                             <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { md: 11 } }}>
@@ -1953,10 +1960,10 @@ export default function PosIndex({
                                 </Stack>
                             )}
                             <Stack direction="row" justifyContent="space-between" alignItems="baseline">
-                                <Typography variant="subtitle2" sx={{ fontSize: { md: 12 }, fontWeight: 800 }}>
+                                <Typography variant="subtitle2" sx={{ fontSize: { md: 15 }, fontWeight: 700 }}>
                                     {__('Grand Total')}
                                 </Typography>
-                                <Typography variant="h6" sx={{ fontSize: { md: 17 }, fontWeight: 800, color: 'primary.main', lineHeight: 1 }}>
+                                <Typography variant="h6" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, color: (theme) => theme.palette.mode === 'dark' ? '#80D5BD' : 'primary.main', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
                                     {currencySymbol}{totals.grandTotal.toFixed(2)}
                                 </Typography>
                             </Stack>
@@ -1965,7 +1972,7 @@ export default function PosIndex({
 
                         <Divider sx={{ my: { xs: 2, md: 0 } }} />
 
-                        <Stack spacing={0.5} sx={{ p: { xs: 0, md: 0.75 } }}>
+                        <Stack spacing={0.75} sx={{ p: { xs: 0, md: 1.5 }, bgcolor: 'background.paper', '& > .MuiButton-contained': { minHeight: 42, borderRadius: '8px', fontSize: 13 } }}>
                             {!hasActiveSession && (
                                 <Alert severity="warning">
                                     {__('Start your shift before completing sales.')}

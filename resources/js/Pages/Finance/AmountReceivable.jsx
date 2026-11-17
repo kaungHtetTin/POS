@@ -296,7 +296,7 @@ export default function AmountReceivable({
                         receivable: Number(summary.receivable_amount || 0),
                     }]} xKey="name" layout="horizontal" series={[
                         { key: 'total', label: __('Original Sales'), color: '#2874bc' },
-                        { key: 'collected', label: __('Collected'), color: '#0E684E' },
+                        { key: 'collected', label: __('Collected'), color: '#176B5B' },
                         { key: 'receivable', label: __('Receivable'), color: '#b77700' },
                     ]} valueFormatter={(value) => `$${money(value)}`} height={168} />
                 </Box>

@@ -151,7 +151,7 @@ function PosLayoutShell({ children, header = 'POS' }) {
                 position="fixed"
                 sx={{
                     color: '#FFFFFF',
-                    bgcolor: '#0C4A3A',
+                    bgcolor: '#173C34',
                     boxShadow: 'none',
                     borderBottom: '1px solid',
                     borderColor: 'rgba(255,255,255,0.14)',
@@ -176,9 +176,9 @@ function PosLayoutShell({ children, header = 'POS' }) {
                                     textTransform: 'none',
                                     fontWeight: item.active ? 700 : 500,
                                     borderRadius: 1,
-                                    color: item.active ? '#0C4A3A' : 'rgba(255,255,255,0.78)',
-                                    bgcolor: item.active ? '#DDF5E9' : 'transparent',
-                                    '&:hover': { bgcolor: item.active ? '#DDF5E9' : 'rgba(255,255,255,0.10)', color: item.active ? '#0C4A3A' : '#FFFFFF' },
+                                    color: item.active ? '#121B32' : 'rgba(255,255,255,0.78)',
+                                    bgcolor: item.active ? '#E0E7FF' : 'transparent',
+                                    '&:hover': { bgcolor: item.active ? '#E0E7FF' : 'rgba(255,255,255,0.10)', color: item.active ? '#121B32' : '#FFFFFF' },
                                     '& .MuiButton-startIcon': {
                                         mr: 0.75,
                                         color: 'inherit',

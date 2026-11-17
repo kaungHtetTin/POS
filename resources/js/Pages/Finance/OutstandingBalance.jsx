@@ -284,7 +284,7 @@ export default function OutstandingBalance({
                         overdue: Number(summary.overdue_amount || 0),
                     }]} xKey="name" layout="horizontal" series={[
                         { key: 'total', label: __('Original Total'), color: '#2874bc' },
-                        { key: 'paid', label: __('Paid'), color: '#0E684E' },
+                        { key: 'paid', label: __('Paid'), color: '#176B5B' },
                         { key: 'due', label: __('Outstanding'), color: '#b77700' },
                         { key: 'overdue', label: __('Overdue'), color: '#ce4444' },
                     ]} valueFormatter={(value) => `$${money(value)}`} height={168} />

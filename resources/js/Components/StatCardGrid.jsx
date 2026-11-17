@@ -21,9 +21,9 @@ export function StatCard({ label, value, icon, tone = 'default', component, href
             variant="outlined"
             sx={{
                 minWidth: 0,
-                minHeight: 62,
-                p: '10px',
-                borderRadius: '6px',
+                minHeight: 76,
+                p: '12px',
+                borderRadius: '10px',
                 boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
@@ -42,10 +42,10 @@ export function StatCard({ label, value, icon, tone = 'default', component, href
                     <Box
                         aria-hidden="true"
                         sx={{
-                            width: 34,
-                            height: 34,
-                            flex: '0 0 34px',
-                            borderRadius: '6px',
+                            width: 32,
+                            height: 32,
+                            flex: '0 0 32px',
+                            borderRadius: '12px',
                             display: 'grid',
                             placeItems: 'center',
                             color: `${paletteKey}.main`,
@@ -57,10 +57,10 @@ export function StatCard({ label, value, icon, tone = 'default', component, href
                     </Box>
                 )}
                 <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography color="text.secondary" sx={{ fontSize: 11, fontWeight: 650, lineHeight: 1.25 }} noWrap>
+                    <Typography color="text.secondary" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.25 }} noWrap>
                         {label}
                     </Typography>
-                    <Typography sx={{ mt: 0.25, fontSize: 18, fontWeight: 800, lineHeight: 1.15, color: 'text.primary' }} noWrap>
+                    <Typography sx={{ mt: 0.75, fontSize: 22, fontWeight: 800, lineHeight: 1.15, color: 'text.primary' }} noWrap>
                         {value}
                     </Typography>
                 </Box>
@@ -79,9 +79,9 @@ export default function StatCardGrid({ items = [], sx = {} }) {
                 gridTemplateColumns: {
                     xs: '1fr',
                     sm: 'repeat(2, minmax(0, 1fr))',
-                    md: 'repeat(4, minmax(0, 1fr))',
+                    lg: 'repeat(4, minmax(0, 1fr))',
                 },
-                gap: 1,
+                gap: 1.25,
                 mb: 1.5,
                 ...sx,
             }}

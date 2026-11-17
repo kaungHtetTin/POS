@@ -1,6 +1,12 @@
 import React from 'react';
 
 const icons = {
+    panelCollapse: [['rect', { x: 3, y: 4, width: 18, height: 16, rx: 3 }], ['path', { d: 'M9 4v16m7-12-4 4 4 4' }]],
+    panelExpand: [['rect', { x: 3, y: 4, width: 18, height: 16, rx: 3 }], ['path', { d: 'M9 4v16m4-12 4 4-4 4' }]],
+    chevronRight: [['path', { d: 'm9 6 6 6-6 6' }]],
+    search: [['circle', { cx: 10.5, cy: 10.5, r: 6.5 }], ['path', { d: 'm16 16 5 5' }]],
+    plus: [['path', { d: 'M12 5v14M5 12h14' }]],
+    arrowRight: [['path', { d: 'M5 12h14m-6-6 6 6-6 6' }]],
     grid: [
         ['rect', { x: 3, y: 3, width: 7, height: 7, rx: 1 }],
         ['rect', { x: 14, y: 3, width: 7, height: 7, rx: 1 }],

@@ -14,8 +14,9 @@ export default forwardRef(function TextInput({ type = 'text', className = '', is
             <input
                 {...props}
                 type={type}
+                data-standard-input="true"
                 className={
-                    'min-h-[34px] border-[#DDE5E1] bg-white px-[9px] py-[6px] text-[13px] text-[#132238] rounded-[4px] shadow-none ' +
+                    'min-h-[34px] border-[#DDE5E1] bg-white px-[9px] py-[6px] text-[13px] text-[#132238] rounded-[6px] shadow-none ' +
                     className
                 }
                 ref={input}

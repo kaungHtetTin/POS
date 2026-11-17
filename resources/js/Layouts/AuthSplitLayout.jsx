@@ -1,210 +1,43 @@
 import React from 'react';
-import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link, usePage } from '@/spa';
-import {
-    Box,
-    Typography,
-    Stack,
-    IconButton,
-    useTheme,
-    useMediaQuery,
-} from '@mui/material';
-import {
-    ArrowBack as BackIcon,
-    ShoppingCart as POSIcon,
-    Inventory as InventoryIcon,
-    VerifiedUser as SecurityIcon,
-} from '@mui/icons-material';
+import ApplicationLogo from '@/Components/ApplicationLogo';
+import SimpleIcon from '@/Components/SimpleIcon';
+import { Box, Stack, Typography } from '@mui/material';
 
-export default function AuthSplitLayout({ children, title, subtitle, topBarContent }) {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+export default function AuthSplitLayout({ children, title, subtitle, topBarContent, compact = false }) {
     const { settings = {}, ziggy = {} } = usePage().props;
     const pharmacyName = settings.invoice?.pharmacy_name || 'Pharmacy POS';
-    const appBase = ziggy?.base || window.laravel_base || '';
-    const withBase = (path) => `${appBase}${path.startsWith('/') ? path : `/${path}`}`.replace(/\/{2,}/g, '/');
-    const logoPath = settings.invoice?.logo_path ? withBase(`/storage/${String(settings.invoice.logo_path).replace(/^\/+/, '')}`) : null;
-    const LogoBadge = ({ size = 44 }) => (
-        <Box
-            sx={{
-                width: size,
-                height: size,
-                borderRadius: 2,
-                p: 0.75,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#0C4A3A',
-                background: '#FFFFFF',
-                border: '1px solid rgba(255,255,255,0.38)',
-            }}
-        >
-            <Box
-                sx={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: 1.25,
-                    bgcolor: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                }}
-            >
-                {logoPath ? (
-                    <Box component="img" src={logoPath} alt={pharmacyName} sx={{ width: '80%', height: '80%', objectFit: 'contain' }} />
-                ) : (
-                    <ApplicationLogo sx={{ width: '74%', height: '74%', color: '#0C4A3A' }} />
-                )}
-            </Box>
-        </Box>
-    );
-
-    // Left panel feature items adapted for Pharmacy POS
-    const features = [
-        { icon: <POSIcon />, title: 'Fast Checkout', desc: 'Process sales in seconds with barcode support' },
-        { icon: <InventoryIcon />, title: 'Inventory Control', desc: 'FEFO-based tracking and expiry alerts' },
-        { icon: <SecurityIcon />, title: 'Role-Based Access', desc: 'Control modules and actions with permission-based security' },
-    ];
-
-    return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-            {/* Left Panel - Branding (desktop only) */}
-            {!isMobile && (
-                <Box
-                    sx={{
-                        width: '45%',
-                        maxWidth: 560,
-                        color: '#FFFFFF',
-                        bgcolor: '#0C4A3A',
-                        borderRight: '1px solid',
-                        borderColor: 'rgba(255,255,255,0.14)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        px: 6,
-                        py: 4,
-                        position: 'relative',
-                        overflow: 'hidden',
-                    }}
-                >
-                    {/* Logo + Brand */}
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 6, position: 'relative', zIndex: 1 }}>
-                        <Link href="/" style={{ display: 'flex' }}>
-                            <LogoBadge size={48} />
-                        </Link>
-                        <Typography variant="h6" fontWeight={800}>
-                            {pharmacyName}
-                        </Typography>
-                    </Stack>
-
-                    <Box sx={{ position: 'relative', zIndex: 1 }}>
-                        <Typography variant="h4" fontWeight={800} sx={{ mb: 1.5, lineHeight: 1.2 }}>
-                            Manage Your Pharmacy{'\n'}With Confidence
-                        </Typography>
-                        <Typography variant="body1" sx={{ mb: 5, lineHeight: 1.7, color: 'rgba(255,255,255,0.72)' }}>
-                            Streamline sales, track every batch, and run operations with secure role-based access control.
-                        </Typography>
-
-                        {/* Feature list */}
-                        <Stack spacing={3}>
-                            {features.map((f, i) => (
-                                <Stack key={i} direction="row" spacing={2} alignItems="flex-start">
-                                    <Box
-                                        sx={{
-                                            p: 1,
-                                            borderRadius: 1.5,
-                                            bgcolor: 'rgba(255,255,255,0.12)',
-                                            color: '#FFFFFF',
-                                            display: 'flex',
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        {React.cloneElement(f.icon, { fontSize: 'small' })}
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700}>
-                                            {f.title}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
-                                            {f.desc}
-                                        </Typography>
-                                    </Box>
-                                </Stack>
-                            ))}
-                        </Stack>
-                    </Box>
-                </Box>
-            )}
-
-            {/* Right Panel - Form Container */}
-            <Box
-                sx={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    bgcolor: 'background.default',
-                }}
-            >
-                {/* Top bar from sample */}
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        px: { xs: 2, sm: 3 },
-                        py: 1.5,
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                    }}
-                >
-                    <IconButton 
-                        component={Link} 
-                        href="/" 
-                        size="small" 
-                        sx={{ color: 'text.secondary' }}
-                    >
-                        <BackIcon fontSize="small" />
-                    </IconButton>
-
-                    {isMobile && (
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                            <LogoBadge size={30} />
-                            <Typography variant="subtitle2" fontWeight={700} color="text.primary">
-                                {pharmacyName}
-                            </Typography>
-                        </Stack>
-                    )}
-
-                    <Box>
-                        {topBarContent}
-                    </Box>
-                </Box>
-
-                {/* Form area */}
-                <Box
-                    sx={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        px: { xs: 3, sm: 4 },
-                        py: 4,
-                    }}
-                >
-                    <Box sx={{ width: '100%', maxWidth: 420, p: { xs: 2.5, sm: 3.5 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 3, boxShadow: '0 18px 50px rgba(12,74,58,0.12)' }}>
-                        {/* Heading from sample style */}
-                        <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
-                            {title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3.5 }}>
-                            {subtitle}
-                        </Typography>
-
-                        {children}
-                    </Box>
+    const base = ziggy.base || window.laravel_base || '';
+    const logo = settings.invoice?.logo_path ? `${base}/storage/${String(settings.invoice.logo_path).replace(/^\/+/, '')}` : null;
+    return <Box sx={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.05fr 1fr' }, bgcolor: 'background.paper' }}>
+        <Stack sx={{ p: compact ? { xs: 2, md: 3 } : { xs: 3, md: 5 }, minWidth: 0 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+                <Stack component={Link} href={route('login')} direction="row" spacing={1.25} alignItems="center" sx={{ textDecoration: 'none', color: 'text.primary' }}>
+                    <Box sx={{ width: compact ? 32 : 40, height: compact ? 32 : 40, borderRadius: compact ? '9px' : '13px', bgcolor: 'primary.main', color: 'primary.contrastText', display: 'grid', placeItems: 'center' }}>{logo ? <Box component="img" src={logo} alt={pharmacyName} sx={{ width: 30, height: 30, objectFit: 'contain' }} /> : <ApplicationLogo sx={{ width: 25, height: 25 }} />}</Box><Typography fontWeight={800}>{pharmacyName}</Typography>
+                </Stack>{topBarContent}
+            </Stack>
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', py: compact ? 3 : 8 }}>
+                <Box sx={{ width: '100%', maxWidth: compact ? 336 : 400 }}>
+                    <Typography sx={{ fontSize: 11, letterSpacing: '0.15em', fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', mb: compact ? 1 : 2 }}>Your pharmacy workspace</Typography>
+                    <Typography component="h1" sx={{ fontSize: compact ? { xs: 24, md: 27 } : { xs: 30, md: 36 }, lineHeight: 1.2, fontWeight: 700, letterSpacing: '-1px', mb: compact ? 0.75 : 1.5 }}>{title}</Typography>
+                    <Typography color="text.secondary" sx={{ mb: compact ? 2 : 4, fontSize: compact ? 12 : undefined, lineHeight: 1.5 }}>{subtitle}</Typography>
+                    {children}
                 </Box>
             </Box>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ color: 'text.secondary' }}><SimpleIcon name="shieldCheck" size={16} /><Typography variant="caption">Secure access for your pharmacy team</Typography></Stack>
+        </Stack>
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, m: compact ? 1.5 : 2, p: compact ? { md: 3, lg: 4 } : { md: 5, lg: 7 }, borderRadius: compact ? '16px' : '28px', bgcolor: '#EAF1E9', color: '#243B30', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+            <Typography sx={{ fontSize: 12, letterSpacing: '0.12em', fontWeight: 700, color: '#527362', mb: 3 }}>LESS FRICTION. MORE FOCUS.</Typography>
+            <Typography sx={{ fontSize: compact ? { md: 32, lg: 40 } : { md: 40, lg: 54 }, lineHeight: 1.08, letterSpacing: '-2px', fontWeight: 600, maxWidth: 490 }}>A better rhythm<br />for your pharmacy.</Typography>
+            <Typography sx={{ mt: 3, maxWidth: 400, color: '#597363', lineHeight: 1.8 }}>From the first delivery to the last receipt. Keep your medicines, stock and team working together.</Typography>
+            <Box sx={{ mt: 5, position: 'relative', py: 2 }}>
+                <Box sx={{ position: 'absolute', left: 25, top: 36, bottom: 36, width: 1, borderLeft: '1px dashed #ABC5B2' }} />
+                <Stack spacing={2}>{[
+                    ['01', 'Receive with confidence', 'Batch details and expiry tracking', 'truck'],
+                    ['02', 'Serve with clarity', 'Barcode checkout and medicine units', 'pill'],
+                    ['03', 'Close with control', 'Cash sessions and business reports', 'chart'],
+                ].map(([number, heading, detail, icon]) => <Stack key={number} direction="row" spacing={2} alignItems="center" sx={{ position: 'relative' }}><Box sx={{ width: 50, height: 50, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', bgcolor: '#EAF1E9', border: '1px solid #BBD0BF', fontSize: 12, fontWeight: 700 }}>{number}</Box><Stack direction="row" alignItems="center" spacing={2} sx={{ p: 2, bgcolor: '#FFFFFF', borderRadius: '16px', flex: 1 }}><Box sx={{ color: '#176B5B' }}><SimpleIcon name={icon} size={24} /></Box><Box><Typography sx={{ fontSize: 14, fontWeight: 700 }}>{heading}</Typography><Typography sx={{ fontSize: 12, color: '#728078', mt: 0.5 }}>{detail}</Typography></Box></Stack></Stack>)}</Stack>
+            </Box>
         </Box>
-    );
+    </Box>;
 }

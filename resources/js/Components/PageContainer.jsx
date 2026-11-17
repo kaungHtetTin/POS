@@ -5,7 +5,7 @@ export const pageContainerSx = {
     width: '100%',
     maxWidth: 'none',
     mx: 'auto',
-    p: { xs: 1, md: '14px' },
+    p: { xs: 1.25, md: '14px' },
     boxSizing: 'border-box',
 };
 

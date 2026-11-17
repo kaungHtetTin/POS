@@ -157,10 +157,10 @@ export default function CashSessionsReport({ auth, branches = [], filters = {}, 
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' }, gap: 1.25, mb: 1.5 }}>
                         <CompactLineChart title="Daily Cash Movement" data={dateTrend} xKey="session_date" series={[
-                            { key: 'net_cash_sales_total', label: 'Net Cash', color: '#0E684E' },
+                            { key: 'net_cash_sales_total', label: 'Net Cash', color: '#176B5B' },
                             { key: 'difference_total', label: 'Difference', color: '#b77700' },
                         ]} valueFormatter={(value) => money(value)} />
-                        <CompactBarChart title="Cash by Branch" data={branchTrend} xKey="branch_name" series={[{ key: 'net_cash_sales_total', label: 'Net Cash', color: '#0E684E' }]} valueFormatter={(value) => money(value)} />
+                        <CompactBarChart title="Cash by Branch" data={branchTrend} xKey="branch_name" series={[{ key: 'net_cash_sales_total', label: 'Net Cash', color: '#176B5B' }]} valueFormatter={(value) => money(value)} />
                     </Box>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>

@@ -31,8 +31,12 @@ class DashboardController extends Controller
         }
 
         // Determine which branch to filter by (default to all accessible if not specified)
-        $filterBranchId = $request->input('branch_id');
-        $targetBranchIds = $filterBranchId ? [$filterBranchId] : $accessibleBranchIds;
+        $validated = $request->validate(['branch_id' => ['nullable', 'string']]);
+        $filterBranchId = $validated['branch_id'] ?? null;
+        if ($filterBranchId !== null) {
+            abort_unless($accessibleBranchIds->contains(fn ($id) => (string) $id === $filterBranchId), 403);
+        }
+        $targetBranchIds = $filterBranchId !== null ? [$filterBranchId] : $accessibleBranchIds;
 
         // Statistics for widgets
         $totalProducts = Product::count();

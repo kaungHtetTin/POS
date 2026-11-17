@@ -259,12 +259,12 @@ export default function SalesByCustomersReport({
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 1.25, mb: 1.5 }}>
                     <CompactLineChart title={__('Sales Trend')} data={trendData} xKey="period" xFormatter={formatShortDate} series={[
-                        { key: 'total', label: __('Sales Amount'), color: '#0E684E' },
+                        { key: 'total', label: __('Sales Amount'), color: '#176B5B' },
                         { key: 'customers', label: __('Customers'), color: '#2874bc' },
                     ]} valueFormatter={(value, name) => name === __('Sales Amount') ? `$${money(value)}` : value} />
 
                     <Box sx={{ display: 'grid', gap: 1 }}>
-                        <CompactBarChart title={__('Top Product Sale Rate')} subtitle={`${topProductData.length} ${__('products')}`} data={topProductData} xKey="name" series={[{ key: 'total', label: __('Sale Amount'), color: '#0E684E' }]} valueFormatter={(value) => `$${money(value)}`} height={160} />
+                        <CompactBarChart title={__('Top Product Sale Rate')} subtitle={`${topProductData.length} ${__('products')}`} data={topProductData} xKey="name" series={[{ key: 'total', label: __('Sale Amount'), color: '#176B5B' }]} valueFormatter={(value) => `$${money(value)}`} height={160} />
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 190 }}>
                             <Table size="small" stickyHeader>
                                 <TableHead>
@@ -306,7 +306,7 @@ export default function SalesByCustomersReport({
 
                 <Box sx={{ mb: 1.5 }}>
                     <CompactBarChart title={__('Top Customers by Sale Amount')} subtitle={`${__('Known customer sales')}: ${percent(summary.known_customer_grand_total, summary.grand_total)}`} data={topCustomerData} xKey="name" series={[
-                        { key: 'total', label: __('Sale Amount'), color: '#0E684E' },
+                        { key: 'total', label: __('Sale Amount'), color: '#176B5B' },
                         { key: 'net', label: __('Net After Returns'), color: '#2874bc' },
                     ]} valueFormatter={(value) => `$${money(value)}`} />
                 </Box>
