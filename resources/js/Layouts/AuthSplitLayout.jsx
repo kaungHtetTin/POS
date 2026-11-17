@@ -27,16 +27,18 @@ export default function AuthSplitLayout({ children, title, subtitle, topBarConte
             <Stack direction="row" spacing={1} alignItems="center" sx={{ color: 'text.secondary' }}><SimpleIcon name="shieldCheck" size={16} /><Typography variant="caption">Secure access for your pharmacy team</Typography></Stack>
         </Stack>
         <Box sx={{ display: { xs: 'none', md: 'flex' }, m: compact ? 1.5 : 2, p: compact ? { md: 3, lg: 4 } : { md: 5, lg: 7 }, borderRadius: compact ? '16px' : '28px', bgcolor: '#EAF1E9', color: '#243B30', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
-            <Typography sx={{ fontSize: 12, letterSpacing: '0.12em', fontWeight: 700, color: '#527362', mb: 3 }}>LESS FRICTION. MORE FOCUS.</Typography>
-            <Typography sx={{ fontSize: compact ? { md: 32, lg: 40 } : { md: 40, lg: 54 }, lineHeight: 1.08, letterSpacing: '-2px', fontWeight: 600, maxWidth: 490 }}>A better rhythm<br />for your pharmacy.</Typography>
-            <Typography sx={{ mt: 3, maxWidth: 400, color: '#597363', lineHeight: 1.8 }}>From the first delivery to the last receipt. Keep your medicines, stock and team working together.</Typography>
-            <Box sx={{ mt: 5, position: 'relative', py: 2 }}>
-                <Box sx={{ position: 'absolute', left: 25, top: 36, bottom: 36, width: 1, borderLeft: '1px dashed #ABC5B2' }} />
-                <Stack spacing={2}>{[
+            <Box data-login-description sx={{ width: '100%', maxWidth: compact ? 390 : undefined, mx: compact ? 'auto' : 0 }}>
+            <Typography sx={{ fontSize: compact ? 10 : 12, letterSpacing: '0.12em', fontWeight: 700, color: '#527362', mb: compact ? 1.25 : 3 }}>LESS FRICTION. MORE FOCUS.</Typography>
+            <Typography sx={{ fontSize: compact ? { md: 26, lg: 30 } : { md: 40, lg: 54 }, lineHeight: compact ? 1.18 : 1.08, letterSpacing: compact ? '-0.6px' : '-2px', fontWeight: 600, maxWidth: 490 }}>A better rhythm<br />for your pharmacy.</Typography>
+            <Typography sx={{ mt: compact ? 1.5 : 3, maxWidth: 400, color: '#597363', fontSize: compact ? 12 : undefined, lineHeight: compact ? 1.5 : 1.8 }}>From the first delivery to the last receipt. Keep your medicines, stock and team working together.</Typography>
+            <Box sx={{ mt: compact ? 2.5 : 5, position: 'relative', py: compact ? 0 : 2 }}>
+                <Box sx={{ position: 'absolute', left: compact ? 14 : 25, top: compact ? 20 : 36, bottom: compact ? 20 : 36, width: 1, borderLeft: '1px dashed #ABC5B2' }} />
+                <Stack spacing={compact ? 1 : 2}>{[
                     ['01', 'Receive with confidence', 'Batch details and expiry tracking', 'truck'],
                     ['02', 'Serve with clarity', 'Barcode checkout and medicine units', 'pill'],
                     ['03', 'Close with control', 'Cash sessions and business reports', 'chart'],
-                ].map(([number, heading, detail, icon]) => <Stack key={number} direction="row" spacing={2} alignItems="center" sx={{ position: 'relative' }}><Box sx={{ width: 50, height: 50, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', bgcolor: '#EAF1E9', border: '1px solid #BBD0BF', fontSize: 12, fontWeight: 700 }}>{number}</Box><Stack direction="row" alignItems="center" spacing={2} sx={{ p: 2, bgcolor: '#FFFFFF', borderRadius: '16px', flex: 1 }}><Box sx={{ color: '#176B5B' }}><SimpleIcon name={icon} size={24} /></Box><Box><Typography sx={{ fontSize: 14, fontWeight: 700 }}>{heading}</Typography><Typography sx={{ fontSize: 12, color: '#728078', mt: 0.5 }}>{detail}</Typography></Box></Stack></Stack>)}</Stack>
+                ].map(([number, heading, detail, icon]) => <Stack key={number} direction="row" spacing={compact ? 1 : 2} alignItems="center" sx={{ position: 'relative' }}><Box sx={{ width: compact ? 28 : 50, height: compact ? 28 : 50, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', bgcolor: '#EAF1E9', border: '1px solid #BBD0BF', fontSize: compact ? 10 : 12, fontWeight: 700 }}>{number}</Box><Stack direction="row" alignItems="center" spacing={compact ? 1 : 2} sx={{ p: compact ? 1 : 2, bgcolor: '#FFFFFF', borderRadius: compact ? '8px' : '16px', flex: 1, minWidth: 0 }}><Box sx={{ color: '#176B5B' }}><SimpleIcon name={icon} size={compact ? 18 : 24} /></Box><Box><Typography sx={{ fontSize: compact ? 12 : 14, lineHeight: 1.4, fontWeight: 700 }}>{heading}</Typography><Typography sx={{ fontSize: compact ? 10.5 : 12, color: '#728078', lineHeight: 1.4, mt: compact ? 0.25 : 0.5 }}>{detail}</Typography></Box></Stack></Stack>)}</Stack>
+            </Box>
             </Box>
         </Box>
     </Box>;
