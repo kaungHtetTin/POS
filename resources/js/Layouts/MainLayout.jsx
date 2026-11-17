@@ -134,6 +134,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
     const [desktopCollapsed, setDesktopCollapsed] = useState(() => window.localStorage.getItem('mkpos.sidebar.collapsed') === '1');
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [branchMenuAnchor, setBranchMenuAnchor] = useState(null);
+    const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
 
     const accessibleBranches = auth.user?.accessible_branches || [];
     const currentBranchId = auth.user?.current_branch_id || '';
@@ -557,8 +558,11 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         </Tooltip>
                         </Stack>
                         <Box sx={{ display: { xs: 'none', md: 'block' }, height: 24, borderLeft: '1px solid', borderColor: 'divider' }} />
-                        <Tooltip title={`${auth.user?.name || ''} · ${__('Profile')}`}>
-                            <Avatar component={Link} href={route('profile.edit')} aria-label={__('Open profile')} src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null} sx={{ display: { xs: 'none', md: 'flex' }, width: 30, height: 30, bgcolor: 'primary.soft', color: 'primary.main', border: '1px solid', borderColor: 'divider', borderRadius: '10px', fontSize: 12, fontWeight: 800, textDecoration: 'none', '&:hover': { borderColor: 'primary.main' } }}>{auth.user?.name?.charAt(0).toUpperCase()}</Avatar>
+                        <Tooltip title={__('Account')}>
+                            <IconButton className="mkpos-bare-action" aria-label={__('Open account menu')} aria-haspopup="menu" aria-controls={profileMenuAnchor ? 'appbar-account-menu' : undefined} aria-expanded={Boolean(profileMenuAnchor)} onClick={(event) => setProfileMenuAnchor(event.currentTarget)} sx={{ '&&': { width: 'auto', minWidth: 40, height: { xs: 36, md: 32 }, px: 0.5, gap: 0.4, border: '1px solid', borderColor: profileMenuAnchor ? 'primary.main' : 'divider', borderRadius: '9px', bgcolor: 'background.paper', '&:hover': { bgcolor: 'primary.soft' } } }}>
+                                <Avatar src={auth.user?.image_path ? storageUrl(auth.user.image_path) : undefined} sx={{ width: 24, height: 24, borderRadius: '6px', bgcolor: 'primary.soft', color: 'text.primary', fontSize: 11, fontWeight: 700 }}>{auth.user?.name?.charAt(0).toUpperCase()}</Avatar>
+                                <Box sx={{ display: 'flex', transform: profileMenuAnchor ? 'rotate(-90deg)' : 'rotate(90deg)', transition: 'transform 150ms' }}><SimpleIcon name="chevronRight" size={12} /></Box>
+                            </IconButton>
                         </Tooltip>
                     </Box>
                 </Toolbar>
@@ -620,6 +624,13 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                 {children}
             </Box>
 
+            <Menu id="appbar-account-menu" anchorEl={profileMenuAnchor} open={Boolean(profileMenuAnchor)} onClose={() => setProfileMenuAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }} MenuListProps={{ 'aria-label': __('Account menu') }} slotProps={{ paper: { sx: { mt: 1, p: 0.5, width: 260, maxWidth: 'calc(100vw - 24px)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.14)', '& .MuiMenuItem-root': { borderRadius: '7px', minHeight: 38, gap: 1, fontSize: 12 }, '& .MuiListItemIcon-root': { minWidth: '24px', color: 'inherit' } } } }}>
+                <Box component="li" role="presentation" sx={{ px: 1.25, py: 1 }}><Typography sx={{ fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>{auth.user?.name}</Typography><Typography sx={{ fontSize: 11, color: 'text.secondary', overflowWrap: 'anywhere' }}>{auth.user?.email}</Typography>{auth.user?.roles?.length > 0 && <Typography sx={{ mt: 0.5, fontSize: 10, color: 'text.secondary' }}>{auth.user.roles.map((role) => __(role)).join(', ')}</Typography>}</Box>
+                <Divider sx={{ my: 0.5 }} />
+                {[{ ...menuItems.profile, text: 'My profile' }, menuItems.dashboard, menuItems.settings, menuItems.manual].filter(canSee).map((item) => <MenuItem key={item.href} component={Link} href={item.href} onClick={() => setProfileMenuAnchor(null)}><ListItemIcon><SimpleIcon name={item.icon} size={16} /></ListItemIcon>{__(item.text)}</MenuItem>)}
+                <Divider sx={{ my: 0.5 }} />
+                <MenuItem onClick={() => { setProfileMenuAnchor(null); router.post(route('logout')); }} sx={{ color: 'error.main' }}><ListItemIcon><SimpleIcon name="logout" size={16} /></ListItemIcon>{__('Log out')}</MenuItem>
+            </Menu>
             <Menu anchorEl={navigationMenu?.anchor || null} open={Boolean(navigationMenu)} onClose={() => setNavigationMenu(null)} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { ml: 1, minWidth: 220, maxHeight: '70vh', borderRadius: '10px' } } }}>
                 <ListSubheader component="li" disableSticky sx={{ px: 1.5, lineHeight: '32px', fontSize: 10, fontWeight: 700, color: 'text.secondary', bgcolor: 'transparent', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{__(navigationMenu?.group.label || '')}</ListSubheader>
                 {navigationMenu?.group.visibleItems.map((item) => <MenuItem key={item.key} component={Link} href={item.href} selected={isActiveRoute(item.routePattern, item.href)} onClick={closeNavigation} sx={{ gap: 1, minHeight: 36, fontSize: 12 }}><ListItemIcon sx={{ minWidth: '24px !important', color: 'inherit' }}><SimpleIcon name={item.icon} size={16} /></ListItemIcon>{__(item.text)}</MenuItem>)}
