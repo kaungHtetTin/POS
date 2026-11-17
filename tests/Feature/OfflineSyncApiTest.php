@@ -205,7 +205,7 @@ class OfflineSyncApiTest extends TestCase
             ->assertContent('null');
     }
 
-    /** @dataProvider purchaseEndpoints */
+    #[\PHPUnit\Framework\Attributes\DataProvider('purchaseEndpoints')]
     public function test_purchase_without_credit_limit_preserves_balances(string $endpoint): void
     {
         $branch = Branch::create([

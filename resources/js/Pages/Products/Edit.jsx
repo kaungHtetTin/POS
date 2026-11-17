@@ -1,3 +1,4 @@
+import ViewportPanel from '@/Components/ViewportPanel';
 import React from 'react';
 import { automaticPrice } from '@/Utils/automaticPricing';
 import MainLayout from '@/Layouts/MainLayout';
@@ -183,9 +184,10 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
             <Head title={isCreating ? 'Add New Medicine' : `Edit ${medicine.name}`} />
             <AppBarBack href={route('products.index')} label="Back to Medicines" />
 
-            <Box sx={{ maxWidth: 1440, mx: 'auto' }}>
+            <ViewportPanel sx={{ maxWidth: 1440, mx: 'auto' }}>
                 <Paper
                     sx={{
+                        height: '100%', boxSizing: 'border-box',
                         p: { xs: 1.5, md: 1.25 },
                         '& .MuiInputBase-root:not(.MuiInputBase-multiline)': { minHeight: 36, fontSize: 12.5 },
                         '& .MuiInputLabel-root': { fontSize: 12 },
@@ -193,7 +195,8 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                         '& .MuiButton-root': { minHeight: 32, fontSize: 11.5 },
                     }}
                 >
-                    <form onSubmit={submit}>
+                    <Box component="form" onSubmit={submit} sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 0.5 }}>
                         {errors.pricing && <Alert severity="error" sx={{ mb: 1, py: 0 }}>{errors.pricing}</Alert>}
                         <Stack spacing={1.5}>
                             <Box>
@@ -579,15 +582,16 @@ export default function ProductEdit({ auth, product = null, categories, taxes, u
                             </Box>
                         </Stack>
 
-                        <Stack direction="row" spacing={1} sx={{ mt: 2 }} justifyContent="flex-end">
+                        </Box>
+                        <Stack direction="row" spacing={1} sx={{ pt: 1, pb: 0.5, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider' }} justifyContent="flex-end">
                             <Button variant="outlined" onClick={() => router.visit(route('products.index'))}>Cancel</Button>
                             <Button type="submit" variant="contained" startIcon={<SaveIcon />} disabled={processing}>
                                 {isCreating ? 'Create Medicine' : 'Save Changes'}
                             </Button>
                         </Stack>
-                    </form>
+                    </Box>
                 </Paper>
-            </Box>
+            </ViewportPanel>
         </MainLayout>
     );
 }

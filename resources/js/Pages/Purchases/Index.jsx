@@ -727,10 +727,10 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                 fullWidth
                 PaperProps={{
                     sx: {
-                        width: 'min(1440px, calc(100vw - 32px))',
-                        height: 'min(900px, calc(100vh - 32px))',
-                        maxHeight: 'calc(100vh - 32px)',
-                        m: 2,
+                        width: 'min(1440px, calc(100vw - 16px))',
+                        height: 'min(900px, calc(100dvh - 16px))',
+                        maxHeight: 'calc(100dvh - 16px)',
+                        m: 1,
                         overflow: 'hidden',
                     },
                 }}
@@ -907,7 +907,7 @@ export default function PurchaseIndex({ auth, purchases, suppliers, products, br
                         )}
 
                         {activeStep === 0 && (
-                            <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                            <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, flex: 1, minHeight: 0, overflow: 'auto' }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>Purchase information</Typography>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 1.5, alignItems: 'start' }}>
                                     <Autocomplete

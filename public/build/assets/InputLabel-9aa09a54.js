@@ -1,1 +1,0 @@
-import{a as n}from"./app-4d0d1b2e.js";function r({value:t,className:e="",children:a,...l}){return n("label",{...l,className:"block text-[11px] leading-[1.3] font-semibold text-[#425466] "+e,children:t||a})}export{r as I};

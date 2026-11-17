@@ -12,10 +12,10 @@ import {
 import { ColorModeContext } from '@/contexts/ColorModeContext';
 import SimpleIcon from '@/Components/SimpleIcon';
 
-const brandPresets = ['#0E684E', '#1565c0', '#7c3aed', '#c2410c', '#b42318', '#2f6f4e'];
+const brandPresets = ['#176B5B', '#1565c0', '#7c3aed', '#c2410c', '#b42318', '#2f6f4e'];
 
 export default function ThemeControl({ label = 'Theme', inverse = false }) {
-    const { mode = 'light', primaryColor = '#0E684E', setMode, setPrimaryColor } = useContext(ColorModeContext);
+    const { mode = 'light', primaryColor = '#176B5B', setMode, setPrimaryColor } = useContext(ColorModeContext);
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
 

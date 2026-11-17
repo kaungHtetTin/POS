@@ -8,16 +8,16 @@ const statusColors = {
     neutral: '#7b8795',
 };
 
-export const getTheme = (mode, primaryColor = '#0E684E') => {
+export const getTheme = (mode, primaryColor = '#176B5B') => {
     const isDark = mode === 'dark';
     const tokens = {
-        bg: isDark ? '#101915' : '#F6F8F7',
-        surface: isDark ? '#17221D' : '#FFFFFF',
-        glass: isDark ? '#17221D' : '#FFFFFF',
-        border: isDark ? alpha('#DDE5E1', 0.16) : '#DDE5E1',
-        text: isDark ? '#EDF4F0' : '#132238',
-        muted: isDark ? '#A9B7B0' : '#687486',
-        soft: isDark ? alpha('#DDE5E1', 0.07) : '#F6F8F7',
+        bg: isDark ? '#101B1B' : '#F7F8F5',
+        surface: isDark ? '#192827' : '#FFFFFF',
+        glass: isDark ? '#192827' : '#FFFFFF',
+        border: isDark ? alpha('#E4E9E2', 0.16) : '#E4E9E2',
+        text: isDark ? '#EFF5F2' : '#24352E',
+        muted: isDark ? '#AEC1B9' : '#728078',
+        soft: isDark ? alpha('#E4E9E2', 0.07) : '#F7F8FC',
         shadow: 'none',
         primarySoft: alpha(primaryColor, isDark ? 0.22 : 0.11),
     };
@@ -36,7 +36,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                 soft: tokens.primarySoft,
             },
             secondary: {
-                main: '#2f6f4e',
+                main: '#C16A36',
                 light: '#57906e',
                 dark: '#204d36',
                 contrastText: '#ffffff',
@@ -61,9 +61,9 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             },
         },
         typography: {
-            fontFamily: 'Inter, "Noto Sans Myanmar", system-ui, sans-serif',
+            fontFamily: '"DM Sans", Inter, "Noto Sans Myanmar", system-ui, sans-serif',
             fontSize: 13,
-            h1: { fontSize: 25, fontWeight: 800, letterSpacing: 0 },
+            h1: { fontSize: 24, fontWeight: 800, letterSpacing: 0 },
             h2: { fontSize: 21, fontWeight: 800, letterSpacing: 0 },
             h3: { fontSize: 19, fontWeight: 800, letterSpacing: 0 },
             h4: { fontSize: 18, fontWeight: 800, letterSpacing: 0 },
@@ -82,8 +82,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             },
         },
         shape: {
-            // Compact radius scale: numeric sx values now resolve from a 4px base.
-            // Keep fully rounded values only for semantic pills and circles.
+            // Numeric sx radii use this base; table and control radii stay explicit.
             borderRadius: 4,
         },
         components: {
@@ -93,6 +92,12 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                         minHeight: '100%',
                         WebkitFontSmoothing: 'antialiased',
                         MozOsxFontSmoothing: 'grayscale',
+                    },
+                    '[data-standard-input="true"]': {
+                        borderColor: tokens.border, borderRadius: 6, color: tokens.text, backgroundColor: tokens.surface, minHeight: 34, fontSize: 13,
+                        '&:focus': { outline: 'none', borderColor: primaryColor, boxShadow: `0 0 0 2px ${tokens.primarySoft}` },
+                        '&:disabled': { backgroundColor: tokens.soft, color: tokens.muted },
+                        '&[aria-invalid="true"]': { borderColor: statusColors.error },
                     },
                     body: {
                         minHeight: '100%',
@@ -154,8 +159,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
-                        borderRadius: 6,
-                        boxShadow: 'none',
+                        borderRadius: 10,
+                        boxShadow: isDark ? 'none' : '0 3px 16px rgba(24,36,61,0.035)',
                         backdropFilter: 'none',
                         WebkitBackdropFilter: 'none',
                     },
@@ -176,8 +181,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                         backgroundImage: 'none',
                         border: '1px solid',
                         borderColor: tokens.border,
-                        borderRadius: 6,
-                        boxShadow: 'none',
+                        borderRadius: 10,
+                        boxShadow: isDark ? 'none' : '0 3px 16px rgba(24,36,61,0.035)',
                         backdropFilter: 'none',
                         WebkitBackdropFilter: 'none',
                     },
@@ -186,7 +191,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             MuiCardContent: {
                 styleOverrides: {
                     root: {
-                        padding: '10px !important',
+                        padding: '12px !important',
                     },
                 },
             },
@@ -198,8 +203,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                 styleOverrides: {
                     root: {
                         minHeight: 32,
-                        borderRadius: 5,
-                        padding: '5px 9px',
+                        borderRadius: 6,
+                        padding: '5px 10px',
                         fontWeight: 600,
                         whiteSpace: 'nowrap',
                         '& .MuiButton-startIcon': {
@@ -281,7 +286,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             MuiInputLabel: {
                 styleOverrides: {
                     root: {
-                        transform: 'translate(12px, 8px) scale(1)',
+                        transform: 'translate(10px, 8px) scale(1)',
                     },
                     shrink: {
                         transform: 'translate(12px, -8px) scale(0.75) !important',
@@ -292,7 +297,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                 styleOverrides: {
                     root: {
                         minHeight: 34,
-                        borderRadius: 4,
+                        borderRadius: 6,
                         fontSize: 13,
                         backgroundColor: isDark ? alpha(tokens.surface, 0.92) : '#ffffff',
                         '& .MuiOutlinedInput-notchedOutline': {
@@ -301,6 +306,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                         '&:hover .MuiOutlinedInput-notchedOutline': {
                             borderColor: alpha(primaryColor, 0.48),
                         },
+                        '&.Mui-error .MuiOutlinedInput-notchedOutline, &.Mui-error.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: statusColors.error, boxShadow: 'none' },
+                        '&.Mui-disabled': { backgroundColor: tokens.soft },
                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                             borderColor: primaryColor,
                             borderWidth: 1,
@@ -308,7 +315,7 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                         },
                     },
                     input: {
-                        padding: '6px 9px',
+                        padding: '6px 10px',
                     },
                     multiline: {
                         padding: 0,
@@ -383,6 +390,20 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                     root: {
                         borderCollapse: 'separate',
                         borderSpacing: 0,
+                        '&&:has(tbody .MuiInputBase-root)': {
+                            '& .MuiTableCell-root': { borderRight: `1px solid ${tokens.border}`, borderBottom: `1px solid ${tokens.border}`, padding: '4px 6px', height: 36 },
+                            '& .MuiTableCell-head': { fontSize: 11, fontWeight: 700, textTransform: 'none', letterSpacing: 0, height: 32 },
+                            '& tbody .MuiTableCell-root:has(.MuiInputBase-root)': { padding: 0, position: 'relative' },
+                            '& tbody .MuiTableCell-root:focus-within': { boxShadow: `inset 0 0 0 2px ${primaryColor}`, backgroundColor: tokens.primarySoft },
+                            '& tbody .MuiTableCell-root:has(.Mui-error)': { boxShadow: `inset 0 0 0 2px ${statusColors.error}` },
+                            '& .MuiInputBase-root': { minHeight: 34, height: 'auto', borderRadius: 0, backgroundColor: 'transparent', fontSize: 12, width: '100%' },
+                            '& .MuiInputBase-input': { padding: '7px 8px', fontWeight: 400, minWidth: 0 },
+                            '& input[type="number"]': { textAlign: 'right', fontVariantNumeric: 'tabular-nums', MozAppearance: 'textfield' },
+                            '& input[type="number"]::-webkit-inner-spin-button, & input[type="number"]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                            '& .MuiOutlinedInput-notchedOutline, & .MuiInput-root:before, & .MuiInput-root:after': { border: 0, boxShadow: 'none' },
+                            '& .MuiSelect-select': { paddingRight: '26px' },
+                            '& .MuiFormHelperText-root': { margin: '2px 8px 4px', whiteSpace: 'normal' },
+                        },
                         '& strong': {
                             color: tokens.text,
                             fontWeight: 800,
@@ -418,8 +439,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             MuiTableCell: {
                 styleOverrides: {
                     root: {
-                        height: 42,
-                        padding: '6px 9px',
+                        height: 36,
+                        padding: '6px 10px',
                         borderColor: tokens.border,
                         color: tokens.text,
                         fontSize: 12,
@@ -594,7 +615,9 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                 },
                 styleOverrides: {
                     paper: {
-                        maxHeight: '90vh',
+                        maxHeight: 'calc(100dvh - 32px)',
+                        maxWidth: 'calc(100vw - 32px)',
+                        '& > form': { display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: 'inherit', overflow: 'hidden' },
                         borderRadius: 8,
                         border: '1px solid',
                         borderColor: tokens.border,
@@ -610,12 +633,14 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
                 styleOverrides: {
                     root: {
                         backgroundColor: alpha('#0a1318', isDark ? 0.58 : 0.35),
+                        '&.MuiBackdrop-invisible': { backgroundColor: 'transparent' },
                     },
                 },
             },
             MuiDialogTitle: {
                 styleOverrides: {
                     root: {
+                        flexShrink: 0,
                         minHeight: 48,
                         padding: '9px 12px !important',
                         fontSize: 16,
@@ -628,6 +653,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             MuiDialogContent: {
                 styleOverrides: {
                     root: {
+                        minHeight: 0,
+                        overflowY: 'auto',
                         padding: '12px !important',
                         '&.MuiDialogContent-dividers': {
                             borderColor: tokens.border,
@@ -638,6 +665,8 @@ export const getTheme = (mode, primaryColor = '#0E684E') => {
             MuiDialogActions: {
                 styleOverrides: {
                     root: {
+                        flexShrink: 0,
+                        flexWrap: 'wrap',
                         minHeight: 52,
                         padding: '9px 12px !important',
                         borderTop: '1px solid',

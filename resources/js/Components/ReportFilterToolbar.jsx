@@ -8,7 +8,7 @@ const filterGap = 1.25;
 const appBarControlSx = {
     height: 30,
     minHeight: 30,
-    borderRadius: '5px',
+    borderRadius: '8px',
     borderColor: 'divider',
     bgcolor: 'background.paper',
 };
@@ -21,7 +21,7 @@ const compactActionSx = {
     minHeight: 30,
     px: 0,
     fontSize: 0,
-    borderRadius: '5px',
+    borderRadius: '8px',
     '& .MuiButton-startIcon, & .MuiButton-endIcon': { m: 0 },
     '& .MuiSvgIcon-root': { width: 15, height: 15, fontSize: 15 },
 };
@@ -139,24 +139,28 @@ export default function ReportFilterToolbar({
                         sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, width: '100%' }}
                     >
                         {searchField && !searchExpanded && (
-                            <Tooltip title="Search">
-                                <IconButton
+                            <Tooltip title="Search this page">
+                                <Button
                                     type="button"
                                     size="small"
-                                    className="mkpos-bare-action"
+                                    variant="outlined"
+                                    className="appbar-search-trigger"
+                                    startIcon={<SearchIcon fontSize="small" />}
                                     aria-label="Expand search"
                                     onClick={() => setSearchExpanded(true)}
                                     sx={{
-                                        bgcolor: 'transparent',
+                                        bgcolor: 'action.hover',
+                                        minWidth: 30,
+                                        '& .MuiButton-startIcon': { mr: { xs: 0, lg: 0.75 }, ml: 0 },
                                         '& .MuiSvgIcon-root': { width: 15, height: 15 },
                                     }}
                                 >
-                                    <SearchIcon fontSize="small" />
-                                </IconButton>
+                                    <Box component="span" sx={{ display: { xs: 'none', lg: 'inline' } }}>Search</Box>
+                                </Button>
                             </Tooltip>
                         )}
                         {searchField && searchExpanded && (
-                            <Box ref={searchWrapRef} sx={{ width: { xs: 210, sm: 320, lg: 420 }, minWidth: { xs: 180, sm: 280 }, flexShrink: 1 }}>
+                            <Box ref={searchWrapRef} className="appbar-search-field" sx={{ width: { xs: 210, sm: 320, lg: 420 }, minWidth: { xs: 180, sm: 280 }, flexShrink: 1 }}>
                                 {React.cloneElement(searchField, {
                                     fullWidth: true,
                                     size: 'small',
@@ -183,16 +187,28 @@ export default function ReportFilterToolbar({
                                                 <SearchIcon fontSize="small" color="action" />
                                             </InputAdornment>
                                         ),
-                                        endAdornment: searchField.props.InputProps?.endAdornment,
+                                        endAdornment: <InputAdornment position="end">{searchField.props.InputProps?.endAdornment}<IconButton type="button" className="mkpos-bare-action appbar-search-close" aria-label="Collapse search" size="small" onClick={() => setSearchExpanded(false)}><CloseIcon sx={{ fontSize: 14 }} /></IconButton></InputAdornment>,
                                     },
                                     sx: {
                                         ...(searchField.props.sx || {}),
                                         '& .MuiOutlinedInput-root': {
                                             ...appBarControlSx,
                                             fontSize: 12,
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 1 },
+                                            bgcolor: 'background.paper',
+                                            borderRadius: '9px',
+                                            height: { xs: 36, md: 32 },
+                                            pl: 1.25,
+                                            pr: 0.5,
+                                            transition: 'background-color 150ms, box-shadow 150ms',
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'text.secondary' },
+                                            '&.Mui-focused': { boxShadow: (theme) => `0 0 0 3px ${theme.palette.primary.main}18` },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 1, borderColor: 'primary.main' },
                                         },
-                                        '& .MuiInputBase-input': { py: 0.5 },
+                                        '& .MuiInputBase-input': { py: 0.5, minWidth: 0, '&::placeholder': { color: 'text.secondary', opacity: 0.8 } },
+                                        '& .MuiInputAdornment-positionStart': { mr: 1, color: 'text.secondary', '& svg': { width: 17, height: 17 } },
+                                        '& .MuiInputAdornment-positionEnd': { ml: 0.5 },
+                                        '& .appbar-search-close.MuiIconButton-root': { width: 24, minWidth: 24, height: 24, minHeight: 24, p: 0, border: 0, borderRadius: '6px', color: 'text.secondary', bgcolor: 'transparent', '&:hover': { color: 'text.primary', bgcolor: 'action.hover' }, '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 } },
                                     },
                                 })}
                             </Box>
@@ -245,7 +261,7 @@ export default function ReportFilterToolbar({
                                 )}
                             </Badge>
                         )}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, '& .MuiButton-root': searchExpanded ? compactActionSx : undefined }}>
+                        <Box className="appbar-action-group" role="toolbar" aria-label="Page tools" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, '& .MuiButton-root': searchExpanded ? compactActionSx : undefined }}>
                             {secondaryActions.map(decorateAction)}
                         </Box>
                     </Box>
@@ -262,20 +278,20 @@ export default function ReportFilterToolbar({
                         sx={{ height: '100%' }}
                     >
                         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ minHeight: 48, px: 1.5, py: 1.125, borderBottom: '1px solid', borderColor: 'divider' }}>
-                            <Box>
-                                <Typography variant="subtitle1" sx={{ fontSize: 16, fontWeight: 650 }}>Filters</Typography>
-                                <Typography variant="caption" color="text.secondary">Search &amp; filter</Typography>
-                            </Box>
+                            <Stack direction="row" spacing={1.25} alignItems="center">
+                                <Box sx={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '10px', bgcolor: 'primary.soft', color: 'primary.main' }}><FilterIcon sx={{ fontSize: 19 }} /></Box>
+                                <Box><Typography variant="subtitle1" sx={{ fontSize: 15, fontWeight: 700 }}>Filters</Typography><Typography variant="caption" color="text.secondary">{ariaLabel}</Typography></Box>
+                            </Stack>
                             <IconButton aria-label="Close filters" onClick={() => setDrawerOpen(false)}><CloseIcon /></IconButton>
                         </Stack>
-                        <Stack spacing={1.25} sx={{ p: 1.5, overflowY: 'auto', flex: 1 }}>
+                        <Stack className="filter-drawer-fields" spacing={2.5} sx={{ px: 2.5, py: 3, overflowY: 'auto', flex: 1, bgcolor: 'background.paper', '& .MuiOutlinedInput-root': { borderRadius: '6px' } }}>
                             {secondaryFields.map((field, index) => (
                                 <ReportFilterField key={field.key || index} kind={secondaryKinds[index] || 'select'} sx={{ width: '100%', minWidth: 0, flex: '0 0 auto' }}>
                                     {field}
                                 </ReportFilterField>
                             ))}
                         </Stack>
-                        <Stack direction="row" justifyContent="flex-end" spacing={1.25} sx={{ minHeight: 52, px: 1.5, py: 1.125, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" justifyContent="flex-end" spacing={1.25} sx={{ minHeight: 56, px: 1.5, py: 1.125, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider' }}>
                             <Box sx={{ flex: 1, display: 'flex', gap: 1 }}>
                                 {resetActions.map((action, index) => React.isValidElement(action) ? React.cloneElement(action, { key: action.key || `reset-${index}` }) : action)}
                             </Box>

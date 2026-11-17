@@ -4,7 +4,8 @@
         "dev": "vite",
         "dev:cashier": "vite --config vite.cashier.config.js",
         "build": "vite build && npm run build:cashier",
-        "build:cashier": "vite build --config vite.cashier.config.js"
+        "build:cashier": "vite build --config vite.cashier.config.js",
+        "test:browser": "node --test tests/browser/*.test.mjs"
     },
     "devDependencies": {
         "@headlessui/react": "^1.4.2",
@@ -15,6 +16,7 @@
         "laravel-mix": "^6.0.6",
         "laravel-vite-plugin": "^0.8.1",
         "lodash": "^4.17.19",
+        "playwright-core": "^1.65.1",
         "postcss": "^8.4.18",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",

@@ -242,10 +242,10 @@ export default function TransferFormDialog({ open, onClose, branches = [], produ
             fullWidth
             PaperProps={{
                 sx: {
-                    width: 'min(1440px, calc(100vw - 32px))',
-                    height: 'min(900px, calc(100vh - 32px))',
-                    maxHeight: 'calc(100vh - 32px)',
-                    m: 2,
+                    width: 'min(1440px, calc(100vw - 16px))',
+                    height: 'min(900px, calc(100dvh - 16px))',
+                    maxHeight: 'calc(100dvh - 16px)',
+                    m: 1,
                     overflow: 'hidden',
                 },
             }}

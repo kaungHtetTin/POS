@@ -1,4 +1,5 @@
 import './bootstrap';
+import useSpreadsheetNavigation from './Components/useSpreadsheetNavigation';
 import '../css/app.css';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -145,7 +146,8 @@ function ContentTransition({ loading, error, children }) {
 }
 
 function Application() {
-    const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#0E684E';
+    useSpreadsheetNavigation();
+    const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#176B5B';
     const [mode, setMode] = useState(() => {
         const stored = window.localStorage.getItem('app.theme');
         return stored === 'dark' || stored === 'light' ? stored : 'light';

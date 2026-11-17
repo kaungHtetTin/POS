@@ -14,7 +14,7 @@ use App\Models\StockTransfer;
 use App\Support\PharmacyAccess;
 use Closure;
 use Illuminate\Http\Request;
-use Tightenco\Ziggy\Ziggy;
+use Tighten\Ziggy\Ziggy;
 
 class HandleSpaRequests
 {
@@ -70,7 +70,7 @@ class HandleSpaRequests
                 'app' => [
                     'currency_symbol' => Setting::get('app.currency_symbol', '$'),
                     'date_format' => Setting::get('app.date_format', 'Y-m-d'),
-                    'theme_primary_color' => Setting::get('app.theme_primary_color', '#0E684E'),
+                    'theme_primary_color' => Setting::get('app.theme_primary_color', '#176B5B'),
                 ],
                 'invoice' => [
                     'pharmacy_name' => Setting::get('invoice.pharmacy_name', config('app.name')),

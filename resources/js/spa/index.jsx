@@ -197,7 +197,10 @@ export function SpaProvider({ initialPage, resolve, children }) {
         const controller = new AbortController();
         requestRef.current = controller;
         setNavigationError('');
-        setPreservingState(Boolean(options.preserveState));
+        // Keep mutation forms mounted while awaiting validation or a redirect.
+        // Otherwise the loading skeleton destroys their local values and the
+        // onError callback updates an unmounted form instead of showing errors.
+        setPreservingState(options.preserveState ?? !isGet);
         setLoading(true);
         options.onStart?.();
         emit('start', { url: target, method });

@@ -5,6 +5,9 @@ import { ColorModeContext } from '@/contexts/ColorModeContext';
 import SimpleIcon from '@/Components/SimpleIcon';
 import PageContainer from '@/Components/PageContainer';
 import {
+    TextField,
+    InputAdornment,
+    Collapse,
     Badge,
     AppBar,
     Box,
@@ -30,8 +33,8 @@ import {
     Stack,
 } from '@mui/material';
 
-const expandedDrawerWidth = 204;
-const collapsedDrawerWidth = 56;
+const expandedDrawerWidth = 224;
+const collapsedDrawerWidth = 64;
 
 const pageDescriptions = {
     'Pharmacy Dashboard': 'Monitor stock risks, returns, balances, and the next actions for today.',
@@ -99,12 +102,12 @@ function EmbeddedPage({ children, header, shell }) {
 
     return (
         <PageContainer normalizeLegacyPadding>
-            {header && (
-                <Box component="header" sx={{ mb: compactMedicineForm ? 0.75 : 1.75, minWidth: 0 }}>
-                    <Typography component="h1" sx={{ color: 'text.primary', fontSize: compactMedicineForm ? 18 : 22, fontWeight: 700, lineHeight: 1.18, letterSpacing: '-0.35px' }}>
+            {header && header !== 'Pharmacy Dashboard' && (
+                <Box component="header" sx={{ mb: compactMedicineForm ? 0.75 : 1.25, minWidth: 0 }}>
+                    <Typography component="h1" sx={{ color: 'text.primary', fontSize: compactMedicineForm ? 20 : 22, fontWeight: 700, lineHeight: 1.18, letterSpacing: '-0.35px' }}>
                         {header}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: compactMedicineForm ? 0.2 : 0.375, maxWidth: 760, fontSize: compactMedicineForm ? 11 : 12, lineHeight: 1.4 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: compactMedicineForm ? 0.2 : 0.375, maxWidth: 760, fontSize: compactMedicineForm ? 12 : 13, lineHeight: 1.4 }}>
                         {descriptionFor(header)}
                     </Typography>
                 </Box>
@@ -125,6 +128,9 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
     const __ = (key) => translations[key] || key;
 
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [navigationQuery, setNavigationQuery] = useState('');
+    const [openGroups, setOpenGroups] = useState({});
+    const [navigationMenu, setNavigationMenu] = useState(null);
     const [desktopCollapsed, setDesktopCollapsed] = useState(() => window.localStorage.getItem('mkpos.sidebar.collapsed') === '1');
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [branchMenuAnchor, setBranchMenuAnchor] = useState(null);
@@ -258,13 +264,13 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
     };
 
     const menuGroups = [
-        { label: 'Main', keys: ['dashboard', 'pos'] },
-        { label: 'Stock', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes'] },
-        { label: 'Purchasing', keys: ['suppliers', 'purchases', 'purchasesReport'] },
-        { label: 'Sales', keys: ['customers', 'sales', 'returns', 'salesCustomerReport'] },
-        { label: 'Finance', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },
-        { label: 'Administration', keys: ['administration', 'roles', 'branches', 'permissions', 'activityLogs', 'manual'] },
-        { label: 'Setting', keys: ['profile', 'settings'] },
+        { label: 'Overview', icon: 'grid', keys: ['dashboard', 'pos'] },
+        { label: 'Inventory', icon: 'box', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes'] },
+        { label: 'Purchasing', icon: 'truck', keys: ['suppliers', 'purchases', 'purchasesReport'] },
+        { label: 'Sales', icon: 'receipt', keys: ['customers', 'sales', 'returns', 'salesCustomerReport'] },
+        { label: 'Finance', icon: 'wallet', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },
+        { label: 'Administration', icon: 'shieldCheck', keys: ['administration', 'roles', 'branches', 'permissions', 'activityLogs'] },
+        { label: 'Settings', icon: 'settings', keys: ['profile', 'settings', 'manual'] },
     ];
 
     const canSee = (item) => {
@@ -287,224 +293,57 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
         }))
         .filter((group) => group.visibleItems.length > 0);
 
-    const navIconBoxSx = (isActive) => ({
-        width: 24,
-        height: 24,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: isActive ? 'primary.main' : 'inherit',
-        transition: 'all 180ms ease',
-    });
+    const selectedGroup = visibleMenuGroups.find((group) => group.visibleItems.some((item) => isActiveRoute(item.routePattern, item.href)));
+    const selectedItem = selectedGroup?.visibleItems.find((item) => isActiveRoute(item.routePattern, item.href));
+    const closeNavigation = () => { setMobileOpen(false); setNavigationMenu(null); setNavigationQuery(''); };
 
-    const renderDrawer = (collapsed = false) => (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: '10px 8px', bgcolor: '#0C4A3A', color: '#E4EFE9' }}>
-            <Box sx={{ minHeight: 42, mb: 1.25, display: 'flex', alignItems: 'center' }}>
-                <Stack direction="row" alignItems="center" justifyContent={collapsed ? 'center' : 'flex-start'} spacing={collapsed ? 0 : 1.25}>
-                    <Box
-                        sx={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 1.5,
-                            bgcolor: 'rgba(255,255,255,0.12)',
-                            color: '#FFFFFF',
-                            border: '1px solid',
-                            borderColor: 'rgba(255,255,255,0.18)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                        }}
-                    >
-                        {settings.invoice?.logo_path ? (
-                            <Box
-                                component="img"
-                                alt={pharmacyName}
-                                src={storageUrl(settings.invoice.logo_path)}
-                                sx={{ width: '82%', height: '82%', objectFit: 'contain' }}
-                            />
-                        ) : (
-                            <SimpleIcon name="bag" size={18} />
-                        )}
-                    </Box>
-                    <Box sx={{ minWidth: 0, display: collapsed ? 'none' : 'block' }}>
-                        <Typography variant="subtitle2" noWrap sx={{ fontSize: 17, fontWeight: 800, lineHeight: 1.1, letterSpacing: '0.2px' }}>
-                            {pharmacyName}
-                        </Typography>
-                        <Typography variant="caption" noWrap display="block" sx={{ mt: 0.25, color: 'rgba(255,255,255,0.66)', fontSize: 10 }}>
-                            Business operations
-                        </Typography>
-                    </Box>
-                </Stack>
-            </Box>
+    const renderNavigationItem = (item, { collapsed = false, nested = false } = {}) => {
+        const selected = isActiveRoute(item.routePattern, item.href);
+        return <ListItem key={item.key} disablePadding sx={{ mb: 0.25 }}>
+            <Tooltip title={collapsed ? __(item.text) : ''} placement="right">
+                <ListItemButton component={Link} href={item.href} selected={selected} onClick={closeNavigation} aria-label={__(item.text)} aria-current={selected ? 'page' : undefined} sx={{ minHeight: { xs: 42, md: 34 }, px: collapsed ? 1 : 1.25, borderRadius: '7px', position: 'relative', justifyContent: collapsed ? 'center' : 'flex-start', color: selected ? 'primary.main' : 'text.secondary', '&.Mui-selected': { bgcolor: 'primary.soft', color: 'primary.main' }, '&.Mui-selected:hover': { bgcolor: 'primary.soft' }, '&.Mui-selected::before': { content: '""', position: 'absolute', left: 0, top: 9, bottom: 9, width: 3, borderRadius: '0 3px 3px 0', bgcolor: 'primary.main' }, '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }}>
+                    <ListItemIcon sx={{ minWidth: collapsed ? 0 : 27, color: 'inherit', opacity: selected ? 1 : 0.8 }}><Badge badgeContent={collapsed ? item.count : 0} max={99} color="error"><SimpleIcon name={item.icon} size={nested ? 15 : 18} /></Badge></ListItemIcon>
+                    {!collapsed && <><ListItemText primary={__(item.text)} primaryTypographyProps={{ fontSize: nested ? 11.5 : 12.5, fontWeight: selected ? 700 : 500, noWrap: true }} />{item.count > 0 && <Box component="span" sx={{ ml: 0.5, px: 0.65, py: 0.1, borderRadius: '5px', bgcolor: selected ? 'background.paper' : 'action.hover', fontSize: 10, fontWeight: 700 }}>{item.count > 99 ? '99+' : item.count}</Box>}</>}
+                </ListItemButton>
+            </Tooltip>
+        </ListItem>;
+    };
 
-            <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
-                {visibleMenuGroups.map((group, groupIndex) => (
-                    <Box key={group.label}>
-                        <List
-                            dense
-                            sx={{ py: 0 }}
-                            subheader={
-                                <ListSubheader
-                                    component="div"
-                                    disableSticky
-                                    sx={{
-                                        display: collapsed ? 'none' : 'block',
-                                        px: 1.5,
-                                        py: 0.6,
-                                        lineHeight: 1.2,
-                                        fontSize: 10,
-                                        fontWeight: 800,
-                                        color: 'rgba(255,255,255,0.62)',
-                                        bgcolor: 'transparent',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.075em',
-                                    }}
-                                >
-                                    {__(group.label)}
-                                </ListSubheader>
-                            }
-                        >
-                            {group.visibleItems.map((item) => {
-                                const isActive = isActiveRoute(item.routePattern, item.href);
-
-                                return (
-                                    <ListItem key={item.text} disablePadding>
-                                        <ListItemButton
-                                            component={Link}
-                                            href={item.href}
-                                            selected={isActive}
-                                            title={collapsed ? __(item.text) : undefined}
-                                            aria-label={__(item.text)}
-                                            sx={{
-                                                minHeight: 36,
-                                                py: '7px',
-                                                px: collapsed ? '9px' : '9px',
-                                                mx: 0,
-                                                borderRadius: '6px',
-                                                justifyContent: collapsed ? 'center' : 'flex-start',
-                                                color: isActive ? '#0C4A3A' : 'rgba(255,255,255,0.76)',
-                                                '&.Mui-selected': {
-                                                    bgcolor: '#DDF5E9',
-                                                    color: '#0C4A3A',
-                                                },
-                                                '&.Mui-selected:hover': {
-                                                    bgcolor: '#DDF5E9',
-                                                    color: '#0C4A3A',
-                                                },
-                                                '&:hover': {
-                                                    bgcolor: 'rgba(255,255,255,0.10)',
-                                                    color: '#FFFFFF',
-                                                },
-                                            }}
-                                        >
-                                            <ListItemIcon sx={{ minWidth: collapsed ? 0 : 34, color: 'inherit', justifyContent: 'center' }}>
-                                                <Badge
-                                                    badgeContent={item.count}
-                                                    max={99}
-                                                    color="error"
-                                                    invisible={item.count <= 0}
-                                                    overlap="circular"
-                                                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                                    sx={{
-                                                        '& .MuiBadge-badge': {
-                                                            minWidth: 15,
-                                                            height: 15,
-                                                            px: 0.35,
-                                                            fontSize: 9,
-                                                            fontWeight: 800,
-                                                        },
-                                                    }}
-                                                >
-                                                    <Box sx={navIconBoxSx(isActive)}>
-                                                        <SimpleIcon name={item.icon} size={17} />
-                                                    </Box>
-                                                </Badge>
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={__(item.text)}
-                                                primaryTypographyProps={{
-                                                    variant: 'body2',
-                                                    noWrap: true,
-                                                    fontSize: 13,
-                                                    fontWeight: isActive ? 650 : 500,
-                                                }}
-                                                sx={{ display: collapsed ? 'none' : 'block' }}
-                                            />
-                                        </ListItemButton>
-                                    </ListItem>
-                                );
-                            })}
-                        </List>
-                        {groupIndex < visibleMenuGroups.length - 1 && (
-                            <Divider sx={{ my: 0.5, mx: 1.25, borderColor: 'rgba(255,255,255,0.14)' }} />
-                        )}
-                    </Box>
-                ))}
-            </Box>
-
-            <Box sx={{ mt: 1.5, pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
-                <Stack direction="row" alignItems="center" justifyContent={collapsed ? 'center' : 'flex-start'} spacing={collapsed ? 0 : 1.1}>
-                    <Badge
-                        overlap="circular"
-                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                        badgeContent={
-                            auth.user?.roles?.some((role) => ['Owner', 'Root'].includes(role)) ? (
-                                <Box sx={{ color: '#2874bc', bgcolor: 'background.paper', borderRadius: '50%', display: 'flex' }}>
-                                    <SimpleIcon name="shieldCheck" size={14} />
-                                </Box>
-                            ) : null
-                        }
-                    >
-                        <Avatar
-                            src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null}
-                            sx={{
-                                width: 34,
-                                height: 34,
-                                bgcolor: 'primary.main',
-                                fontSize: 14,
-                                fontWeight: 800,
-                            }}
-                        >
-                            {auth.user?.name?.charAt(0).toUpperCase()}
-                        </Avatar>
-                    </Badge>
-                    <Box sx={{ minWidth: 0, flex: 1, display: collapsed ? 'none' : 'block' }}>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                            {auth.user?.name}
-                        </Typography>
-                        <Typography variant="caption" noWrap display="block" sx={{ color: 'rgba(255,255,255,0.66)', fontSize: 10 }}>
-                            {auth.user?.roles?.map((roleName) => __(roleName)).join(', ') || auth.user?.email}
-                        </Typography>
-                    </Box>
-                    <Tooltip title={__('Logout')}>
-                        <Button
-                            size="small"
-                            onClick={() => router.post(route('logout'))}
-                            aria-label={__('Logout')}
-                            startIcon={<SimpleIcon name="logout" size={16} />}
-                            sx={{
-                                display: collapsed ? 'none' : 'inline-flex',
-                                minWidth: 0,
-                                minHeight: 28,
-                                height: 28,
-                                px: 0.75,
-                                gap: 0.25,
-                                fontSize: 11,
-                                lineHeight: 1,
-                                color: '#FFFFFF',
-                                border: '1px solid rgba(255,255,255,0.19)',
-                                bgcolor: 'transparent',
-                                '& .MuiButton-startIcon': { mr: 0.5, ml: 0 },
-                                '& .MuiButton-startIcon svg': { width: 14, height: 14 },
-                                '&:hover': { bgcolor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.30)' },
-                            }}
-                        >
-                            {!collapsed && __('Logout')}
+    const renderDrawer = (collapsed = false, surface = 'desktop') => (
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', color: 'text.primary' }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ px: collapsed ? 2 : 1.75, minHeight: 58, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ width: 31, height: 31, flexShrink: 0, borderRadius: '9px', bgcolor: 'primary.main', color: 'primary.contrastText', display: 'grid', placeItems: 'center', boxShadow: '0 2px 6px rgba(23,107,91,0.15)' }}>
+                    {settings.invoice?.logo_path ? <Box component="img" src={storageUrl(settings.invoice.logo_path)} alt={pharmacyName} sx={{ width: 25, height: 25, objectFit: 'contain' }} /> : <SimpleIcon name="pill" size={19} />}
+                </Box>
+                {!collapsed && <Box sx={{ minWidth: 0 }}><Typography title={pharmacyName} noWrap sx={{ fontWeight: 800, fontSize: 13, lineHeight: 1.35 }}>{pharmacyName}</Typography><Stack direction="row" alignItems="center" spacing={0.5}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: 'primary.main' }} /><Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>{__('Pharmacy workspace')}</Typography></Stack></Box>}
+            </Stack>
+            {!collapsed && <Box sx={{ px: 1.25, pt: 1.25, pb: 0.75 }}>
+                <TextField size="small" placeholder={__('Search pages…')} value={navigationQuery} onChange={(event) => setNavigationQuery(event.target.value)} inputProps={{ 'aria-label': __('Search navigation') }} InputProps={{ startAdornment: <InputAdornment position="start"><SimpleIcon name="search" size={15} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'action.hover', borderRadius: '7px', fontSize: 11.5 }, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' } }} />
+            </Box>}
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', px: 1, py: 0.75 }}>
+                {visibleMenuGroups.map((group) => {
+                    const query = collapsed ? '' : navigationQuery.trim().toLowerCase();
+                    const items = group.visibleItems.filter((item) => !query || __(item.text).toLowerCase().includes(query) || __(group.label).toLowerCase().includes(query));
+                    if (!items.length) return null;
+                    const active = group.visibleItems.some((item) => isActiveRoute(item.routePattern, item.href));
+                    const expanded = Boolean(query) || (openGroups[group.label] ?? active);
+                    if (group.label === 'Overview') return <Box key={group.label} sx={{ mb: 1, pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}><List dense disablePadding>{items.map((item) => renderNavigationItem(item, { collapsed }))}</List></Box>;
+                    if (collapsed) return <Tooltip key={group.label} title={__(group.label)} placement="right"><IconButton aria-label={`${__('Open')} ${__(group.label)} ${__('navigation')}`} aria-haspopup="menu" aria-expanded={navigationMenu?.group.label === group.label} onClick={(event) => setNavigationMenu({ group, anchor: event.currentTarget })} sx={{ width: 46, height: 38, mb: 0.5, borderRadius: '8px', color: active ? 'primary.main' : 'text.secondary', bgcolor: active ? 'primary.soft' : 'transparent' }}><SimpleIcon name={group.icon} size={20} /></IconButton></Tooltip>;
+                    return <Box key={group.label} sx={{ mb: 0.5, ...(group.label === 'Settings' ? { mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' } : {}) }}>
+                        <Button fullWidth aria-label={__(group.label)} aria-expanded={expanded} aria-controls={`nav-${surface}-${group.label.toLowerCase()}`} onClick={() => setOpenGroups((value) => ({ ...value, [group.label]: !expanded }))} sx={{ px: 1.25, minHeight: { xs: 42, md: 36 }, justifyContent: 'flex-start', color: active ? 'text.primary' : 'text.secondary', fontSize: 12, fontWeight: active ? 700 : 600, borderRadius: '7px', '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' } }}>
+                            <Box sx={{ display: 'flex', width: 27, color: active ? 'primary.main' : 'text.secondary' }}><SimpleIcon name={group.icon} size={18} /></Box><Box sx={{ flex: 1, textAlign: 'left' }}>{__(group.label)}</Box><Box sx={{ display: 'flex', opacity: 0.5, transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 140ms ease' }}><SimpleIcon name="chevronRight" size={12} /></Box>
                         </Button>
-                    </Tooltip>
+                        <Collapse in={expanded} timeout="auto"><List id={`nav-${surface}-${group.label.toLowerCase()}`} dense disablePadding sx={{ ml: 2.25, pl: 0.75, my: 0.25, borderLeft: '1px solid', borderColor: 'divider' }}>{items.map((item) => renderNavigationItem(item, { nested: true }))}</List></Collapse>
+                    </Box>;
+                })}
+                {!collapsed && navigationQuery && !visibleMenuGroups.some((group) => __(group.label).toLowerCase().includes(navigationQuery.trim().toLowerCase()) || group.visibleItems.some((item) => __(item.text).toLowerCase().includes(navigationQuery.trim().toLowerCase()))) && <Typography role="status" variant="body2" color="text.secondary" sx={{ p: 1.5 }}>{__('No matching pages')}</Typography>}
+            </Box>
+            <Box sx={{ p: 1.25, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent={collapsed ? 'center' : 'flex-start'}>
+                    <Tooltip title={__('Profile')}><Avatar component={Link} onClick={closeNavigation} href={route('profile.edit')} src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null} sx={{ width: 30, height: 30, borderRadius: '9px', bgcolor: 'primary.soft', color: 'primary.main', fontSize: 12, fontWeight: 700 }}>{auth.user?.name?.charAt(0).toUpperCase()}</Avatar></Tooltip>
+                    {!collapsed && <><Box sx={{ flex: 1, minWidth: 0 }}><Typography noWrap sx={{ fontSize: 11.5, fontWeight: 700 }}>{auth.user?.name}</Typography><Typography noWrap variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>{auth.user?.roles?.map((name) => __(name)).join(', ') || auth.user?.email}</Typography></Box><Tooltip title={__('Logout')}><IconButton aria-label={__('Logout')} onClick={() => router.post(route('logout'))}><SimpleIcon name="logout" size={16} /></IconButton></Tooltip></>}
                 </Stack>
+                {collapsed && <IconButton aria-label={__('Logout')} onClick={() => router.post(route('logout'))} sx={{ mt: 0.75, mx: 'auto', display: 'flex' }}><SimpleIcon name="logout" size={16} /></IconButton>}
             </Box>
         </Box>
     );
@@ -518,17 +357,20 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                     width: { md: `calc(100% - ${desktopDrawerWidth}px)` },
                     ml: { md: `${desktopDrawerWidth}px` },
                     color: 'text.primary',
-                    boxShadow: '0 1px 4px rgba(19,34,56,0.04)',
+                    boxShadow: '0 2px 10px rgba(19,34,56,0.045)',
+                    backgroundImage: (theme) => `linear-gradient(100deg, ${theme.palette.background.paper} 65%, ${theme.palette.primary.soft} 180%)`,
+                    '&::after': { content: '""', position: 'absolute', bottom: -1, left: 0, width: 72, height: 2, bgcolor: 'primary.main', opacity: 0.6 },
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     borderRadius: 0,
                     zIndex: (muiTheme) => muiTheme.zIndex.drawer - 1,
                     transition: 'width 180ms cubic-bezier(.2,.75,.25,1), margin-left 180ms cubic-bezier(.2,.75,.25,1)',
+                    '& .appbar-utilities .MuiIconButton-root': { width: { xs: 40, md: 28 }, minWidth: { xs: 40, md: 28 }, height: { xs: 40, md: 28 }, minHeight: { xs: 40, md: 28 }, border: 0, borderRadius: '7px', color: 'text.secondary', bgcolor: 'transparent', '&:hover': { color: 'primary.main', bgcolor: 'primary.soft' } },
                     '& .MuiButton-root': {
                         minHeight: 30,
                         height: 30,
                         px: 1,
-                        borderRadius: '5px',
+                        borderRadius: '8px',
                         fontSize: 11,
                         fontWeight: 600,
                         lineHeight: 1,
@@ -544,12 +386,17 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         },
                     },
                     '& .MuiButton-contained': {
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.09)',
                         color: '#fff',
                         bgcolor: 'primary.main',
                         border: '1px solid',
                         borderColor: 'primary.main',
                         '&:hover': { bgcolor: 'primary.dark', borderColor: 'primary.dark', boxShadow: 'none' },
                     },
+                    '& .appbar-action-group': { p: '2px', gap: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.paper', flexShrink: 0 },
+                    '& .appbar-action-group .MuiButton-outlined, & .appbar-action-group .MuiButton-text': { border: 0, bgcolor: 'transparent', borderRadius: '6px', '&:hover': { bgcolor: 'primary.soft', color: 'primary.main' } },
+                    '& .appbar-action-group .MuiButton-root': { height: { xs: 36, md: 26 }, minHeight: { xs: 36, md: 26 } },
+                    '& .appbar-search-trigger': { minHeight: { xs: 36, md: 30 }, borderColor: 'transparent', bgcolor: 'action.hover', '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.soft' } },
                     '& .MuiButton-outlined, & .MuiButton-text': {
                         color: 'text.primary',
                         bgcolor: 'background.paper',
@@ -582,7 +429,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                     },
                 }}
             >
-                <Toolbar sx={{ minHeight: '44px !important', height: 44, px: { xs: 1, md: '14px' }, gap: 1 }}>
+                <Toolbar sx={{ minHeight: '48px !important', height: 48, px: { xs: 1, md: '14px' }, gap: 1 }}>
                     <IconButton
                         color="inherit"
                         aria-label="open drawer"
@@ -597,11 +444,16 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                             color="inherit"
                             aria-label={desktopCollapsed ? __('Expand navigation') : __('Collapse navigation')}
                             onClick={handleDesktopDrawerToggle}
-                            sx={{ display: { xs: 'none', md: 'inline-flex' } }}
+                            aria-expanded={!desktopCollapsed}
+                            sx={{ display: { xs: 'none', md: 'inline-flex' }, '&&': { border: 0, borderRadius: '8px', bgcolor: 'primary.soft', color: 'primary.main', '&:hover': { bgcolor: 'action.selected' } } }}
                         >
-                            <SimpleIcon name="sidebar" size={18} />
+                            <SimpleIcon name={desktopCollapsed ? "panelExpand" : "panelCollapse"} size={19} />
                         </IconButton>
                     </Tooltip>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ display: { xs: 'none', lg: 'flex' }, minWidth: 0, maxWidth: 205, mr: 0.75, flexShrink: 0 }}>
+                        <Box sx={{ display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: '8px', bgcolor: 'primary.soft', color: 'primary.main', flexShrink: 0 }}><SimpleIcon name={selectedGroup?.icon || 'grid'} size={16} /></Box>
+                        <Box sx={{ minWidth: 0 }}><Typography component="div" noWrap sx={{ fontSize: 9, fontWeight: 600, lineHeight: 1.3, letterSpacing: '0.04em', color: 'text.secondary' }}>{__(selectedGroup?.label || 'Workspace')}</Typography><Typography component="div" noWrap sx={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>{__(selectedItem?.text || header || 'Overview')}</Typography></Box>
+                    </Stack>
                     <Box
                         ref={setAppBarBackTarget}
                         id="mkpos-appbar-back"
@@ -624,13 +476,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         }}
                     />
 
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.75,
-                        flexShrink: 0,
-                        ml: 0.75,
-                    }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, ml: 0.5 }}>
                         {isPosScreen && accessibleBranches.length > 0 && (
                             <>
                                 <Tooltip title={__('Switch branch')}>
@@ -638,12 +484,17 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                                         variant="outlined"
                                         size="small"
                                         startIcon={<SimpleIcon name="store" size={15} />}
+                                        endIcon={<Box sx={{ display: 'flex', transform: 'rotate(90deg)' }}><SimpleIcon name="chevronRight" size={12} /></Box>}
                                         onClick={(event) => setBranchMenuAnchor(event.currentTarget)}
                                         aria-haspopup="menu"
                                         aria-expanded={Boolean(branchMenuAnchor)}
                                         sx={{
-                                            maxWidth: { xs: 118, md: 180 },
+                                            maxWidth: { xs: 110, md: 180 },
                                             justifyContent: 'flex-start',
+                                            borderRadius: '8px !important',
+                                            borderColor: 'divider',
+                                            bgcolor: 'primary.soft !important',
+                                            color: 'primary.main !important',
                                             '& .MuiButton-startIcon': { flexShrink: 0 },
                                         }}
                                     >
@@ -658,7 +509,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                                     onClose={() => setBranchMenuAnchor(null)}
                                     anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                     transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                    slotProps={{ paper: { sx: { mt: 0.5, minWidth: 220, maxHeight: 360 } } }}
+                                    slotProps={{ paper: { sx: { mt: 1, p: 0.5, minWidth: 220, maxHeight: 360, borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', '& .MuiMenuItem-root': { borderRadius: '7px', minHeight: 36, my: 0.25 } } } }}
                                 >
                                     {accessibleBranches.map((branch) => (
                                         <MenuItem
@@ -676,9 +527,11 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                                 </Menu>
                             </>
                         )}
+                        <Stack className="appbar-utilities" direction="row" alignItems="center" sx={{ p: { xs: 0, md: '3px' }, borderRadius: '10px', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', gap: '2px' }}>
                         <Tooltip title={locale === 'my' ? __('Change language to English') : __('Change language to Myanmar')}>
                             <IconButton
                                 onClick={() => changeLanguage(locale === 'my' ? 'en' : 'my')}
+                                className="mkpos-bare-action"
                                 color="inherit"
                                 size="small"
                                 aria-label={locale === 'my' ? __('Change language to English') : __('Change language to Myanmar')}
@@ -689,6 +542,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         <Tooltip title={mode === 'dark' ? __('Switch to light mode') : __('Switch to dark mode')}>
                             <IconButton
                                 onClick={toggleColorMode}
+                                className="mkpos-bare-action"
                                 color="inherit"
                                 size="small"
                                 aria-label={mode === 'dark' ? __('Switch to light mode') : __('Switch to dark mode')}
@@ -697,9 +551,14 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                             </IconButton>
                         </Tooltip>
                         <Tooltip title={__('Refresh')}>
-                            <IconButton onClick={() => router.reload()} color="inherit" size="small" aria-label={__('Refresh')}>
+                            <IconButton className="mkpos-bare-action" onClick={() => router.reload()} color="inherit" size="small" aria-label={__('Refresh')}>
                                 <SimpleIcon name="rotate" size={17} />
                             </IconButton>
+                        </Tooltip>
+                        </Stack>
+                        <Box sx={{ display: { xs: 'none', md: 'block' }, height: 24, borderLeft: '1px solid', borderColor: 'divider' }} />
+                        <Tooltip title={`${auth.user?.name || ''} · ${__('Profile')}`}>
+                            <Avatar component={Link} href={route('profile.edit')} aria-label={__('Open profile')} src={auth.user?.image_path ? storageUrl(auth.user.image_path) : null} sx={{ display: { xs: 'none', md: 'flex' }, width: 30, height: 30, bgcolor: 'primary.soft', color: 'primary.main', border: '1px solid', borderColor: 'divider', borderRadius: '10px', fontSize: 12, fontWeight: 800, textDecoration: 'none', '&:hover': { borderColor: 'primary.main' } }}>{auth.user?.name?.charAt(0).toUpperCase()}</Avatar>
                         </Tooltip>
                     </Box>
                 </Toolbar>
@@ -721,12 +580,12 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         '& .MuiDrawer-paper': {
                             boxSizing: 'border-box',
                             width: expandedDrawerWidth,
-                            borderRightColor: 'rgba(255,255,255,0.12)',
+                            borderRightColor: 'divider',
                             borderRadius: 0,
                         },
                     }}
                 >
-                    {renderDrawer(false)}
+                    {renderDrawer(false, 'mobile')}
                 </Drawer>
                 <Drawer
                     variant="permanent"
@@ -735,7 +594,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                         '& .MuiDrawer-paper': {
                             boxSizing: 'border-box',
                             width: desktopDrawerWidth,
-                            borderRightColor: 'rgba(255,255,255,0.12)',
+                            borderRightColor: 'divider',
                             borderRadius: 0,
                             overflowX: 'hidden',
                             transition: 'width 180ms cubic-bezier(.2,.75,.25,1)',
@@ -757,9 +616,14 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
                     bgcolor: 'transparent',
                 }}
             >
-                <Toolbar sx={{ minHeight: '44px !important' }} />
+                <Toolbar sx={{ minHeight: '48px !important' }} />
                 {children}
             </Box>
+
+            <Menu anchorEl={navigationMenu?.anchor || null} open={Boolean(navigationMenu)} onClose={() => setNavigationMenu(null)} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { ml: 1, minWidth: 220, maxHeight: '70vh', borderRadius: '10px' } } }}>
+                <ListSubheader component="li" disableSticky sx={{ px: 1.5, lineHeight: '32px', fontSize: 10, fontWeight: 700, color: 'text.secondary', bgcolor: 'transparent', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{__(navigationMenu?.group.label || '')}</ListSubheader>
+                {navigationMenu?.group.visibleItems.map((item) => <MenuItem key={item.key} component={Link} href={item.href} selected={isActiveRoute(item.routePattern, item.href)} onClick={closeNavigation} sx={{ gap: 1, minHeight: 36, fontSize: 12 }}><ListItemIcon sx={{ minWidth: '24px !important', color: 'inherit' }}><SimpleIcon name={item.icon} size={16} /></ListItemIcon>{__(item.text)}</MenuItem>)}
+            </Menu>
 
             <Snackbar 
                 open={snackbarOpen} 

@@ -99,7 +99,7 @@ export default function PurchaseSupplierReport({
     })), [category_summary]);
 
     const currentPurchases = purchases?.data || [];
-    const statusColors = ['#0E684E', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
+    const statusColors = ['#176B5B', '#2874bc', '#b77700', '#ce4444', '#7b8795'];
 
     return (
         <MainLayout auth={auth} header="Supplier Purchase Report">
@@ -190,14 +190,14 @@ export default function PurchaseSupplierReport({
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' }, gap: 1.25, mb: 1.5 }}>
                     <CompactLineChart title="Purchase Trend" data={trendData} xKey="period" series={[
-                        { key: 'total', label: 'Total', color: '#0E684E' },
+                        { key: 'total', label: 'Total', color: '#176B5B' },
                         { key: 'due', label: 'Due', color: '#b77700' },
                     ]} valueFormatter={(value) => `$${money(value)}`} />
                     <CompactDonutChart title="Payment Status Mix" data={statusData} valueKey="total" colors={statusColors} valueFormatter={(value) => `$${money(value)}`} />
                 </Box>
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 1.25, mb: 1.5 }}>
-                    <CompactBarChart title="Category Summary" data={categoryData} xKey="name" series={[{ key: 'total', label: 'Total', color: '#0E684E' }]} valueFormatter={(value) => `$${money(value)}`} />
+                    <CompactBarChart title="Category Summary" data={categoryData} xKey="name" series={[{ key: 'total', label: 'Total', color: '#176B5B' }]} valueFormatter={(value) => `$${money(value)}`} />
 
                     <Paper sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Top Products</Typography>

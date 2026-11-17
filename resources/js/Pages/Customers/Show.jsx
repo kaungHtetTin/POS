@@ -259,7 +259,7 @@ export default function CustomerShow({
                                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
                                     <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'sales' ? value : `$${money(value)}`} />
                                     <Legend />
-                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#0E684E" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#176B5B" strokeWidth={2} dot={false} />
                                     <Line type="monotone" dataKey="tax" name={__('Tax')} stroke="#b77700" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -276,7 +276,7 @@ export default function CustomerShow({
                                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={128} />
                                     <ChartTooltip formatter={(value) => `$${money(value)}`} />
                                     <Legend />
-                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#0E684E" />
+                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#176B5B" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>

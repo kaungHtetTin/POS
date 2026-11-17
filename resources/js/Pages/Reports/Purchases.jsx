@@ -107,7 +107,7 @@ export default function PurchaseReport({
     })), [top_suppliers]);
 
     const currentRows = suppliers?.data || [];
-    const statusColors = ['#0E684E', '#2874bc', '#b77700', '#ce4444'];
+    const statusColors = ['#176B5B', '#2874bc', '#b77700', '#ce4444'];
 
     return (
         <MainLayout auth={auth} header="Purchases Report">
@@ -199,12 +199,12 @@ export default function PurchaseReport({
 
                 <Box sx={{ display: 'grid !important', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr)) !important' }, alignItems: 'stretch', gap: 1, mb: 1.25 }}>
                     <CompactLineChart title="Purchase Trend" data={trendData} xKey="period" series={[
-                        { key: 'total', label: 'Total', color: '#0E684E' },
+                        { key: 'total', label: 'Total', color: '#176B5B' },
                         { key: 'due', label: 'Due', color: '#b77700' },
                     ]} valueFormatter={(value) => `$${money(value)}`} height={148} />
                     <CompactDonutChart title="Payment Status Mix" data={statusData} valueKey="total" colors={statusColors} valueFormatter={(value) => `$${money(value)}`} height={148} />
                     <CompactBarChart title="Top Suppliers" data={supplierChartData} xKey="name" series={[
-                        { key: 'total', label: 'Total', color: '#0E684E' },
+                        { key: 'total', label: 'Total', color: '#176B5B' },
                         { key: 'due', label: 'Due', color: '#b77700' },
                     ]} valueFormatter={(value) => `$${money(value)}`} height={148} />
                 </Box>

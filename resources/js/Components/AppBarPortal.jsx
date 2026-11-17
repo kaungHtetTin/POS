@@ -13,7 +13,7 @@ export default function AppBarPortal({ children }) {
 export function AppBarActions({ children }) {
     return (
         <AppBarPortal>
-            <Box sx={{
+            <Box className="appbar-action-group" role="toolbar" aria-label="Page actions" sx={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 0.75,

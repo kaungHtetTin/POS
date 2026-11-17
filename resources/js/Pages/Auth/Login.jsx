@@ -29,20 +29,21 @@ export default function Login({ status }) {
 
     return (
         <AuthSplitLayout
-            title="Log in to your account"
-            subtitle="Enter your email and password to continue"
+            compact
+            title="Welcome back."
+            subtitle="Sign in to keep your pharmacy moving."
             topBarContent={<Typography variant="body2" color="text.secondary" />}
         >
             <Head title="Log in" />
 
             {status && (
-                <Alert severity="success" sx={{ mb: 2 }}>
+                <Alert severity="success" sx={{ mb: 1.5 }}>
                     {status}
                 </Alert>
             )}
 
             <form onSubmit={submit}>
-                <Stack spacing={2.5}>
+                <Stack spacing={1.5} sx={{ '& .MuiOutlinedInput-root': { minHeight: { xs: 40, sm: 34 } }, '& .MuiFormHelperText-root': { mt: 0.5, mx: 0 } }}>
                     <TextField
                         id="email"
                         type="email"
@@ -76,6 +77,7 @@ export default function Login({ status }) {
 
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <FormControlLabel
+                            sx={{ m: 0, ml: -0.5, '& .MuiCheckbox-root': { p: 0.5 }, '& .MuiTypography-root': { fontSize: 12 } }}
                             control={
                                 <MuiCheckbox
                                     name="remember"
@@ -94,7 +96,7 @@ export default function Login({ status }) {
                             variant="contained"
                             disabled={processing}
                             size="small"
-                            sx={{ px: 4 }}
+                            sx={{ width: '100%', minHeight: { xs: 40, sm: 34 }, borderRadius: '6px' }}
                         >
                             Log in
                         </Button>
