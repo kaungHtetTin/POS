@@ -1097,7 +1097,7 @@ export default function PosIndex({
                                     fullWidth
                                     size="small"
                                     inputRef={searchInputRef}
-                                    placeholder={__('Search name, SKU, or scan barcode')}
+                                    placeholder={__('Search product or chemical name, or scan barcode')}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => {
