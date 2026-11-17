@@ -1,3 +1,5 @@
+import { ChartLegend, useReportChartStyle, shortChartLabel } from '@/Components/ReportChartStyle';
+import { compactNumber } from '@/Components/CompactReportChart';
 import React, { useMemo, useState } from 'react';
 import DataTableFooter from '@/Components/DataTableFooter';
 import MainLayout from '@/Layouts/MainLayout';
@@ -59,6 +61,7 @@ export default function CustomerShow({
     top_products = [],
     sales = [],
 }) {
+    const chartStyle = useReportChartStyle();
     const { translations = {} } = usePage().props;
     const __ = (key) => translations[key] || key;
     const [branchId, setBranchId] = useState(filters.branch_id || 'all');
@@ -249,34 +252,34 @@ export default function CustomerShow({
                 </Box>
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.35fr 1fr' }, gap: 2, mb: 2 }}>
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>{__('Sales Trend')}</Typography>
+                    <Paper sx={{ p: 1.5, minWidth: 0, borderRadius: '10px' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{__('Sales Trend')}</Typography>
                         <Box sx={{ height: 260 }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="period" tick={{ fontSize: 11 }} tickFormatter={formatDate} />
-                                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
-                                    <ChartTooltip labelFormatter={formatDate} formatter={(value, name) => name === 'sales' ? value : `$${money(value)}`} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke="#176B5B" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="tax" name={__('Tax')} stroke="#b77700" strokeWidth={2} dot={false} />
+                                <LineChart accessibilityLayer data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                                    <CartesianGrid stroke={chartStyle.grid} strokeDasharray="2 5" vertical={false} />
+                                    <XAxis dataKey="period" tick={{ fontSize: 10, fill: chartStyle.text }} tickLine={false} axisLine={false} tickFormatter={formatDate} />
+                                    <YAxis tick={{ fontSize: 10, fill: chartStyle.text }} tickLine={false} axisLine={false} tickFormatter={(value) => `$${compactNumber(value)}`} />
+                                    <ChartTooltip contentStyle={chartStyle.tooltip} itemStyle={{ color: chartStyle.textPrimary }} labelFormatter={formatDate} formatter={(value, name) => name === 'sales' ? value : `$${money(value)}`} />
+                                    <Legend content={<ChartLegend />} />
+                                    <Line type="monotone" dataKey="total" name={__('Sales Amount')} stroke={chartStyle.color('#176B5B')} strokeWidth={2} dot={trendData.length <= 8 ? { r: 2.5, strokeWidth: 0 } : false} activeDot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="tax" name={__('Tax')} stroke={chartStyle.color('#b77700')} strokeWidth={2} dot={trendData.length <= 8 ? { r: 2.5, strokeWidth: 0 } : false} activeDot={{ r: 4 }} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </Box>
                     </Paper>
 
-                    <Paper sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>{__('Top Products')}</Typography>
+                    <Paper sx={{ p: 1.5, minWidth: 0, borderRadius: '10px' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{__('Top Products')}</Typography>
                         <Box sx={{ height: 260, mb: 1 }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={topProductData} layout="vertical" margin={{ top: 8, right: 20, left: 42, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(value) => `$${money(value)}`} />
-                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={128} />
-                                    <ChartTooltip formatter={(value) => `$${money(value)}`} />
-                                    <Legend />
-                                    <Bar dataKey="amount" name={__('Sale Amount')} fill="#176B5B" />
+                                <BarChart accessibilityLayer data={topProductData} layout="vertical" margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
+                                    <CartesianGrid stroke={chartStyle.grid} strokeDasharray="2 5" vertical horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 10, fill: chartStyle.text }} tickLine={false} axisLine={false} tickFormatter={(value) => `$${compactNumber(value)}`} />
+                                    <YAxis type="category" dataKey="name" tickFormatter={shortChartLabel} tick={{ fontSize: 10, fill: chartStyle.text }} tickLine={false} axisLine={false} width={104} />
+                                    <ChartTooltip contentStyle={chartStyle.tooltip} itemStyle={{ color: chartStyle.textPrimary }} formatter={(value) => `$${money(value)}`} />
+                                    <Legend content={<ChartLegend />} />
+                                    <Bar maxBarSize={18} radius={[0, 4, 4, 0]} dataKey="amount" name={__('Sale Amount')} fill={chartStyle.color('#176B5B')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
