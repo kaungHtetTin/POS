@@ -5,11 +5,11 @@ import '../css/app.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@mui/material/styles';
-import { Alert, Box, CircularProgress, CssBaseline, LinearProgress, Paper, Skeleton, Stack, Typography } from '@mui/material';
+import { CssBaseline } from '@mui/material';
 import getTheme from './Theme/theme';
 import { ColorModeContext } from './contexts/ColorModeContext';
 import PersistentShellContext from './contexts/PersistentShellContext';
-import PageContainer from './Components/PageContainer';
+import ContentTransition from './Components/PageLoadingState';
 import MainLayout from './Layouts/MainLayout';
 import { SpaProvider, router } from './spa';
 
@@ -74,77 +74,6 @@ const updateZiggy = (page) => {
     if (csrfMeta && page?.props?.csrf_token) csrfMeta.content = page.props.csrf_token;
 };
 
-function PageLoadingState({ initial = false }) {
-    return (
-        <Box role="status" aria-live="polite" sx={{ minHeight: initial ? '100vh' : 240, display: 'grid', placeItems: 'center', p: 3 }}>
-            <Paper variant="outlined" sx={{ px: 3, py: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <CircularProgress size={22} />
-                <Box>
-                    <Typography variant="subtitle2" fontWeight={800}>Loading page</Typography>
-                    <Typography variant="caption" color="text.secondary">Getting the latest data…</Typography>
-                </Box>
-            </Paper>
-        </Box>
-    );
-}
-
-function PageContentSkeleton() {
-    return (
-        <PageContainer
-            role="status"
-            aria-live="polite"
-            aria-label="Loading page content"
-            sx={{ position: 'relative', minHeight: 360 }}
-        >
-            <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
-            <Stack spacing={1.25}>
-                <Stack spacing={0.75}>
-                    <Skeleton variant="rounded" width={180} height={28} />
-                    <Skeleton variant="rounded" width="min(55%, 340px)" height={14} />
-                </Stack>
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, minmax(0, 1fr))' },
-                        gap: 1,
-                    }}
-                >
-                    {[0, 1, 2, 3].map((item) => (
-                        <Skeleton key={item} variant="rounded" height={62} />
-                    ))}
-                </Box>
-                <Paper variant="outlined" sx={{ p: 1.25 }}>
-                    <Stack spacing={0.125}>
-                        <Skeleton variant="rounded" width="42%" height={38} />
-                        {[0, 1, 2, 3, 4].map((item) => (
-                            <Skeleton key={item} variant="rounded" height={42} />
-                        ))}
-                    </Stack>
-                </Paper>
-            </Stack>
-        </PageContainer>
-    );
-}
-
-function ContentTransition({ loading, error, children }) {
-    if (loading) return <PageContentSkeleton />;
-
-    return (
-        <Box sx={{ minHeight: 240 }}>
-            {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
-            {children}
-            {loading && (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'start center', pt: 8, zIndex: 5 }}>
-                    <Paper variant="outlined" sx={{ px: 2, py: 1.25, display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                        <CircularProgress size={18} />
-                        <Typography variant="body2" fontWeight={700}>Loading latest data…</Typography>
-                    </Paper>
-                </Box>
-            )}
-        </Box>
-    );
-}
-
 function Application() {
     useSpreadsheetNavigation();
     const defaultPrimaryColor = initialPage.props?.settings?.app?.theme_primary_color || '#176B5B';
@@ -198,11 +127,17 @@ function Application() {
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 <SpaProvider initialPage={initialPage} resolve={resolvePage}>
-                    {({ PageComponent, page, loading, preservingState, navigationError }) => {
-                        if (!PageComponent) return <PageLoadingState initial />;
+                    {({ PageComponent, page, loading, preservingState, pendingPage, navigationError }) => {
                         const content = (
-                            <ContentTransition loading={loading && !preservingState} error={navigationError}>
-                                <PageComponent {...page.props} />
+                            <ContentTransition
+                                loading={loading}
+                                keepContent={preservingState || pendingPage?.samePage}
+                                hasContent={Boolean(PageComponent)}
+                                component={pendingPage?.component || (!PageComponent ? page.component : '')}
+                                url={pendingPage?.url || page.url}
+                                error={navigationError}
+                            >
+                                {PageComponent && <PageComponent {...page.props} />}
                             </ContentTransition>
                         );
                         const isAuthenticated = Boolean(page.props?.auth?.user);

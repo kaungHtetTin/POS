@@ -60,7 +60,11 @@ class InventoryAdjustmentController extends Controller
                 ['branch_id' => $validated['branch_id'], 'product_id' => $validated['product_id']],
                 ['quantity' => 0]
             );
-            $inventory->increment('quantity', $validated['quantity']);
+            app(\App\Services\StockMovementService::class)->change(
+                $inventory, (int) $validated['quantity'], 'Adjustment', $adjustment,
+                $adjustment->batch?->batch_number,
+                $validated['adjustment_type'].': '.($validated['reason'] ?? '')
+            );
 
             // Update Batch Inventory if specified
             if ($validated['inventory_batch_id']) {

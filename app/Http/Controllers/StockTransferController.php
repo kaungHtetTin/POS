@@ -100,9 +100,10 @@ class StockTransferController extends Controller
 
                 // 3. Deduct from source inventory and batch
                 $sourceBatch->decrement('quantity', $item['quantity']);
-                Inventory::where('branch_id', $validated['from_branch_id'])
+                $sourceInventory = Inventory::where('branch_id', $validated['from_branch_id'])
                     ->where('product_id', $item['product_id'])
-                    ->decrement('quantity', $item['quantity']);
+                    ->lockForUpdate()->firstOrFail();
+                app(\App\Services\StockMovementService::class)->change($sourceInventory, -(int) $item['quantity'], 'Transfer out', $transfer, $sourceBatch->batch_number, $validated['notes'] ?? null);
 
                 // 4. Add to destination inventory and batch (or create new batch record at destination)
                 $destBatch = InventoryBatch::where('branch_id', $validated['to_branch_id'])
@@ -129,7 +130,7 @@ class StockTransferController extends Controller
                     ['branch_id' => $validated['to_branch_id'], 'product_id' => $item['product_id']],
                     ['quantity' => 0]
                 );
-                $destInventory->increment('quantity', $item['quantity']);
+                app(\App\Services\StockMovementService::class)->change($destInventory, (int) $item['quantity'], 'Transfer in', $transfer, $sourceBatch->batch_number, $validated['notes'] ?? null);
             }
         });
 

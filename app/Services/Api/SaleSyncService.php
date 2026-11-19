@@ -273,8 +273,7 @@ class SaleSyncService
                     'product_id' => $line['product_id'],
                 ]);
 
-                $inventory->quantity = max(($inventory->quantity ?? 0) - (int) $line['total_base_quantity'], 0);
-                $inventory->save();
+                app(\App\Services\StockMovementService::class)->change($inventory, -(int) $line['total_base_quantity'], 'Sale', $sale, null, 'Synced sale, including free-of-charge quantities.', true);
             }
 
             return $sale;

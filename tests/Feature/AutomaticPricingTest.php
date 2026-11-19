@@ -208,6 +208,8 @@ class AutomaticPricingTest extends TestCase
         $this->assertFalse($service->sync($payload, auth()->user())['created']);
         $this->assertDatabaseCount('price_changes', 2);
         $this->assertDatabaseCount('purchases', 1);
+        $this->assertDatabaseCount('stock_movements', 1);
+        $this->assertDatabaseHas('stock_movements', ['type' => 'Purchase', 'quantity' => 12, 'user_id' => auth()->id()]);
     }
 
     public function test_new_medicine_uses_enabled_rule_and_manual_rule_cannot_be_selected_as_auto(): void

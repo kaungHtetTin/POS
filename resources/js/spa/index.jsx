@@ -164,6 +164,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
     const [loading, setLoading] = useState(true);
     const [preservingState, setPreservingState] = useState(false);
     const [navigationError, setNavigationError] = useState('');
+    const [pendingPage, setPendingPage] = useState(null);
     const requestRef = useRef(null);
     const pageRef = useRef(initialPage);
 
@@ -197,6 +198,11 @@ export function SpaProvider({ initialPage, resolve, children }) {
         const controller = new AbortController();
         requestRef.current = controller;
         setNavigationError('');
+        setPendingPage({
+            url: target,
+            component: null,
+            samePage: new URL(target, window.location.href).pathname === new URL(pageRef.current.url, window.location.href).pathname,
+        });
         // Keep mutation forms mounted while awaiting validation or a redirect.
         // Otherwise the loading skeleton destroys their local values and the
         // onError callback updates an unmounted form instead of showing errors.
@@ -245,6 +251,8 @@ export function SpaProvider({ initialPage, resolve, children }) {
                 return null;
             }
 
+            if (controller.signal.aborted) return null;
+            setPendingPage(current => ({ ...current, component: payload.component }));
             const component = await loadComponent(payload.component);
             if (controller.signal.aborted) return null;
             const finalUrl = normalizeUrl(response.url || payload.url || target);
@@ -272,6 +280,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
             if (requestRef.current === controller) {
                 requestRef.current = null;
                 setLoading(false);
+                setPendingPage(null);
             }
             options.onFinish?.();
             emit('finish', { page: pageRef.current });
@@ -295,7 +304,7 @@ export function SpaProvider({ initialPage, resolve, children }) {
 
     return (
         <SpaContext.Provider value={context}>
-            {children({ PageComponent, page, loading, preservingState, navigationError })}
+            {children({ PageComponent, page, loading, preservingState, pendingPage, navigationError })}
         </SpaContext.Provider>
     );
 }

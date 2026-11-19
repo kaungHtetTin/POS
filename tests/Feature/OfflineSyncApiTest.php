@@ -119,6 +119,11 @@ class OfflineSyncApiTest extends TestCase
         $this->assertSame(8, InventoryBatch::where('product_id', $product->id)->first()->quantity);
 
         $cashSession->update(['status' => 'closed', 'closed_at' => now()]);
+        $this->assertDatabaseCount('stock_movements', 1);
+        $this->assertDatabaseHas('stock_movements', [
+            'type' => 'Sale', 'quantity' => -2, 'balance_before' => 10, 'balance_after' => 8,
+            'user_id' => $user->id, 'source_id' => Sale::first()->id,
+        ]);
         $payload['sales'][0]['client_reference'] = 'android-sale-closed-session';
 
         $this->postJson('http://localhost/api/sync/sales', $payload)

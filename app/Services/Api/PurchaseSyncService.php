@@ -202,7 +202,7 @@ class PurchaseSyncService
                     'branch_id' => $validated['branch_id'],
                     'product_id' => $item['product_id'],
                 ], ['quantity' => 0]);
-                $inventory->increment('quantity', $item['base_quantity']);
+                app(\App\Services\StockMovementService::class)->change($inventory, (int) $item['base_quantity'], 'Purchase', $purchase, $item['batch_number'], 'Synced purchase.');
 
                 $pricing->purchasePrices($item, $user->id);
             }

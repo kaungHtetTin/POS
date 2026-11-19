@@ -5,7 +5,7 @@ import MergedTablePanel from '@/Components/MergedTablePanel';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
 import CsvExportButton from '@/Components/CsvExportButton';
 import DataTableFooter from '@/Components/DataTableFooter';
-import { Head, router } from '@/spa';
+import { Head, Link, router } from '@/spa';
 import {
     Box,
     Stack,
@@ -93,6 +93,7 @@ export default function InventoryIndex({ auth, inventory, branches, categories, 
                                     <Button variant="contained" type="submit" startIcon={<FilterIcon />}>Apply</Button>
                                     <Button variant="outlined" onClick={handleReset} startIcon={<ResetIcon />}>Reset</Button>
                                     <CsvExportButton source={inventory} dataKey="inventory" filename="inventory.csv" />
+                                    <Button component={Link} href={route('inventory.movements.index', filters?.branch_id ? { branch_id: filters.branch_id } : {})} variant="outlined">Stock Movements</Button>
                                 </>
                             )}
                         >

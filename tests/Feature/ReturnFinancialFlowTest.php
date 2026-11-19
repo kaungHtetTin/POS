@@ -54,6 +54,7 @@ class ReturnFinancialFlowTest extends TestCase
         $this->assertEquals(0, (float) $return->fresh()->settlement_due);
         $this->assertEquals(0, (float) $return->items()->first()->cost_total);
         $this->assertSame(10, $batch->fresh()->quantity);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     public function test_supplier_return_applies_payable_credit_and_tracks_refund_receipt(): void
@@ -85,10 +86,43 @@ class ReturnFinancialFlowTest extends TestCase
         $this->assertEquals(40, (float) $purchase->fresh()->return_credit_amount);
         $this->assertEquals(0, (float) $supplier->fresh()->balance);
         $this->assertSame(8, $batch->fresh()->quantity);
+        $this->assertDatabaseHas('stock_movements', ['type' => 'Supplier return', 'source_id' => $return->id, 'quantity' => -2, 'balance_before' => 10, 'balance_after' => 8]);
 
         $service->settle($return, $user, ['amount' => 10, 'payment_method' => 'Card', 'reference_number' => 'REFUND-123']);
         $this->assertEquals(10, (float) $return->fresh()->settlement_paid);
         $this->assertEquals(10, (float) $return->settlements()->sum('amount'));
+    }
+
+    public function test_approved_customer_restock_records_history_once(): void
+    {
+        [$branch, $user, $product, $unit, $batch] = $this->inventoryFixture();
+        $this->actingAs($user);
+        $sale = Sale::create([
+            'branch_id' => $branch->id, 'user_id' => $user->id,
+            'invoice_number' => 'RESTOCK-SALE', 'total_amount' => 100, 'discount' => 0,
+            'tax' => 0, 'grand_total' => 100, 'amount_received' => 100,
+            'payment_method' => 'Cash', 'payment_status' => 'Paid', 'sale_date' => now(),
+        ]);
+        $line = SaleItem::create([
+            'sale_id' => $sale->id, 'product_id' => $product->id, 'batch_id' => $batch->id,
+            'unit_id' => $unit->id, 'quantity' => 2, 'base_quantity' => 2,
+            'unit_price' => 50, 'total_price' => 100, 'payable_total' => 100,
+            'tax_amount' => 0, 'financial_snapshot' => true, 'base_unit_cost' => 5,
+            'cost_total' => 10, 'created_at' => now(),
+        ]);
+        $service = app(ReturnService::class);
+        $return = $service->create([
+            'type' => 'Customer', 'reference_id' => $sale->id, 'reason' => 'Unopened medicine',
+            'items' => [['reference_item_id' => $line->id, 'quantity' => 1, 'restock' => true]],
+        ], collect([$branch->id]));
+        $this->assertDatabaseCount('stock_movements', 0);
+        $service->decide($return, 'Approved');
+        $this->assertDatabaseHas('stock_movements', ['type' => 'Customer return', 'source_id' => $return->id,
+            'quantity' => 1, 'balance_before' => 10, 'balance_after' => 11, 'user_id' => $user->id]);
+        $this->assertSame(11, $batch->fresh()->quantity);
+        $this->assertDatabaseCount('stock_movements', 1);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $service->decide($return, 'Approved');
     }
 
     private function inventoryFixture(): array

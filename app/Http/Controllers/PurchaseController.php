@@ -350,7 +350,7 @@ class PurchaseController extends Controller
                     ['quantity' => 0]
                 );
 
-                $inventory->increment('quantity', $item['base_quantity']);
+                app(\App\Services\StockMovementService::class)->change($inventory, (int) $item['base_quantity'], 'Purchase', $purchase, $item['batch_number']);
 
                 $pricing->purchasePrices($item, auth()->id());
             }
@@ -519,7 +519,7 @@ class PurchaseController extends Controller
                     ['branch_id' => $validated['branch_id'], 'product_id' => $item['product_id']],
                     ['quantity' => 0]
                 );
-                $inventory->increment('quantity', $item['base_quantity']);
+                app(\App\Services\StockMovementService::class)->change($inventory, (int) $item['base_quantity'], 'Purchase', $purchase, $item['batch_number'], 'Stock received after purchase edit.');
 
                 $batch = InventoryBatch::where('branch_id', $validated['branch_id'])
                     ->where('product_id', $item['product_id'])
@@ -677,7 +677,7 @@ class PurchaseController extends Controller
                 ]);
             }
 
-            $inventory->decrement('quantity', $requiredQuantity);
+            app(\App\Services\StockMovementService::class)->change($inventory, -$requiredQuantity, 'Purchase reversal', $purchase, null, 'Previous stock reversed for purchase edit or deletion.');
         }
 
         $batchGroups = $purchase->items->groupBy(function ($item) {

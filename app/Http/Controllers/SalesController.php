@@ -307,9 +307,7 @@ class SalesController extends Controller
                     ]);
                 }
 
-                $inventory->update([
-                    'quantity' => (int) $inventory->quantity + $baseQuantity,
-                ]);
+                app(\App\Services\StockMovementService::class)->change($inventory, $baseQuantity, 'Sale void', $lockedSale, $batch?->batch_number, $validated['reason']);
             }
 
             $lockedSale->update([

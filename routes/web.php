@@ -261,6 +261,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/inventory/transfers/create', [StockTransferController::class, 'create'])->name('inventory.transfers.create')->middleware('permission:adjust_stock');
         Route::get('/inventory/transfers/{transfer}', [StockTransferController::class, 'show'])->name('inventory.transfers.show')->middleware('permission:adjust_stock');
         Route::post('/inventory/transfers', [StockTransferController::class, 'store'])->name('inventory.transfers.store')->middleware('permission:adjust_stock');
+        Route::get('/inventory/movements', [\App\Http\Controllers\StockMovementController::class, 'index'])->name('inventory.movements.index')->middleware('permission:manage_inventory');
         Route::get('/inventory/{product}', [InventoryController::class, 'show'])->name('inventory.show')->middleware('permission:manage_inventory');
 
         Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware('permission:manage_expenses');

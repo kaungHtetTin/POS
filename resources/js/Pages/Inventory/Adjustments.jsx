@@ -26,6 +26,7 @@ import {
     TextField,
     Typography,
     Alert,
+    Autocomplete,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -53,18 +54,22 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
     });
 
     useEffect(() => {
+        const controller = new AbortController();
+        setBatches([]);
+        setLoadingBatches(false);
         if (data.product_id && data.branch_id) {
             setLoadingBatches(true);
-            fetch(route('inventory.batches.get', { product: data.product_id, branch: data.branch_id }))
+            fetch(route('inventory.batches.get', { product: data.product_id, branch: data.branch_id }), { signal: controller.signal })
                 .then(res => res.json())
                 .then(data => {
                     setBatches(data);
                     setLoadingBatches(false);
                 })
-                .catch(() => setLoadingBatches(false));
-        } else {
-            setBatches([]);
+                .catch(() => {
+                    if (!controller.signal.aborted) setLoadingBatches(false);
+                });
         }
+        return () => controller.abort();
     }, [data.product_id, data.branch_id]);
 
     const handleOpen = () => setOpen(true);
@@ -181,7 +186,7 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                                 fullWidth
                                 size="small"
                                 value={data.branch_id}
-                                onChange={e => setData('branch_id', e.target.value)}
+                                onChange={e => setData({ ...data, branch_id: e.target.value, inventory_batch_id: '' })}
                                 error={!!errors.branch_id}
                                 helperText={errors.branch_id}
                                 required
@@ -191,21 +196,27 @@ export default function InventoryAdjustments({ auth, adjustments, products, bran
                                 ))}
                             </TextField>
 
-                            <TextField
-                                select
-                                label="Product"
+                            <Autocomplete
                                 fullWidth
                                 size="small"
-                                value={data.product_id}
-                                onChange={e => setData('product_id', e.target.value)}
-                                error={!!errors.product_id}
-                                helperText={errors.product_id}
-                                required
-                            >
-                                {products.map(product => (
-                                    <MenuItem key={product.id} value={product.id}>{product.name}</MenuItem>
-                                ))}
-                            </TextField>
+                                options={products}
+                                value={products.find(product => product.id === data.product_id) || null}
+                                getOptionLabel={product => product.name}
+                                getOptionKey={product => product.id}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
+                                onChange={(_, product) => setData({ ...data, product_id: product?.id || '', inventory_batch_id: '' })}
+                                noOptionsText="No products found"
+                                renderInput={params => (
+                                    <TextField
+                                        {...params}
+                                        label="Product"
+                                        placeholder="Search and select a product..."
+                                        error={!!errors.product_id}
+                                        helperText={errors.product_id}
+                                        required
+                                    />
+                                )}
+                            />
 
                             <TextField
                                 select

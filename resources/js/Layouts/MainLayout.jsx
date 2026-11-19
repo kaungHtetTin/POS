@@ -46,6 +46,7 @@ const pageDescriptions = {
     'Tax Configuration': 'Maintain the tax rules applied to purchases and sales.',
     'Inventory Stock Reports': 'Compare available stock by branch, batch, and medicine.',
     'Inventory Detail': 'Review batch quantities, expiry dates, valuation, and movement history.',
+    'Stock Movement History': 'Trace stock receipts, sales, transfers, adjustments, returns, and reversals.',
     'Inventory Control': 'Record auditable stock corrections for damage, loss, and counting differences.',
     'Stock Transfers': 'Move stock between branches with clear source and destination records.',
     'Supplier Management': 'Maintain supplier contacts, balances, purchases, and payment history.',
@@ -228,6 +229,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
         pos: { text: 'POS', icon: 'card', href: route('pos.index'), routePattern: 'pos.index', permission: 'process_sale' },
 
         inventory: { text: 'Stock Balance', icon: 'box', href: route('inventory.index'), routePattern: 'inventory.index', permission: 'manage_inventory' },
+        stockMovements: { text: 'Stock Movements', icon: 'history', href: route('inventory.movements.index'), routePattern: 'inventory.movements.*', permission: 'manage_inventory' },
         medicines: { text: 'Products', icon: 'pill', href: route('products.index'), routePattern: 'products.*', permission: 'manage_products' },
         categories: { text: 'Categories', icon: 'tag', href: route('categories.index'), routePattern: 'categories.*', permission: 'manage_products' },
         taxes: { text: 'Tax Calculation', icon: 'percent', href: route('taxes.index'), routePattern: 'taxes.*', permission: 'manage_products' },
@@ -266,7 +268,7 @@ function MainLayoutShell({ children, header, setAppBarTarget, setAppBarBackTarge
 
     const menuGroups = [
         { label: 'Overview', icon: 'grid', keys: ['dashboard', 'pos'] },
-        { label: 'Inventory', icon: 'box', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes'] },
+        { label: 'Inventory', icon: 'box', keys: ['inventory', 'medicines', 'categories', 'expiryReport', 'lowBalanceReport', 'adjustments', 'transfers', 'taxes', 'stockMovements'] },
         { label: 'Purchasing', icon: 'truck', keys: ['suppliers', 'purchases', 'purchasesReport'] },
         { label: 'Sales', icon: 'receipt', keys: ['customers', 'sales', 'returns', 'salesCustomerReport'] },
         { label: 'Finance', icon: 'wallet', keys: ['expenses', 'expenseCategories', 'amountReceivable', 'pendingPayments', 'reports', 'cashSessionReport', 'salePersonReports'] },

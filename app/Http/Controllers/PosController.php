@@ -642,9 +642,7 @@ class PosController extends Controller
                     ['quantity' => 0]
                 );
 
-                $inventory->update([
-                    'quantity' => max(0, (int) $inventory->quantity - $baseToDeduct),
-                ]);
+                app(\App\Services\StockMovementService::class)->change($inventory, -(int) $baseToDeduct, 'Sale', $sale, null, 'Includes free-of-charge quantities.', true);
             }
         });
 

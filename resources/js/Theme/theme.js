@@ -804,7 +804,18 @@ export const getTheme = (mode, primaryColor = '#176B5B') => {
                 },
             },
             MuiSkeleton: {
-                styleOverrides: { root: { borderRadius: 5 } },
+                defaultProps: { animation: 'pulse' },
+                styleOverrides: {
+                    root: {
+                        borderRadius: 3,
+                        backgroundColor: isDark ? alpha('#E4E9E2', 0.07) : '#EAF0EC',
+                        animationDuration: '2.4s',
+                        '@media (prefers-reduced-motion: reduce)': {
+                            animation: 'none',
+                            '&::after': { animation: 'none' },
+                        },
+                    },
+                },
             },
             MuiSvgIcon: {
                 styleOverrides: {

@@ -3,7 +3,7 @@ import MainLayout from '@/Layouts/MainLayout';
 import { AppBarBack } from '@/Components/AppBarPortal';
 import CsvExportButton from '@/Components/CsvExportButton';
 import ReportFilterToolbar from '@/Components/ReportFilterToolbar';
-import { Head, router } from '@/spa';
+import { Head, Link, router } from '@/spa';
 import {
     Alert,
     Box,
@@ -61,7 +61,7 @@ export default function InventoryShow({ auth, product, branches, branchGroups, s
                     appBar
                     ariaLabel="Inventory detail filters"
                     fieldKinds={['select']}
-                    actions={<CsvExportButton source={branchGroups.flatMap((group) => (group.batches || []).map((batch) => ({ ...batch, branch: group.branch?.name })))} filename="inventory-batches.csv" />}
+                    actions={<><Button component={Link} href={route('inventory.movements.index', { product_id: product.id, ...(selectedBranchId ? { branch_id: selectedBranchId } : {}) })} variant="outlined">Stock Movements</Button><CsvExportButton source={branchGroups.flatMap((group) => (group.batches || []).map((batch) => ({ ...batch, branch: group.branch?.name })))} filename="inventory-batches.csv" /></>}
                 >
                     <TextField
                         select
