@@ -117,6 +117,7 @@ export default function PosIndex({
     const lastScanTime = useRef(0);
     const searchInputRef = useRef(null);
     const catalogLoadingRef = useRef(false);
+    const catalogEndRef = useRef(null);
     const silentPrintFallbackRef = useRef(false);
 
     const { data, setData, post, processing, errors } = useForm({
@@ -377,7 +378,7 @@ export default function PosIndex({
             // Mark pending responses stale when the query changes before they finish.
             searchRequestRef.current = requestId + 1;
         };
-    }, [searchQuery]);
+    }, [searchQuery, selectedCategoryId]);
 
     const fetchCategories = async () => {
         try {
@@ -397,6 +398,7 @@ export default function PosIndex({
         setCatalogLoading(true);
         try {
             const response = await fetch(route('pos.catalog', { category_id: categoryId || null, page, per_page: 30 }));
+            if (!response.ok) throw new Error('Failed to load products.');
             const payload = await response.json();
             const items = Array.isArray(payload?.data) ? payload.data : [];
             const meta = payload?.meta || {};
@@ -405,47 +407,35 @@ export default function PosIndex({
             setCatalogHasMore(hasMore);
             setCatalogPage(Number(meta.current_page || page || 1));
             setSearchResults((prev) => (append ? [...prev, ...items] : items));
+        } catch {
+            setScanError(__('Failed to load products. Please try again.'));
         } finally {
             catalogLoadingRef.current = false;
             setCatalogLoading(false);
         }
     };
 
-    const handleCatalogScroll = (event) => {
-        const container = event.currentTarget;
-        const remaining = container.scrollHeight - container.scrollTop - container.clientHeight;
+    useEffect(() => {
+        const end = catalogEndRef.current;
+        if (!end || searchQuery.trim() || !catalogHasMore) return;
 
-        if (
-            remaining <= 180
-            && !searchQuery.trim()
-            && catalogHasMore
-            && !catalogLoadingRef.current
-        ) {
-            fetchCatalog({ categoryId: selectedCategoryId, page: catalogPage + 1, append: true });
-        }
-    };
+        // The viewport observer also respects clipping by the desktop list's
+        // scroll container, so it works with both list scrolling and page scrolling.
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting && !catalogLoadingRef.current) {
+                fetchCatalog({ categoryId: selectedCategoryId, page: catalogPage + 1, append: true });
+            }
+        }, { rootMargin: '180px 0px' });
+
+        observer.observe(end);
+        return () => observer.disconnect();
+    }, [catalogPage, catalogHasMore, searchResults.length, resultsView, searchQuery, selectedCategoryId, mobileStep]);
 
     useEffect(() => {
         if (catalogCategories.length === 0) {
             fetchCategories();
         }
-        if (!searchQuery.trim()) {
-            fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
-        }
     }, []);
-
-    useEffect(() => {
-        if (!searchQuery.trim()) {
-            fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
-            return;
-        }
-        fetchSearch({ categoryId: selectedCategoryId });
-    }, [selectedCategoryId]);
-
-    useEffect(() => {
-        if (resultsView !== 'grid' || searchQuery.trim()) return;
-        fetchCatalog({ categoryId: selectedCategoryId, page: 1, append: false });
-    }, [resultsView]);
 
     const handleBarcodeScan = async (barcode) => {
         setScanError('');
@@ -1255,7 +1245,7 @@ export default function PosIndex({
                         </Typography>
 
                         {resultsView === 'table' ? (
-                            <TableContainer onScroll={handleCatalogScroll} sx={{ mt: 0.75, flex: 1, minHeight: 0, overflow: 'auto', scrollbarGutter: 'stable' }}>
+                            <TableContainer sx={{ mt: 0.75, flex: 1, minHeight: 0, overflow: 'auto', scrollbarGutter: 'stable' }}>
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : 'rgba(255, 255, 255, 0.05)' }}>
@@ -1319,12 +1309,20 @@ export default function PosIndex({
                                                 </TableCell>
                                             </TableRow>
                                         )}
+                                        {!searchQuery.trim() && catalogHasMore && (
+                                            <TableRow>
+                                                <TableCell colSpan={4} sx={{ p: 0, border: 0 }}>
+                                                    <Box ref={catalogEndRef} sx={{ minHeight: 1, textAlign: 'center' }}>
+                                                        {catalogLoading && <Typography variant="caption" color="text.secondary">{__('Loading more products...')}</Typography>}
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                         ) : (
                             <Box
-                                onScroll={handleCatalogScroll}
                                 sx={{
                                     mt: { xs: 0.75, md: 0.5 },
                                     display: 'grid',
@@ -1462,11 +1460,13 @@ export default function PosIndex({
                                         </Typography>
                                     </Paper>
                                 )}
-                                {searchResults.length > 0 && catalogLoading && (
-                                    <Box sx={{ gridColumn: '1 / -1', py: 0.75, textAlign: 'center' }}>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                            {__('Loading more products...')}
-                                        </Typography>
+                                {!searchQuery.trim() && catalogHasMore && (
+                                    <Box ref={catalogEndRef} sx={{ gridColumn: '1 / -1', minHeight: 1, textAlign: 'center' }}>
+                                        {catalogLoading && (
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                                                {__('Loading more products...')}
+                                            </Typography>
+                                        )}
                                     </Box>
                                 )}
                             </Box>
